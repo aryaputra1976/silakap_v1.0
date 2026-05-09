@@ -1,30 +1,25 @@
-export const ROLES = [
-  'SUPER_ADMIN',
-  'ADMIN_BKPSDM',
-  'KEPALA_BADAN',
-  'KABID',
-  'ANALIS_MADYA',
-  'ANALIS_MUDA',
-  'ANALIS_PERTAMA',
-  'PENELAAH',
-  'PPPK',
-  'OPD_OPERATOR',
-  'ASN',
-] as const;
+export type Role = string;
 
-export type Role = (typeof ROLES)[number];
-
-export interface AuthUser {
+export type AuthUser = {
   id: string;
+  username: string;
   name: string;
-  email: string;
-  role: Role;
-  unitId?: string;
-}
+  email: string | null;
+  roles: string[];
+  unitKerjaId: string | null;
+  unitKerja: {
+    id: string;
+    kode: string;
+    nama: string;
+  } | null;
+};
 
-export interface JwtPayload {
+export type JwtPayload = {
   sub: string;
-  email: string;
-  role: Role;
-  unitId?: string;
-}
+  username: string;
+  name: string;
+  email: string | null;
+  roles: string[];
+  unitKerjaId: string | null;
+  unitKerja: AuthUser['unitKerja'];
+};

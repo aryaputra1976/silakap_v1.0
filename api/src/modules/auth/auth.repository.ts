@@ -1,69 +1,100 @@
-import { Injectable } from '@nestjs/common';
-import { Role } from './auth.types';
+import { Inject, Injectable } from '@nestjs/common';
+import { AccountStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+const authUserInclude = {
+  userRoles: {
+    include: {
+      role: true,
+    },
+  },
+  unitKerja: {
+    select: {
+      id: true,
+      kode: true,
+      nama: true,
+    },
+  },
+} satisfies Prisma.UserInclude;
+
+type AuthUserEntity = Prisma.UserGetPayload<{
+  include: typeof authUserInclude;
+}>;
 
 export interface UserRecord {
   id: string;
+  username: string;
   name: string;
-  email: string;
+  email: string | null;
   passwordHash: string;
-  role: Role;
-  unitId?: string;
+  roles: string[];
+  unitKerjaId: string | null;
+  unitKerja: {
+    id: string;
+    kode: string;
+    nama: string;
+  } | null;
   isActive: boolean;
 }
 
 @Injectable()
 export class AuthRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  private readonly fallbackUsers: UserRecord[] = [
-    {
-      id: 'usr-super-admin',
-      name: 'Super Admin',
-      email: 'admin@silakap.local',
-      passwordHash: '$2b$10$2nb/mj/CW.Q93/AFO1y3OuwxV2i2W3meOkBV.oXgRT5iyBf408rZO',
-      role: 'SUPER_ADMIN',
-      isActive: true,
-    },
-  ];
+  private toUserRecord(user: AuthUserEntity): UserRecord {
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      roles: user.userRoles.map((userRole) => userRole.role.code),
+      unitKerjaId: user.unitKerjaId,
+      unitKerja: user.unitKerja,
+      isActive: user.status === AccountStatus.ACTIVE,
+    };
+  }
 
-  async findByEmail(email: string): Promise<UserRecord | null> {
-    const normalizedEmail = email.trim().toLowerCase();
+  async findByUsername(username: string): Promise<UserRecord | null> {
+    const normalizedUsername = username.trim().toLowerCase();
 
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { email: normalizedEmail },
-        include: {
-          userRoles: {
-            include: {
-              role: true,
-            },
-          },
-        },
-      });
+    const user = await this.prisma.user.findUnique({
+      where: {
+        username: normalizedUsername,
+      },
+      include: authUserInclude,
+    });
 
-      if (!user) {
-        return null;
-      }
-
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email ?? user.username,
-        passwordHash: user.passwordHash,
-        role: (user.userRoles[0]?.role.code ?? 'ASN') as Role,
-        unitId: user.unitKerjaId ?? undefined,
-        isActive: user.status === 'ACTIVE',
-      };
-    } catch {
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('Database auth repository unavailable');
-      }
-
-      return (
-        this.fallbackUsers.find((user) => user.email === normalizedEmail) ??
-        null
-      );
+    if (!user || user.deletedAt) {
+      return null;
     }
+
+    return this.toUserRecord(user);
+  }
+
+  async findById(id: string): Promise<UserRecord | null> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id,
+      },
+      include: authUserInclude,
+    });
+
+    if (!user || user.deletedAt) {
+      return null;
+    }
+
+    return this.toUserRecord(user);
+  }
+
+  async updateLastLogin(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        lastLoginAt: new Date(),
+      },
+    });
   }
 }
