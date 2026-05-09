@@ -1,5 +1,3 @@
-# 10-ANALYTICS-BLUEPRINT.md
-
 # Analytics Blueprint
 
 ## 1. Objective
@@ -15,22 +13,21 @@ Menyediakan executive intelligence system.
 - SLA
 - backlog
 - overdue
-
----
+- task queue
 
 ### Tactical Analytics
 
 - workload
 - bottleneck
 - performa OPD
-
----
+- return rate
 
 ### Strategic Analytics
 
 - forecasting ASN
 - proyeksi pensiun
 - kebutuhan pegawai
+- trend layanan
 
 ---
 
@@ -43,6 +40,8 @@ Menyediakan executive intelligence system.
 | processing time | efektivitas |
 | backlog ratio | kapasitas |
 | workload balance | kesehatan organisasi |
+| approval lead time | kecepatan pengambilan keputusan |
+| overdue ratio | kontrol risiko |
 
 ---
 
@@ -53,6 +52,8 @@ Menyediakan executive intelligence system.
 - bottleneck
 - workload staf
 - performa OPD
+- layanan selesai bulan ini
+- layanan terlambat
 
 ---
 
@@ -62,6 +63,8 @@ Menyediakan executive intelligence system.
 - forecasting ASN
 - kebutuhan pegawai
 - performa BKPSDM
+- trend pensiun
+- beban layanan lintas bidang
 
 ---
 
@@ -72,3 +75,5 @@ Menyediakan executive intelligence system.
 - drill-down capable
 - role-based visibility
 - exportable
+- derived from source data
+- no manual duplicate statistics

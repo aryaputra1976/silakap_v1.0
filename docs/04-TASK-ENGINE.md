@@ -1,10 +1,8 @@
-# 04-TASK-ENGINE.md
-
 # Task Engine
 
 ## 1. Objective
 
-Mengatur seluruh pekerjaan organisasi.
+Mengatur seluruh pekerjaan organisasi melalui SIAP sebagai task orchestration engine.
 
 ---
 
@@ -31,6 +29,8 @@ CANCELLED
 | APPROVAL | approval |
 | REVIEW | telaah |
 | ARCHIVE | arsip |
+| DOCUMENT_CHECK | cek dokumen |
+| NOTIFICATION | pengingat |
 | SYSTEM | task otomatis |
 
 ---
@@ -43,6 +43,7 @@ CANCELLED
 | rule-based | berdasarkan role |
 | workload-based | balancing |
 | skill-based | kompetensi |
+| unit-based | berdasarkan unit kerja |
 
 ---
 
@@ -58,14 +59,27 @@ CANCELLED
 ### Team Tasks
 
 Untuk:
+
 - Kabid
 - Madya
+- supervisor role
 
 ---
 
 ## 6. Timeline
 
 Semua task wajib memiliki timeline.
+
+Contoh timeline:
+
+```text
+Task created
+Task assigned
+Task started
+Task returned
+Task completed
+Task escalated
+```
 
 ---
 
@@ -77,5 +91,17 @@ Semua task wajib memiliki timeline.
 | task wajib SLA | wajib |
 | task wajib timeline | wajib |
 | task bisa escalation | wajib |
+| task bisa reassignment | wajib |
+| task selesai wajib catatan/output | wajib |
 
 ---
+
+## 8. Task Completion Rule
+
+Task dapat diselesaikan jika:
+
+- user adalah assignee atau supervisor
+- mandatory checklist selesai
+- required note diisi jika diperlukan
+- file output ada jika task menghasilkan dokumen
+- audit log berhasil dibuat

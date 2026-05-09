@@ -1,5 +1,3 @@
-# 01-DOMAIN-ARCHITECTURE.md
-
 # Domain Architecture
 
 ## 1. Vision
@@ -28,8 +26,6 @@ Tujuan utama:
 | SISURAT | surat & disposisi |
 | SIANALITIK | dashboard & KPI |
 | SIAUTH | identity & access |
-
----
 
 ### Business Service Domain
 
@@ -146,6 +142,9 @@ Fungsi:
 | SIUNDUR | SIAP, SIDATA |
 | SIFORMASI | SIDATA, SIANALITIK |
 | SIAP | SIDATA, SIAUTH |
+| SIANALITIK | read-only semua domain |
+| SIARSIP | SIAUTH, SIDATA |
+| SISURAT | SIAUTH, SIARSIP |
 
 ---
 
@@ -157,5 +156,3 @@ SILAKAP menggunakan pendekatan:
 - domain-oriented architecture
 - workflow-driven system
 - centralized governance
-
----

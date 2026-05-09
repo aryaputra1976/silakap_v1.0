@@ -1,10 +1,8 @@
-# 03-WORKFLOW-STANDARD.md
-
 # Workflow Standard
 
 ## 1. Objective
 
-Menstandarkan workflow seluruh layanan.
+Menstandarkan workflow seluruh layanan agar semua domain menggunakan bahasa proses yang sama.
 
 ---
 
@@ -50,18 +48,23 @@ EXPIRED
 | approval bertingkat | configurable |
 | return wajib catatan | wajib |
 | SLA per state | wajib |
+| role restriction | wajib |
+| audit log | wajib |
+| timeline entry | wajib |
 
 ---
 
 ## 5. Workflow Transition
 
-| From | Action | To |
-|---|---|---|
-| DRAFT | submit | SUBMITTED |
-| SUBMITTED | verify | VERIFIED_ADMIN |
-| VERIFIED_ADMIN | validate | VERIFIED_SUBSTANCE |
-| VERIFIED_SUBSTANCE | qc | QC |
-| QC | approve | APPROVED |
+| From | Action | To | Default Role |
+|---|---|---|---|
+| DRAFT | submit | SUBMITTED | ASN / OPD |
+| SUBMITTED | verify | VERIFIED_ADMIN | OPD / ANALIS_PERTAMA |
+| VERIFIED_ADMIN | validate | VERIFIED_SUBSTANCE | ANALIS_MUDA |
+| VERIFIED_SUBSTANCE | qc | QC | ANALIS_MADYA |
+| QC | approve | APPROVED | KABID |
+| APPROVED | complete | COMPLETED | System / Admin |
+| COMPLETED | archive | ARCHIVED | SIARSIP / System |
 
 ---
 
@@ -74,6 +77,30 @@ FROM_STATE
 TO_STATE
 WHEN
 NOTE
+IP_ADDRESS
+USER_AGENT
 ```
 
 ---
+
+## 7. Return Rule
+
+Setiap return/revisi wajib memiliki:
+
+- alasan
+- catatan
+- target role penerima revisi
+- dokumen/field yang harus diperbaiki
+- deadline perbaikan
+
+---
+
+## 8. Approval Rule
+
+Approval wajib memenuhi:
+
+- role sesuai
+- task aktif selesai
+- dokumen wajib lengkap
+- tidak ada blocking issue
+- audit log tercatat

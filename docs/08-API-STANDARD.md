@@ -1,5 +1,3 @@
-# 08-API-STANDARD.md
-
 # API Standard
 
 ## 1. Principle
@@ -8,6 +6,8 @@
 - thin controller
 - service orchestration
 - repository only DB access
+- validation before service
+- transaction for workflow mutation
 
 ---
 
@@ -18,6 +18,9 @@
 /tasks
 /workflows
 /documents
+/sla
+/audit
+/analytics
 ```
 
 ---
@@ -53,7 +56,47 @@ GET    /cases
 GET    /cases/:id
 POST   /cases
 POST   /cases/:id/submit
+POST   /cases/:id/action
+
+GET    /tasks/my
+GET    /tasks/team
+POST   /tasks/:id/start
 POST   /tasks/:id/complete
+POST   /tasks/:id/return
+POST   /tasks/:id/assign
 ```
 
 ---
+
+## 6. Controller Rule
+
+Controller hanya boleh:
+
+- menerima request
+- validasi input
+- memanggil service
+- mengembalikan response
+
+Controller tidak boleh berisi business logic.
+
+---
+
+## 7. Service Rule
+
+Service bertanggung jawab untuk:
+
+- orchestration
+- transaction
+- workflow decision
+- audit call
+- event publishing
+
+---
+
+## 8. Repository Rule
+
+Repository hanya bertanggung jawab untuk:
+
+- query database
+- mutation database
+- tidak boleh business rule

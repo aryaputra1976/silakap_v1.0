@@ -1,10 +1,8 @@
-# 06-SLA-STANDARD.md
-
 # SLA Standard
 
 ## 1. Objective
 
-Mengatur standar waktu layanan.
+Mengatur standar waktu layanan dan mekanisme eskalasi.
 
 ---
 
@@ -39,6 +37,8 @@ Hari 7 → critical
 | overdue wajib escalation | wajib |
 | SLA analytics | wajib |
 | reminder otomatis | wajib |
+| pause SLA untuk waiting external | configurable |
+| SLA per service type | wajib |
 
 ---
 
@@ -50,5 +50,35 @@ Hari 7 → critical
 | Validasi substansi | 3 hari |
 | QC | 2 hari |
 | Approval | 1 hari |
+| Arsip final | 1 hari |
 
 ---
+
+## 6. SLA Calculation
+
+SLA dihitung dari:
+
+```text
+started_at → due_at → completed_at
+```
+
+SLA dapat memiliki status:
+
+- tepat waktu
+- hampir terlambat
+- terlambat
+- dieskalasi
+- selesai
+
+---
+
+## 7. SLA Analytics
+
+Minimal dashboard SLA:
+
+- SLA compliance
+- overdue task
+- average processing time
+- bottleneck state
+- unit paling lambat
+- role paling overload

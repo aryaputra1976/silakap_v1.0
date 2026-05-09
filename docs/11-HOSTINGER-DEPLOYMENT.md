@@ -1,142 +1,92 @@
-# 11-HOSTINGER-DEPLOYMENT.md
+# Hostinger Deployment Standard
 
-# Hostinger Deployment
+## 1. Objective
 
-## 1. Target
+Standar deployment SILAKAP pada environment Hostinger VPS atau Node.js Hosting.
 
-Struktur ini mendukung dua mode kerja:
+---
 
-- Frontend statis React/Vite ke `public_html`.
-- Backend NestJS sesuai model Hostinger Node app pada subdomain API.
+## 2. Required Environment
 
-## 2. Local Development
+| Component | Version |
+|---|---|
+| Node.js | 20.x atau 22.x |
+| MySQL | 8.x / MariaDB compatible |
+| PM2 | latest |
+| Nginx | latest |
 
-Untuk development lokal, gunakan:
+---
 
-```bash
-npm install --force
-npm --prefix api install
-npm run dev:api
-npm run dev:web
-```
-
-Default lokal:
-
-```text
-Frontend : http://localhost:5173
-API      : http://localhost:3101
-API base : http://localhost:3101/api/v1
-```
-
-Konfigurasi lokal ada di:
-
-```text
-apps/web/.env
-api/.env
-```
-
-Konfigurasi production frontend ada di:
-
-```text
-apps/web/.env.production
-```
-
-Catatan folder API:
-
-```text
-api/      -> API utama NestJS untuk lokal dan Hostinger
-apps/web  -> frontend React/Vite
-```
-
-## 3. Frontend
-
-Lokasi source:
-
-```text
-apps/web
-```
-
-Build lokal:
+## 3. Backend Build Command
 
 ```bash
-npm install --force
-npm run build:web
+npm ci
+npm run build
 ```
 
-Output:
+---
 
-```text
-apps/web/dist
+## 4. Backend Start Command
+
+```bash
+npm run start
 ```
 
-Upload isi folder `dist` ke:
+Atau dengan PM2:
 
-```text
-/home/{username}/domains/{domain}/public_html
+```bash
+pm2 start dist/main.js --name silakap-api
 ```
 
-File `apps/web/public/.htaccess` ikut masuk ke `dist` agar refresh route seperti `/workspace` tetap membuka aplikasi React.
+---
 
-## 4. Backend API Hostinger
+## 5. Frontend Build Command
 
-Sesuai contoh dashboard Hostinger:
-
-```text
-Domain/subdomain  : api.bkpsdm-tolis.or.id
-Preset framework  : NestJS
-Branch            : main
-Versi node        : 18.x
-Root directory    : api
-Build command     : npm run build
-Package manager   : npm
-Direktori output  : dist
-Entry file        : main.js
+```bash
+npm ci
+npm run build
 ```
 
-Folder yang dipakai:
+Frontend dapat dijalankan dengan:
 
-```text
-api
+```bash
+npm run start
 ```
 
-Endpoint awal:
+---
 
-```text
-https://api.bkpsdm-tolis.or.id/health
-https://api.bkpsdm-tolis.or.id/api/v1/sidata/asn
+## 6. Environment Variable
+
+```env
+DATABASE_URL=
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+APP_URL=
+API_URL=
+UPLOAD_DIR=
 ```
 
-Environment API:
+---
 
-```text
-NODE_ENV=production
-PORT=3000
-WEB_ORIGIN=https://bkpsdm-tolis.or.id
-```
+## 7. Deployment Rule
 
-Catatan: biasanya Hostinger akan mengatur port internal sendiri. Jika panel menyediakan environment variable `PORT`, biarkan aplikasi membaca `process.env.PORT`.
+- gunakan production build
+- jangan commit `.env`
+- gunakan `prisma migrate deploy`
+- gunakan backup database otomatis
+- aktifkan audit logging
+- gunakan HTTPS
+- batasi akses upload directory
+- aktifkan log rotation
 
-## 5. Database
+---
 
-Gunakan MySQL dari Hostinger.
+## 8. Pre-Deployment Checklist
 
-Backend NestJS Hostinger:
-
-```text
-DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/DB_NAME
-```
-
-## 6. Environment Frontend
-
-Jika backend NestJS berada di subdomain API, gunakan:
-
-```text
-VITE_API_BASE_URL=https://api.bkpsdm-tolis.or.id/api/v1
-```
-
-## 7. Catatan Penting
-
-Untuk model pada screenshot, repo harus punya folder root `api/` karena Hostinger menjalankan build dari root directory tersebut.
-
-- Hostinger Node app: `api/`.
-- Frontend utama: `apps/web`.
+- build backend berhasil
+- build frontend berhasil
+- migration berhasil
+- seed role awal berhasil
+- health endpoint OK
+- login admin OK
+- upload directory writable

@@ -1,12 +1,10 @@
-# 09-UI-WORKSPACE.md
-
 # UI Workspace
 
 ## 1. Principle
 
 UI berbasis pekerjaan harian.
 
-Bukan menu-oriented.
+Bukan menu-oriented, tetapi work-oriented.
 
 ---
 
@@ -15,6 +13,7 @@ Bukan menu-oriented.
 - submit layanan
 - upload dokumen
 - tracking status
+- melihat catatan revisi
 
 ---
 
@@ -23,6 +22,7 @@ Bukan menu-oriented.
 - verifikasi ASN
 - monitoring unit
 - revisi layanan
+- submit ke BKPSDM
 
 ---
 
@@ -31,6 +31,7 @@ Bukan menu-oriented.
 - checklist dokumen
 - arsip pending
 - validasi file
+- monitoring dokumen invalid
 
 ---
 
@@ -38,6 +39,8 @@ Bukan menu-oriented.
 
 - validasi awal
 - pending verification
+- return administrasi
+- checklist layanan
 
 ---
 
@@ -45,6 +48,8 @@ Bukan menu-oriented.
 
 - telaah substansi
 - validasi layanan
+- assign task substansi
+- catatan rekomendasi
 
 ---
 
@@ -53,6 +58,7 @@ Bukan menu-oriented.
 - QC
 - monitoring SLA
 - audit kualitas
+- review kasus berisiko
 
 ---
 
@@ -62,6 +68,7 @@ Bukan menu-oriented.
 - bottleneck
 - workload staf
 - SLA merah
+- dashboard bidang
 
 ---
 
@@ -82,3 +89,17 @@ Action Panel
 ```
 
 ---
+
+## 10. UI Component Standard
+
+Komponen wajib reusable:
+
+- status badge
+- SLA badge
+- workflow timeline
+- task card
+- document preview
+- action panel
+- empty state
+- loading state
+- audit timeline

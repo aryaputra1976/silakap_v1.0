@@ -1,5 +1,3 @@
-# ARCHITECTURE.md
-
 # SILAKAP Enterprise Architecture
 
 ## Overview
@@ -34,10 +32,14 @@ Platform ini dirancang untuk mendukung:
 | 08-API-STANDARD.md | standar backend API |
 | 09-UI-WORKSPACE.md | UI/UX per role |
 | 10-ANALYTICS-BLUEPRINT.md | KPI & dashboard |
+| 11-HOSTINGER-DEPLOYMENT.md | deployment standard |
+| 12-SIPENSIUN-PILOT-BLUEPRINT.md | pilot domain pertama |
+| 13-DATABASE-SCHEMA-BLUEPRINT.md | blueprint database |
+| 14-CODEX-IMPLEMENTATION-GUIDE.md | panduan AI coding assistant |
 
 ---
 
-## Core Principle
+## Core Principles
 
 - Workflow First
 - Task Oriented
@@ -49,3 +51,37 @@ Platform ini dirancang untuk mendukung:
 - Workspace Driven UI
 
 ---
+
+## Implementation Direction
+
+Urutan implementasi utama:
+
+1. Project foundation
+2. Auth + RBAC
+3. SIDATA minimal
+4. SIAP Core Engine
+5. SIPENSIUN pilot
+6. SIARSIP basic
+7. Dashboard dan analytics dasar
+8. Automation/event engine
+9. Modul layanan lain
+
+---
+
+## Final Principle
+
+SILAKAP tidak dibangun sebagai kumpulan CRUD, tetapi sebagai platform kerja pemerintahan berbasis:
+
+```text
+CASE
+↓
+WORKFLOW
+↓
+TASK
+↓
+SLA
+↓
+AUDIT
+↓
+ANALYTICS
+```

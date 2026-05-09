@@ -1,5 +1,3 @@
-# 02-DATA-MODEL.md
-
 # Unified Data Model
 
 ## 1. Objective
@@ -20,6 +18,9 @@ Menyediakan data model global yang dipakai seluruh domain.
 | USER | akun |
 | ROLE | akses |
 | UNIT | organisasi |
+| SLA | pengendalian waktu |
+| AUDIT | jejak perubahan |
+| TIMELINE | riwayat proses user |
 
 ---
 
@@ -51,6 +52,10 @@ priority
 created_at
 submitted_at
 completed_at
+closed_at
+created_by
+updated_by
+deleted_at
 ```
 
 ---
@@ -61,12 +66,18 @@ completed_at
 id
 case_id
 task_type
+title
+description
 status
+priority
 assigned_to
 assigned_by
 due_date
 started_at
 completed_at
+created_at
+updated_at
+deleted_at
 ```
 
 ---
@@ -78,10 +89,15 @@ id
 case_id
 document_type
 file_name
+original_file_name
 storage_path
+mime_type
+file_size
+checksum
 version
 uploaded_by
 uploaded_at
+deleted_at
 ```
 
 ---
@@ -96,6 +112,9 @@ role_id
 unit_id
 position_id
 status
+created_at
+updated_at
+deleted_at
 ```
 
 ---
@@ -112,6 +131,15 @@ updated_by
 deleted_at
 ```
 
+Untuk entity sensitif, tambahkan:
+
+```text
+approved_at
+approved_by
+locked_at
+locked_by
+```
+
 ---
 
 ## 9. Data Rules
@@ -123,17 +151,19 @@ deleted_at
 | immutable history | wajib |
 | auditability | wajib |
 | timestamped | wajib |
+| foreign key | wajib |
+| indexed search field | wajib untuk entity besar |
 
 ---
 
 ## 10. Analytics Ready
 
-Semua entity wajib memiliki:
+Semua entity utama wajib memiliki:
 
 - owner
 - unit
 - timestamp
 - status
 - role
-
----
+- service type
+- state
