@@ -4,15 +4,14 @@ import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health/health.controller';
 import { SiapController } from './siap/siap.controller';
 import { SiarsipController } from './siarsip/siarsip.controller';
-import { SidataController } from './sidata/sidata.controller';
+import { SidataModule } from './sidata/sidata.module';
 import { SipensiunController } from './sipensiun/sipensiun.controller';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, SidataModule],
   controllers: [
     HealthController,
-    SidataController,
     SiapController,
     SipensiunController,
     SiarsipController,
