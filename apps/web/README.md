@@ -17,7 +17,7 @@ http://localhost:5173
 API lokal:
 
 ```text
-http://localhost:3101/api/v1
+http://localhost:3000/api/v1
 ```
 
 Konfigurasi ada di:
