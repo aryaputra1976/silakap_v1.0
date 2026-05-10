@@ -6,18 +6,21 @@ import {
   Param,
   Post,
   Query,
+  Req,
   StreamableFile,
   UseGuards,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Request } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
+import { getAuditContext } from '../shared/request-context';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DocumentListQueryDto } from './dto/document-list-query.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
@@ -84,12 +87,14 @@ export class SiarsipController {
     @Body() dto: UploadDocumentDto,
     @UploadedFile() file: UploadedDocumentFile | undefined,
     @CurrentUser() user: AuthUser,
+    @Req() request: Request,
   ) {
     const result = await this.siarsipService.uploadDocument(
       caseId,
       dto,
       file,
       user,
+      getAuditContext(request),
     );
     return ok(result, 'Dokumen berhasil diunggah');
   }

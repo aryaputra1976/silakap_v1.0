@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Menu, UserCircle } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { useLocation } from 'react-router';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useScrollPosition } from '@/hooks/use-scroll-position';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/workspace/layout';
+import { RoleBadge } from '@/components/workspace/ui';
+import { useAuth } from '@/lib/auth/session';
 import {
   Sheet,
   SheetBody,
@@ -17,6 +20,7 @@ import { SidebarMenu } from './sidebar-menu';
 
 export function Header() {
   const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const { pathname } = useLocation();
   const mobileMode = useIsMobile();
@@ -39,7 +43,7 @@ export function Header() {
       <div className="container-fluid flex justify-between items-stretch lg:gap-4">
         {/* HeaderLogo */}
         <div className="flex lg:hidden items-center gap-2.5">
-          <Link to="/" className="shrink-0 text-base font-semibold text-mono">
+          <Link to="/dashboard" className="shrink-0 text-base font-semibold text-mono">
             SILAKAP
           </Link>
           <div className="flex items-center">
@@ -70,20 +74,37 @@ export function Header() {
 
         {!mobileMode && (
           <nav className="flex items-center gap-5 text-sm font-medium text-secondary-foreground">
-            <Link to="/" className="hover:text-primary">Workspace</Link>
-            <Link to="/workspace" className="hover:text-primary">SIAP</Link>
-            <Link to="/workspace" className="hover:text-primary">SIDATA</Link>
-            <Link to="/workspace" className="hover:text-primary">SIPENSIUN</Link>
-            <Link to="/workspace" className="hover:text-primary">Analytics</Link>
+            <Link to="/dashboard" className="hover:text-primary">Workspace</Link>
+            <Link to="/siap/tasks" className="hover:text-primary">SIAP</Link>
+            <Link to="/sidata/asn" className="hover:text-primary">SIDATA</Link>
+            <Link to="/sipensiun" className="hover:text-primary">SIPENSIUN</Link>
+            <Link to="/dashboard" className="hover:text-primary">Analytics</Link>
           </nav>
         )}
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" className="hidden sm:inline-flex">
-            Local Dev
-          </Button>
-          <Button variant="ghost" mode="icon" shape="circle" className="size-9">
-            <UserCircle className="size-4.5!" />
+          <NotificationBell />
+
+          {user ? (
+            <div className="hidden min-w-0 text-right text-sm md:block">
+              <div className="font-semibold text-mono">{user.name}</div>
+              <div className="mt-1 flex max-w-96 flex-wrap justify-end gap-1.5">
+                {user.roles.slice(0, 2).map((role) => (
+                  <RoleBadge key={role} role={role} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <Button
+            variant="outline"
+            mode="icon"
+            className="size-9"
+            onClick={logout}
+            title="Logout"
+            type="button"
+          >
+            <LogOut className="size-4" />
           </Button>
         </div>
       </div>

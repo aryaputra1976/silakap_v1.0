@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SiapModule } from '../siap/siap.module';
@@ -7,7 +8,7 @@ import { SipensiunRepository } from './sipensiun.repository';
 import { SipensiunService } from './sipensiun.service';
 
 @Module({
-  imports: [AuthModule, PrismaModule, SiapModule],
+  imports: [AuditModule, AuthModule, PrismaModule, SiapModule],
   controllers: [SipensiunController],
   providers: [SipensiunRepository, SipensiunService],
 })

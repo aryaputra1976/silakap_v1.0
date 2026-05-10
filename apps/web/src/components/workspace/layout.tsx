@@ -213,7 +213,7 @@ function SidebarLink({ item }: { item: MenuItem }) {
   );
 }
 
-function NotificationBell() {
+export function NotificationBell() {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 

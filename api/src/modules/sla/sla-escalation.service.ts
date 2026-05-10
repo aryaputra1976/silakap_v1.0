@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { TaskStatus } from '@prisma/client';
+import { AuditContext, AuditService } from '../audit/audit.service';
+import { AuthUser } from '../auth/auth.types';
 import { EventBusService } from '../events/event-bus.service';
 import { OverdueSlaRecord, SiapRepository } from '../siap/siap.repository';
 
@@ -14,9 +16,15 @@ export class SlaEscalationService {
     private readonly siapRepository: SiapRepository,
     @Inject(EventBusService)
     private readonly eventBusService: EventBusService,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
-  async processOverdue(limit = DEFAULT_OVERDUE_LIMIT) {
+  async processOverdue(
+    limit = DEFAULT_OVERDUE_LIMIT,
+    actor?: AuthUser,
+    context?: AuditContext,
+  ) {
     const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
     const now = new Date();
     const candidates = await this.siapRepository.findOverdueSlaCandidates(
@@ -29,7 +37,7 @@ export class SlaEscalationService {
 
     for (const item of candidates) {
       try {
-        await this.escalateOne(item, now);
+        await this.escalateOne(item, now, actor, context);
         escalated += 1;
       } catch (caught) {
         failed += 1;
@@ -46,7 +54,12 @@ export class SlaEscalationService {
     };
   }
 
-  private async escalateOne(item: OverdueSlaRecord, now: Date) {
+  private async escalateOne(
+    item: OverdueSlaRecord,
+    now: Date,
+    actor?: AuthUser,
+    context?: AuditContext,
+  ) {
     if (!item.task) {
       return;
     }
@@ -111,6 +124,26 @@ export class SlaEscalationService {
         caseNumber: item.case.caseNumber,
         serviceType: item.case.serviceType,
       },
+    });
+
+    await this.auditService.record({
+      entityType: 'SLA_TRACKING',
+      entityId: item.id,
+      action: 'SLA_ESCALATED_OVERDUE',
+      performedBy: actor?.id ?? null,
+      beforeData: {
+        status: item.status,
+        taskStatus: task.status,
+      },
+      afterData: {
+        status: 'OVERDUE',
+        taskStatus: 'OVERDUE',
+        caseId: item.caseId,
+        taskId: task.id,
+        dueAt: item.dueAt.toISOString(),
+        triggeredBy: actor ? 'MANUAL' : 'WORKER',
+      },
+      context,
     });
   }
 }

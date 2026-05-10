@@ -12,11 +12,14 @@ import {
   TaskPriority,
   TaskStatus,
 } from '@prisma/client';
+import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { EventBusService } from '../events/event-bus.service';
+import { AssignTaskDto } from './dto/assign-task.dto';
 import { CaseListQueryDto } from './dto/case-list-query.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { CreateCaseDto } from './dto/create-case.dto';
+import { ReturnTaskDto } from './dto/return-task.dto';
 import { TaskListQueryDto } from './dto/task-list-query.dto';
 import {
   SiapCaseDetailRecord,
@@ -31,6 +34,20 @@ const SUBMITTED_STATE = 'SUBMITTED';
 const DRAFT_STATE = 'DRAFT';
 const FIRST_TASK_TYPE = 'VERIFIKASI_ADMIN';
 const FIRST_TASK_SLA_DAYS = 3;
+const STAFF_ROLES = [
+  'ANALIS_PERTAMA',
+  'ANALIS_MUDA',
+  'ANALIS_MADYA',
+  'PENELAAH',
+  'PPPK',
+];
+const SUPERVISOR_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+];
 
 @Injectable()
 export class SiapService {
@@ -39,6 +56,8 @@ export class SiapService {
     private readonly siapRepository: SiapRepository,
     @Inject(EventBusService)
     private readonly eventBusService: EventBusService,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
   async createCase(dto: CreateCaseDto, user: AuthUser) {
@@ -79,7 +98,7 @@ export class SiapService {
     return created;
   }
 
-  async submitCase(id: string, user: AuthUser) {
+  async submitCase(id: string, user: AuthUser, context?: AuditContext) {
     const existing = await this.siapRepository.findCaseById(id.trim());
 
     if (!existing) {
@@ -194,11 +213,25 @@ export class SiapService {
       },
     });
 
+    await this.auditService.record({
+      entityType: 'SIAP_CASE',
+      entityId: submitted.id,
+      action: 'SIAP_CASE_SUBMITTED',
+      performedBy: user.id,
+      afterData: {
+        caseNumber: submitted.caseNumber,
+        serviceType: submitted.serviceType,
+        currentState: submitted.currentState,
+        status: submitted.status,
+      },
+      context,
+    });
+
     return this.toCaseDetailResponse(submitted);
   }
 
-  async findCases(query: CaseListQueryDto) {
-    const filters = this.normalizeCaseFilters(query);
+  async findCases(query: CaseListQueryDto, user: AuthUser) {
+    const filters = this.normalizeCaseFilters(query, user);
     const result = await this.siapRepository.findCases(filters);
 
     return {
@@ -209,11 +242,15 @@ export class SiapService {
     };
   }
 
-  async findCaseById(id: string) {
+  async findCaseById(id: string, user: AuthUser) {
     const found = await this.siapRepository.findCaseById(id.trim());
 
     if (!found) {
       throw new NotFoundException('Case tidak ditemukan');
+    }
+
+    if (!this.canSeeCase(found, user)) {
+      throw new ForbiddenException('Anda tidak berwenang mengakses case ini');
     }
 
     return this.toCaseDetailResponse(found);
@@ -231,12 +268,46 @@ export class SiapService {
     };
   }
 
+  async findMyTasks(query: TaskListQueryDto, user: AuthUser) {
+    const filters = this.normalizeTaskFilters(query, user, {
+      forceAssigneeId: user.id,
+      activeOnly: !query.status,
+    });
+    const result = await this.siapRepository.findTasks(filters);
+
+    return {
+      items: result.items.map((item) => this.toTaskResponse(item)),
+      page: filters.page,
+      limit: filters.limit,
+      total: result.total,
+    };
+  }
+
+  async findTeamTasks(query: TaskListQueryDto, user: AuthUser) {
+    if (!this.canSeeTeamTasks(user)) {
+      throw new ForbiddenException('Anda tidak berwenang melihat team task');
+    }
+
+    const filters = this.normalizeTaskFilters(query, user, {
+      forceAllAssignees: true,
+      activeOnly: !query.status,
+    });
+    const result = await this.siapRepository.findTasks(filters);
+
+    return {
+      items: result.items.map((item) => this.toTaskResponse(item)),
+      page: filters.page,
+      limit: filters.limit,
+      total: result.total,
+    };
+  }
+
   async findTaskById(id: string, user: AuthUser) {
     const task = await this.getTaskForUser(id, user);
     return this.toTaskResponse(task);
   }
 
-  async startTask(id: string, user: AuthUser) {
+  async startTask(id: string, user: AuthUser, context?: AuditContext) {
     const task = await this.getTaskForUser(id, user);
 
     this.ensureTaskCanStart(task);
@@ -274,42 +345,81 @@ export class SiapService {
       },
     });
 
+    await this.auditService.record({
+      entityType: 'SIAP_TASK',
+      entityId: updated.id,
+      action: 'TASK_STARTED',
+      performedBy: user.id,
+      beforeData: {
+        status: task.status,
+        startedAt: task.startedAt?.toISOString() ?? null,
+      },
+      afterData: {
+        status: updated.status,
+        startedAt: updated.startedAt?.toISOString() ?? null,
+        caseId: updated.caseId,
+        taskType: updated.taskType,
+      },
+      context,
+    });
+
     return this.toTaskResponse(updated);
   }
 
-  async completeTask(id: string, dto: CompleteTaskDto, user: AuthUser) {
+  async completeTask(
+    id: string,
+    dto: CompleteTaskDto,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
     const task = await this.getTaskForUser(id, user);
 
     this.ensureTaskCanComplete(task);
 
     const now = new Date();
-    const updated = await this.siapRepository.updateTask(task.id, {
-      status: TaskStatus.COMPLETED,
-      startedAt: task.startedAt ?? now,
-      completedAt: now,
-      updatedBy: user.id,
-    });
+    const note =
+      this.normalizeOptionalText(dto.note) ?? `${task.taskType} selesai`;
+    const updated = await this.siapRepository.withTransaction(async (client) => {
+      const updatedTask = await this.siapRepository.updateTask(
+        task.id,
+        {
+          status: TaskStatus.COMPLETED,
+          startedAt: task.startedAt ?? now,
+          completedAt: now,
+          updatedBy: user.id,
+        },
+        client,
+      );
 
-    await this.siapRepository.createWorkflowLog({
-      caseId: task.caseId,
-      fromState: task.case.currentState,
-      toState: task.case.currentState,
-      action: 'COMPLETE_TASK',
-      note: this.normalizeOptionalText(dto.note) ?? `${task.taskType} selesai`,
-      performedBy: user.id,
-      performedAt: now,
-    });
+      await this.siapRepository.completeSlaForTask(task.id, now, client);
 
-    await this.siapRepository.createTimelineEntry({
-      caseId: task.caseId,
-      taskId: task.id,
-      eventType: 'TASK_COMPLETED',
-      title: 'Task selesai',
-      description:
-        this.normalizeOptionalText(dto.note) ??
-        `Task ${task.taskType} selesai diproses`,
-      performedBy: user.id,
-      createdAt: now,
+      await this.siapRepository.createWorkflowLog(
+        {
+          caseId: task.caseId,
+          fromState: task.case.currentState,
+          toState: task.case.currentState,
+          action: 'COMPLETE_TASK',
+          note,
+          performedBy: user.id,
+          performedAt: now,
+        },
+        client,
+      );
+
+      await this.siapRepository.createTimelineEntry(
+        {
+          caseId: task.caseId,
+          taskId: task.id,
+          eventType: 'TASK_COMPLETED',
+          title: 'Task selesai',
+          description: note,
+          performedBy: user.id,
+          createdAt: now,
+        },
+        client,
+      );
+
+      return updatedTask;
     });
 
     await this.eventBusService.publishNotification({
@@ -325,6 +435,229 @@ export class SiapService {
         taskId: updated.id,
         taskType: updated.taskType,
         status: updated.status,
+      },
+    });
+
+    await this.auditService.record({
+      entityType: 'SIAP_TASK',
+      entityId: updated.id,
+      action: 'TASK_COMPLETED',
+      performedBy: user.id,
+      beforeData: {
+        status: task.status,
+        completedAt: task.completedAt?.toISOString() ?? null,
+      },
+      afterData: {
+        status: updated.status,
+        completedAt: updated.completedAt?.toISOString() ?? null,
+        caseId: updated.caseId,
+        taskType: updated.taskType,
+      },
+      context,
+    });
+
+    return this.toTaskResponse(updated);
+  }
+
+  async assignTask(id: string, dto: AssignTaskDto, user: AuthUser) {
+    if (!this.canAssignTask(user)) {
+      throw new ForbiddenException('Anda tidak berwenang membagi task');
+    }
+
+    const task = await this.siapRepository.findTaskById(id.trim());
+
+    if (!task) {
+      throw new NotFoundException('Task tidak ditemukan');
+    }
+
+    this.ensureTaskCanBeModified(task);
+
+    const assigneeId = dto.assignedTo.trim();
+    const assigneeExists = await this.siapRepository.userExists(assigneeId);
+
+    if (!assigneeExists) {
+      throw new NotFoundException('User penerima task tidak ditemukan/aktif');
+    }
+
+    const now = new Date();
+    const note =
+      this.normalizeOptionalText(dto.note) ??
+      `Task ditugaskan kepada user ${assigneeId}`;
+
+    const updated = await this.siapRepository.withTransaction(async (client) => {
+      const updatedTask = await this.siapRepository.updateTask(
+        task.id,
+        {
+          status:
+            task.status === TaskStatus.CREATED
+              ? TaskStatus.ASSIGNED
+              : task.status,
+          assignedTo: assigneeId,
+          assignedBy: user.id,
+          updatedBy: user.id,
+        },
+        client,
+      );
+
+      await this.siapRepository.createWorkflowLog(
+        {
+          caseId: task.caseId,
+          fromState: task.case.currentState,
+          toState: task.case.currentState,
+          action: 'ASSIGN_TASK',
+          note,
+          performedBy: user.id,
+          performedAt: now,
+        },
+        client,
+      );
+
+      await this.siapRepository.createTimelineEntry(
+        {
+          caseId: task.caseId,
+          taskId: task.id,
+          eventType: 'TASK_ASSIGNED',
+          title: 'Task ditugaskan',
+          description: note,
+          performedBy: user.id,
+          createdAt: now,
+        },
+        client,
+      );
+
+      return updatedTask;
+    });
+
+    await this.eventBusService.publishNotification({
+      type: 'TASK_ASSIGNED',
+      title: 'Task baru ditugaskan',
+      body: `${updated.title} ditugaskan kepada Anda`,
+      caseId: updated.caseId,
+      actionUrl: '/siap/tasks',
+      recipientUserIds: [assigneeId],
+      recipientRoleCodes: ['SUPER_ADMIN', 'ADMIN_BKPSDM'],
+      createdBy: user.id,
+      metadata: {
+        taskId: updated.id,
+        taskType: updated.taskType,
+        assignedBy: user.id,
+      },
+    });
+
+    await this.auditService.record({
+      entityType: 'SIAP_TASK',
+      entityId: updated.id,
+      action: 'TASK_ASSIGNED',
+      performedBy: user.id,
+      beforeData: {
+        assignedTo: task.assignedTo,
+        assignedBy: task.assignedBy,
+        status: task.status,
+      },
+      afterData: {
+        assignedTo: updated.assignedTo,
+        assignedBy: updated.assignedBy,
+        status: updated.status,
+      },
+    });
+
+    return this.toTaskResponse(updated);
+  }
+
+  async returnTask(id: string, dto: ReturnTaskDto, user: AuthUser) {
+    const task = await this.getTaskForUser(id, user);
+
+    this.ensureTaskCanBeModified(task);
+
+    const returnableStatuses: TaskStatus[] = [
+      TaskStatus.ASSIGNED,
+      TaskStatus.IN_PROGRESS,
+      TaskStatus.WAITING,
+      TaskStatus.OVERDUE,
+    ];
+
+    if (!returnableStatuses.includes(task.status)) {
+      throw new BadRequestException(
+        'Task tidak dapat dikembalikan dari status ini',
+      );
+    }
+
+    const now = new Date();
+    const reason = dto.reason.trim();
+    const targetRole = this.normalizeOptionalText(dto.targetRole);
+    const description = targetRole
+      ? `${reason} Target revisi: ${targetRole}`
+      : reason;
+
+    const updated = await this.siapRepository.withTransaction(async (client) => {
+      const updatedTask = await this.siapRepository.updateTask(
+        task.id,
+        {
+          status: TaskStatus.RETURNED,
+          updatedBy: user.id,
+        },
+        client,
+      );
+
+      await this.siapRepository.createWorkflowLog(
+        {
+          caseId: task.caseId,
+          fromState: task.case.currentState,
+          toState: task.case.currentState,
+          action: 'RETURN_TASK',
+          note: description,
+          performedBy: user.id,
+          performedAt: now,
+        },
+        client,
+      );
+
+      await this.siapRepository.createTimelineEntry(
+        {
+          caseId: task.caseId,
+          taskId: task.id,
+          eventType: 'TASK_RETURNED',
+          title: 'Task dikembalikan',
+          description,
+          performedBy: user.id,
+          createdAt: now,
+        },
+        client,
+      );
+
+      return updatedTask;
+    });
+
+    await this.eventBusService.publishNotification({
+      type: 'TASK_RETURNED',
+      title: 'Task dikembalikan',
+      body: `${updated.title} dikembalikan untuk revisi`,
+      caseId: updated.caseId,
+      actionUrl: '/siap/tasks',
+      recipientUserIds: updated.assignedTo ? [updated.assignedTo] : [],
+      recipientRoleCodes: targetRole
+        ? [targetRole]
+        : ['SUPER_ADMIN', 'ADMIN_BKPSDM'],
+      createdBy: user.id,
+      metadata: {
+        taskId: updated.id,
+        taskType: updated.taskType,
+        targetRole,
+      },
+    });
+
+    await this.auditService.record({
+      entityType: 'SIAP_TASK',
+      entityId: updated.id,
+      action: 'TASK_RETURNED',
+      performedBy: user.id,
+      beforeData: {
+        status: task.status,
+      },
+      afterData: {
+        status: updated.status,
+        reason,
+        targetRole,
       },
     });
 
@@ -354,8 +687,31 @@ export class SiapService {
       return true;
     }
 
+    if (this.canSeeTeamTasks(user)) {
+      return true;
+    }
+
     if (!task.assignedTo && this.hasPrivilegedRole(user)) {
       return true;
+    }
+
+    return false;
+  }
+
+  private canSeeCase(record: SiapCaseDetailRecord, user: AuthUser) {
+    if (this.canSeeAllCases(user)) {
+      return true;
+    }
+
+    if (this.hasRole(user, 'ASN')) {
+      return record.createdBy === user.id;
+    }
+
+    if (this.hasRole(user, 'OPD_OPERATOR')) {
+      return (
+        record.createdBy === user.id ||
+        (!!user.unitKerjaId && record.asn?.unitKerjaId === user.unitKerjaId)
+      );
     }
 
     return false;
@@ -365,22 +721,50 @@ export class SiapService {
     return this.hasPrivilegedRole(user);
   }
 
+  private canSeeTeamTasks(user: AuthUser) {
+    return this.hasAnyRole(user, SUPERVISOR_ROLES);
+  }
+
+  private canAssignTask(user: AuthUser) {
+    return this.hasAnyRole(user, [
+      'SUPER_ADMIN',
+      'ADMIN_BKPSDM',
+      'KABID',
+      'ANALIS_MADYA',
+      'ANALIS_MUDA',
+    ]);
+  }
+
   private hasPrivilegedRole(user: AuthUser) {
-    return user.roles.some((role) =>
-      ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'].includes(role),
-    );
+    return this.hasAnyRole(user, [
+      'SUPER_ADMIN',
+      'ADMIN_BKPSDM',
+      'KEPALA_BADAN',
+      'KABID',
+      'ANALIS_MADYA',
+      'ANALIS_MUDA',
+    ]);
   }
 
   private hasRole(user: AuthUser, expectedRole: string) {
     return user.roles.includes(expectedRole);
   }
 
+  private hasAnyRole(user: AuthUser, expectedRoles: string[]) {
+    return user.roles.some((role) => expectedRoles.includes(role));
+  }
+
   private ensureTaskCanStart(task: SiapTaskRecord) {
     this.ensureTaskCanBeModified(task);
 
-    if (task.status !== TaskStatus.ASSIGNED) {
+    const startableStatuses: TaskStatus[] = [
+      TaskStatus.ASSIGNED,
+      TaskStatus.OVERDUE,
+    ];
+
+    if (!startableStatuses.includes(task.status)) {
       throw new BadRequestException(
-        'Task hanya dapat dimulai dari status ASSIGNED',
+        'Task hanya dapat dimulai dari status ASSIGNED atau OVERDUE',
       );
     }
   }
@@ -388,9 +772,14 @@ export class SiapService {
   private ensureTaskCanComplete(task: SiapTaskRecord) {
     this.ensureTaskCanBeModified(task);
 
-    if (task.status !== TaskStatus.IN_PROGRESS) {
+    const completableStatuses: TaskStatus[] = [
+      TaskStatus.IN_PROGRESS,
+      TaskStatus.OVERDUE,
+    ];
+
+    if (!completableStatuses.includes(task.status)) {
       throw new BadRequestException(
-        'Task hanya dapat diselesaikan dari status IN_PROGRESS',
+        'Task hanya dapat diselesaikan dari status IN_PROGRESS atau OVERDUE',
       );
     }
   }
@@ -407,8 +796,11 @@ export class SiapService {
     }
   }
 
-  private normalizeCaseFilters(query: CaseListQueryDto): NormalizedCaseFilters {
-    return {
+  private normalizeCaseFilters(
+    query: CaseListQueryDto,
+    user: AuthUser,
+  ): NormalizedCaseFilters {
+    const filters: NormalizedCaseFilters = {
       q: this.normalizeOptionalText(query.q),
       serviceType: this.normalizeOptionalText(query.serviceType)?.toUpperCase(),
       currentState: this.normalizeOptionalText(query.currentState),
@@ -416,20 +808,52 @@ export class SiapService {
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
       limit: this.normalizePositiveNumber(query.limit, 10, 1, 100),
     };
+
+    if (this.hasRole(user, 'ASN')) {
+      filters.createdBy = user.id;
+    } else if (this.hasRole(user, 'OPD_OPERATOR') && user.unitKerjaId) {
+      filters.asnUnitKerjaId = user.unitKerjaId;
+    } else if (
+      this.hasRole(user, 'OPD_OPERATOR') &&
+      !this.canSeeAllCases(user)
+    ) {
+      filters.createdBy = user.id;
+    }
+
+    return filters;
   }
 
   private normalizeTaskFilters(
     query: TaskListQueryDto,
     user: AuthUser,
+    options: {
+      forceAssigneeId?: string;
+      forceAllAssignees?: boolean;
+      activeOnly?: boolean;
+    } = {},
   ): NormalizedTaskFilters {
     return {
       q: this.normalizeOptionalText(query.q),
       taskType: this.normalizeOptionalText(query.taskType),
       status: query.status,
+      activeOnly: options.activeOnly,
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
       limit: this.normalizePositiveNumber(query.limit, 10, 1, 100),
-      assigneeId: this.canSeeAllTasks(user) ? undefined : user.id,
+      assigneeId: options.forceAllAssignees
+        ? undefined
+        : options.forceAssigneeId ??
+          (this.canSeeAllTasks(user) ? undefined : user.id),
     };
+  }
+
+  private canSeeAllCases(user: AuthUser) {
+    return this.hasAnyRole(user, [
+      'SUPER_ADMIN',
+      'ADMIN_BKPSDM',
+      'KEPALA_BADAN',
+      'KABID',
+      ...STAFF_ROLES,
+    ]);
   }
 
   private normalizeOptionalText(value: string | undefined) {

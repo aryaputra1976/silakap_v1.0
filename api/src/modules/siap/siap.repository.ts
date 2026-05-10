@@ -241,15 +241,44 @@ export class SiapRepository {
     });
   }
 
+  async userExists(id: string, client: SiapDbClient = this.prisma) {
+    const count = await client.user.count({
+      where: {
+        id,
+        deletedAt: null,
+        status: 'ACTIVE',
+      },
+    });
+
+    return count > 0;
+  }
+
   async updateTask(
     id: string,
-    data: Prisma.SiapTaskUpdateInput,
+    data: Prisma.SiapTaskUncheckedUpdateInput,
     client: SiapDbClient = this.prisma,
   ): Promise<SiapTaskRecord> {
     return client.siapTask.update({
       where: { id },
       data,
       include: taskInclude,
+    });
+  }
+
+  async completeSlaForTask(
+    taskId: string,
+    completedAt: Date,
+    client: SiapDbClient = this.prisma,
+  ) {
+    return client.slaTracking.updateMany({
+      where: {
+        taskId,
+        completedAt: null,
+      },
+      data: {
+        completedAt,
+        status: SlaStatus.COMPLETED,
+      },
     });
   }
 
@@ -339,6 +368,16 @@ export class SiapRepository {
       where.status = filters.status;
     }
 
+    if (filters.createdBy) {
+      where.createdBy = filters.createdBy;
+    }
+
+    if (filters.asnUnitKerjaId) {
+      where.asn = {
+        unitKerjaId: filters.asnUnitKerjaId,
+      };
+    }
+
     if (filters.q) {
       where.OR = [
         { caseNumber: { contains: filters.q } },
@@ -369,6 +408,18 @@ export class SiapRepository {
 
     if (filters.status) {
       where.status = filters.status;
+    }
+
+    if (filters.activeOnly) {
+      where.status = {
+        in: [
+          TaskStatus.ASSIGNED,
+          TaskStatus.IN_PROGRESS,
+          TaskStatus.WAITING,
+          TaskStatus.RETURNED,
+          TaskStatus.OVERDUE,
+        ],
+      };
     }
 
     if (filters.q) {

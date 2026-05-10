@@ -1,35 +1,33 @@
 import 'reflect-metadata';
+import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { config } from 'dotenv';
+import { json, urlencoded } from 'express';
+import { validateEnv } from './config/env';
 import { AppModule } from './modules/app.module';
+import { GlobalHttpExceptionFilter } from './modules/shared/http-exception.filter';
 
-config({ quiet: true });
+const appConfig = validateEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const webOrigin = process.env.WEB_ORIGIN || '*';
-  const allowedOrigins =
-    webOrigin === '*'
-      ? true
-      : webOrigin
-          .split(',')
-          .map((origin) => origin.trim())
-          .filter(Boolean);
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: appConfig.webOrigins,
     credentials: true,
   });
+  app.use(json({ limit: appConfig.requestBodyLimit }));
+  app.use(urlencoded({ extended: true, limit: appConfig.requestBodyLimit }));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
+      forbidNonWhitelisted: appConfig.nodeEnv === 'production',
     }),
   );
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
-  const port = Number(process.env.PORT || 3000);
-  await app.listen(port);
+  await app.listen(appConfig.port);
 }
 
 bootstrap();

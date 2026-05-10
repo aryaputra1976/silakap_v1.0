@@ -20,10 +20,12 @@ export class CreateCaseDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(2000)
   description?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(36)
   asnId?: string;
 
   @IsEnum(CasePriority)

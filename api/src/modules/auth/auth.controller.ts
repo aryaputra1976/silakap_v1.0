@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ok } from '../shared/respond';
+import { getAuditContext } from '../shared/request-context';
 import { AuthService } from './auth.service';
 import { AuthUser } from './auth.types';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -14,8 +16,8 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    const result = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() request: Request) {
+    const result = await this.authService.login(dto, getAuditContext(request));
     return ok(result, 'Login berhasil');
   }
 

@@ -1,6 +1,5 @@
-import { ChevronFirst } from 'lucide-react';
+import { ChevronFirst, Landmark } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useLayout } from './context';
@@ -14,31 +13,21 @@ export function SidebarHeader() {
 
   return (
     <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
-      <Link to="/layout-1">
-        <div className="dark:hidden">
-          <img
-            src={toAbsoluteUrl('/media/app/default-logo.svg')}
-            className="default-logo h-[22px] max-w-none"
-            alt="Default Logo"
-          />
-          <img
-            src={toAbsoluteUrl('/media/app/mini-logo.svg')}
-            className="small-logo h-[22px] max-w-none"
-            alt="Mini Logo"
-          />
-        </div>
-        <div className="hidden dark:block">
-          <img
-            src={toAbsoluteUrl('/media/app/default-logo-dark.svg')}
-            className="default-logo h-[22px] max-w-none"
-            alt="Default Dark Logo"
-          />
-          <img
-            src={toAbsoluteUrl('/media/app/mini-logo.svg')}
-            className="small-logo h-[22px] max-w-none"
-            alt="Mini Logo"
-          />
-        </div>
+      <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <Landmark className="size-4.5" />
+        </span>
+        <span className="default-logo min-w-0">
+          <span className="block text-base font-semibold leading-none text-mono">
+            SILAKAP
+          </span>
+          <span className="mt-1 block text-xs font-medium text-muted-foreground">
+            BKPSDM Workspace
+          </span>
+        </span>
+        <span className="small-logo hidden text-base font-semibold leading-none text-mono">
+          SK
+        </span>
       </Link>
       <Button
         onClick={handleToggleClick}

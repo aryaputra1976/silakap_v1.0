@@ -7,7 +7,8 @@ import {
 import { CasePriority, JenisPensiun } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
-import { resolve } from 'path';
+import { dirname, isAbsolute, relative, resolve } from 'path';
+import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { SiapRepository } from '../siap/siap.repository';
 import { SiapService } from '../siap/siap.service';
@@ -45,6 +46,8 @@ export class SipensiunService {
     private readonly siapRepository: SiapRepository,
     @Inject(SiapService)
     private readonly siapService: SiapService,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
   getRequirements() {
@@ -55,7 +58,11 @@ export class SipensiunService {
     return SIPENSIUN_LETTER_TEMPLATES;
   }
 
-  async createCase(dto: CreateSipensiunCaseDto, user: AuthUser) {
+  async createCase(
+    dto: CreateSipensiunCaseDto,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
     const asn = await this.sipensiunRepository.findAsnById(dto.asnId.trim());
 
     if (!asn) {
@@ -103,17 +110,31 @@ export class SipensiunService {
       );
     });
 
+    await this.auditService.record({
+      entityType: 'SIPENSIUN_CASE',
+      entityId: created.id,
+      action: 'SIPENSIUN_CREATED',
+      performedBy: user.id,
+      afterData: {
+        siapCaseId: created.siapCaseId,
+        asnId: created.asnId,
+        jenisPensiun: created.jenisPensiun,
+        tmtPensiun: created.tmtPensiun?.toISOString() ?? null,
+      },
+      context,
+    });
+
     return this.toDetailResponse(created);
   }
 
-  async submitCase(id: string, user: AuthUser) {
+  async submitCase(id: string, user: AuthUser, context?: AuditContext) {
     const existing = await this.sipensiunRepository.findCaseById(id.trim());
 
     if (!existing) {
       throw new NotFoundException('Data SIPENSIUN tidak ditemukan');
     }
 
-    await this.siapService.submitCase(existing.siapCaseId, user);
+    await this.siapService.submitCase(existing.siapCaseId, user, context);
 
     const submitted = await this.sipensiunRepository.findCaseById(existing.id);
 
@@ -122,6 +143,20 @@ export class SipensiunService {
         'Data SIPENSIUN tidak ditemukan setelah submit',
       );
     }
+
+    await this.auditService.record({
+      entityType: 'SIPENSIUN_CASE',
+      entityId: submitted.id,
+      action: 'SIPENSIUN_SUBMITTED',
+      performedBy: user.id,
+      afterData: {
+        siapCaseId: submitted.siapCaseId,
+        caseNumber: submitted.siapCase.caseNumber,
+        currentState: submitted.siapCase.currentState,
+        status: submitted.siapCase.status,
+      },
+      context,
+    });
 
     return this.toDetailResponse(submitted);
   }
@@ -187,7 +222,11 @@ export class SipensiunService {
     return buildSipensiunLetterPreview(source);
   }
 
-  async generateLetter(id: string, user: AuthUser) {
+  async generateLetter(
+    id: string,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
     const source = await this.buildLetterPreviewSource(id.trim());
     const preview = buildSipensiunLetterPreview(source);
     const pdfBuffer = buildSipensiunLetterPdf({
@@ -204,11 +243,10 @@ export class SipensiunService {
       source.caseId,
       fileName,
     );
-    const absoluteStoragePath = resolve(process.cwd(), relativeStoragePath);
+    const absoluteStoragePath =
+      this.resolveGeneratedLetterStoragePath(relativeStoragePath);
 
-    await mkdir(resolve(process.cwd(), 'uploads', 'cases', source.caseId), {
-      recursive: true,
-    });
+    await mkdir(dirname(absoluteStoragePath), { recursive: true });
 
     await writeFile(absoluteStoragePath, pdfBuffer);
 
@@ -224,6 +262,21 @@ export class SipensiunService {
         checksum,
         uploadedBy: user.id,
       });
+
+    await this.auditService.record({
+      entityType: 'DOCUMENT',
+      entityId: document.id,
+      action: 'SIPENSIUN_PDF_GENERATED',
+      performedBy: user.id,
+      afterData: {
+        caseId: source.caseId,
+        documentType: document.documentType,
+        fileName: document.fileName,
+        fileSize: document.fileSize,
+        checksum: document.checksum,
+      },
+      context,
+    });
 
     return {
       preview,
@@ -370,6 +423,30 @@ export class SipensiunService {
 
   private toGeneratedLetterStoragePath(caseId: string, fileName: string) {
     return ['uploads', 'cases', caseId, fileName].join('/');
+  }
+
+  private getUploadRoot() {
+    return resolve(process.cwd(), 'uploads');
+  }
+
+  private resolveGeneratedLetterStoragePath(storagePath: string) {
+    if (isAbsolute(storagePath)) {
+      throw new BadRequestException('Path dokumen tidak valid');
+    }
+
+    const uploadRoot = this.getUploadRoot();
+    const absolutePath = resolve(process.cwd(), storagePath);
+    const relativePath = relative(uploadRoot, absolutePath);
+
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+      throw new BadRequestException('Path dokumen tidak valid');
+    }
+
+    if (!absolutePath.toLowerCase().endsWith('.pdf')) {
+      throw new BadRequestException('Ekstensi dokumen tidak valid');
+    }
+
+    return absolutePath;
   }
 
   private toGeneratedDocumentResponse(document: GeneratedLetterDocumentRecord) {

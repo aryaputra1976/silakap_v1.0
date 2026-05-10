@@ -1,6 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthRepository, UserRecord } from './auth.repository';
 import { AuthUser, JwtPayload } from './auth.types';
 import { LoginDto } from './dto/login.dto';
@@ -12,18 +13,42 @@ export class AuthService {
     private readonly authRepository: AuthRepository,
     @Inject(JwtService)
     private readonly jwtService: JwtService,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, context?: AuditContext) {
     const user = await this.authRepository.findByUsername(dto.username);
 
     if (!user || !user.isActive) {
+      await this.auditService.record({
+        entityType: 'AUTH',
+        entityId: dto.username.trim().toLowerCase(),
+        action: 'LOGIN_FAILED',
+        performedBy: null,
+        afterData: {
+          reason: 'USER_NOT_FOUND_OR_INACTIVE',
+          username: dto.username.trim().toLowerCase(),
+        },
+        context,
+      });
       throw new UnauthorizedException('Username atau password tidak valid');
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
     if (!passwordValid) {
+      await this.auditService.record({
+        entityType: 'AUTH',
+        entityId: user.id,
+        action: 'LOGIN_FAILED',
+        performedBy: user.id,
+        afterData: {
+          reason: 'INVALID_PASSWORD',
+          username: user.username,
+        },
+        context,
+      });
       throw new UnauthorizedException('Username atau password tidak valid');
     }
 
@@ -40,6 +65,18 @@ export class AuthService {
       unitKerjaId: authUser.unitKerjaId,
       unitKerja: authUser.unitKerja,
     };
+
+    await this.auditService.record({
+      entityType: 'AUTH',
+      entityId: user.id,
+      action: 'LOGIN_SUCCESS',
+      performedBy: user.id,
+      afterData: {
+        username: user.username,
+        roles: authUser.roles,
+      },
+      context,
+    });
 
     return {
       user: authUser,

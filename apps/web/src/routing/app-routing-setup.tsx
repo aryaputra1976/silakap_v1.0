@@ -1,5 +1,5 @@
 import { Route, Routes, Navigate } from 'react-router';
-import { WorkspaceLayout } from '@/components/workspace/layout';
+import { Layout1 } from '@/components/layouts/layout-1';
 import { LoginPage } from '@/pages/auth/login-page';
 import { DashboardPage } from '@/pages/workspace/dashboard-page';
 import { SiapTasksPage } from '@/pages/workspace/siap-tasks-page';
@@ -14,7 +14,7 @@ export function AppRoutingSetup() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
-        <Route element={<WorkspaceLayout />}>
+        <Route element={<Layout1 />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/sidata/asn" element={<SidataAsnPage />} />

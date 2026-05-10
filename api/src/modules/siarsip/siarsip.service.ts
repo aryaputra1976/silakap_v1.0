@@ -3,6 +3,7 @@ import { JenisPensiun } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, isAbsolute, relative, resolve } from 'path';
+import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { SIPENSIUN_REQUIREMENTS } from '../sipensiun/sipensiun-requirements';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -31,6 +32,8 @@ export class SiarsipService {
   constructor(
     @Inject(SiarsipRepository)
     private readonly siarsipRepository: SiarsipRepository,
+    @Inject(AuditService)
+    private readonly auditService: AuditService,
   ) {}
 
   async findDocuments(query: DocumentListQueryDto) {
@@ -87,6 +90,7 @@ export class SiarsipService {
     dto: UploadDocumentDto,
     file: UploadedDocumentFile | undefined,
     user: AuthUser,
+    context?: AuditContext,
   ) {
     const siapCase = await this.getCaseOrThrow(caseId);
 
@@ -127,6 +131,23 @@ export class SiarsipService {
       fileSize: file.size,
       checksum,
       uploadedBy: user.id,
+    });
+
+    await this.auditService.record({
+      entityType: 'DOCUMENT',
+      entityId: created.id,
+      action: 'DOCUMENT_UPLOADED',
+      performedBy: user.id,
+      afterData: {
+        caseId: siapCase.id,
+        documentType,
+        fileName: storedFileName,
+        originalFileName: basename(file.originalname),
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        checksum,
+      },
+      context,
     });
 
     return this.toDocumentResponse(created);

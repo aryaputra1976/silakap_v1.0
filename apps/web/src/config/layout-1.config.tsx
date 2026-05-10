@@ -17,61 +17,61 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'Dashboard',
     icon: Gauge,
-    path: '/',
+    path: '/dashboard',
   },
   {
     title: 'SIAP Core',
     icon: GitBranch,
     children: [
-      { title: 'Case Management', path: '/workspace' },
-      { title: 'Workflow Engine', path: '/workspace' },
-      { title: 'Task Engine', path: '/workspace' },
-      { title: 'SLA & Audit', path: '/workspace' },
+      { title: 'Task Engine', path: '/siap/tasks' },
+      { title: 'SLA Monitoring', path: '/siap/tasks?status=OVERDUE' },
+      { title: 'Case Management', path: '/sipensiun' },
+      { title: 'Workflow Engine', path: '/sipensiun' },
     ],
   },
   {
     title: 'SIDATA',
     icon: Database,
     children: [
-      { title: 'ASN', path: '/workspace' },
-      { title: 'Unit Organisasi', path: '/workspace' },
-      { title: 'Jabatan & Golongan', path: '/workspace' },
+      { title: 'ASN', path: '/sidata/asn' },
+      { title: 'Unit Organisasi', disabled: true },
+      { title: 'Jabatan & Golongan', disabled: true },
     ],
   },
   {
     title: 'SIPENSIUN',
     icon: FileText,
     children: [
-      { title: 'Usulan Pensiun', path: '/workspace' },
-      { title: 'Verifikasi OPD', path: '/workspace' },
-      { title: 'Approval', path: '/workspace' },
+      { title: 'Usulan Pensiun', path: '/sipensiun' },
+      { title: 'Verifikasi OPD', path: '/sipensiun' },
+      { title: 'Approval', path: '/sipensiun' },
     ],
   },
   { heading: 'Control' },
   {
     title: 'SIARSIP',
     icon: Archive,
-    path: '/workspace',
+    path: '/siarsip',
   },
   {
     title: 'SIANALITIK',
     icon: BarChart3,
-    path: '/workspace',
+    path: '/dashboard',
   },
   {
     title: 'RBAC',
     icon: ShieldCheck,
-    path: '/workspace',
+    disabled: true,
   },
   {
     title: 'Pengguna',
     icon: Users,
-    path: '/workspace',
+    disabled: true,
   },
   {
     title: 'Pengaturan',
     icon: Settings,
-    path: '/workspace',
+    disabled: true,
   },
 ];
 

@@ -7,14 +7,17 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
+import { getAuditContext } from '../shared/request-context';
 import { CreateSipensiunCaseDto } from './dto/create-sipensiun-case.dto';
 import { SipensiunCaseListQueryDto } from './dto/sipensiun-case-list-query.dto';
 import { UpdateSipensiunLetterDataDto } from './dto/update-sipensiun-letter-data.dto';
@@ -75,15 +78,28 @@ export class SipensiunController {
   async createCase(
     @Body() dto: CreateSipensiunCaseDto,
     @CurrentUser() user: AuthUser,
+    @Req() request: Request,
   ) {
-    const result = await this.sipensiunService.createCase(dto, user);
+    const result = await this.sipensiunService.createCase(
+      dto,
+      user,
+      getAuditContext(request),
+    );
 
     return ok(result, 'Usulan pensiun berhasil dibuat');
   }
 
   @Post('cases/:id/submit')
-  async submitCase(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    const result = await this.sipensiunService.submitCase(id, user);
+  async submitCase(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    const result = await this.sipensiunService.submitCase(
+      id,
+      user,
+      getAuditContext(request),
+    );
 
     return ok(result, 'Usulan pensiun berhasil disubmit');
   }
@@ -92,8 +108,13 @@ export class SipensiunController {
   async generateLetter(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
+    @Req() request: Request,
   ) {
-    const result = await this.sipensiunService.generateLetter(id, user);
+    const result = await this.sipensiunService.generateLetter(
+      id,
+      user,
+      getAuditContext(request),
+    );
 
     return ok(result, 'Surat permohonan pensiun berhasil digenerate');
   }
