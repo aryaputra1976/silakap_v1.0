@@ -11,6 +11,12 @@ export type PaginatedResult<T> = {
   total: number;
 };
 
+export type UnitKerjaSummary = {
+  id: string;
+  kode: string;
+  nama: string;
+};
+
 export type AuthUser = {
   id: string;
   username: string;
@@ -24,12 +30,6 @@ export type AuthUser = {
 export type LoginResponse = {
   user: AuthUser;
   accessToken: string;
-};
-
-export type UnitKerjaSummary = {
-  id: string;
-  kode: string;
-  nama: string;
 };
 
 export type AsnRecord = {
@@ -79,7 +79,9 @@ export type SiapTask = {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  case?: SiapCaseSummary & { asn?: Pick<AsnRecord, 'id' | 'nip' | 'nama'> | null };
+  case?: SiapCaseSummary & {
+    asn?: Pick<AsnRecord, 'id' | 'nip' | 'nama'> | null;
+  };
 };
 
 export type WorkflowLog = {
@@ -113,6 +115,10 @@ export type RequirementItem = {
   notes?: string | null;
 };
 
+export type ChecklistItem = RequirementItem & {
+  uploaded: boolean;
+};
+
 export type SipensiunRecipient = {
   category: string;
   recipientName: string;
@@ -128,7 +134,10 @@ export type SipensiunCaseListItem = {
   tmtPensiun: string | null;
   catatan: string | null;
   siapCase: SiapCaseSummary;
-  asn: Pick<AsnRecord, 'id' | 'nip' | 'nama' | 'unitKerja' | 'golonganNama'>;
+  asn: Pick<
+    AsnRecord,
+    'id' | 'nip' | 'nama' | 'golonganNama' | 'unitKerja'
+  >;
   requirements: RequirementItem[];
   recipient?: SipensiunRecipient;
   createdAt: string;
@@ -151,10 +160,6 @@ export type DocumentRecord = {
   createdAt: string;
   updatedAt: string;
   case?: SiapCaseSummary | null;
-};
-
-export type ChecklistItem = RequirementItem & {
-  uploaded: boolean;
 };
 
 export type DocumentChecklist = {
@@ -187,6 +192,31 @@ export type SipensiunCaseDetail = {
   timelines: TimelineEntry[];
 };
 
+export type SipensiunLetterPreview = {
+  caseId: string;
+  caseNumber: string;
+  jenisPensiun: string;
+  recipient: SipensiunRecipient;
+  subject: string;
+  fields: {
+    nama: string;
+    nip: string;
+    jabatanNama: string | null;
+    golonganNama: string | null;
+    unitKerjaNama: string | null;
+    statusAsn: string | null;
+    tmtPensiun: string | null;
+  };
+  body: string;
+  requirements: ChecklistItem[];
+  missingDocuments: ChecklistItem[];
+};
+
+export type SipensiunGeneratedLetter = {
+  preview: SipensiunLetterPreview;
+  document: DocumentRecord;
+};
+
 export type AnalyticsGroup = {
   key: string;
   label: string;
@@ -215,14 +245,14 @@ export type AnalyticsDashboard = {
     pendingTasks: number;
     completedTasks: number;
     uploadedDocuments: number;
-    slaOverdue: number;
+    slaOverdue?: number;
   };
-  activeCases: {
+  activeCases?: {
     totalActive: number;
     draft: number;
     submitted: number;
   };
-  documentCompleteness: {
+  documentCompleteness?: {
     totalDocuments: number;
     casesWithDocuments: number;
     casesWithoutDocuments: number;
@@ -231,7 +261,7 @@ export type AnalyticsDashboard = {
   casesByServiceType: AnalyticsGroup[];
   tasksByStatus: AnalyticsGroup[];
   documentsByType: AnalyticsGroup[];
-  slaSummary: AnalyticsGroup[];
-  sipensiunByJenis: AnalyticsGroup[];
-  recentTimeline: AnalyticsRecentTimeline[];
+  slaSummary?: AnalyticsGroup[];
+  sipensiunByJenis?: AnalyticsGroup[];
+  recentTimeline?: AnalyticsRecentTimeline[];
 };

@@ -10,3 +10,6 @@ Thumbs.db
 *.log
 
 *.tsbuildinfo
+
+api/uploads/
+*.pdf
