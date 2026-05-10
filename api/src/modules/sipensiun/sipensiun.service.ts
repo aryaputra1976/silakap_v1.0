@@ -15,6 +15,8 @@ import {
   SipensiunCaseListRecord,
   SipensiunRepository,
 } from './sipensiun.repository';
+import { SIPENSIUN_LETTER_TEMPLATES } from './sipensiun-letter-templates';
+import { resolvePensiunRecipient } from './sipensiun-recipient';
 import { SIPENSIUN_REQUIREMENTS } from './sipensiun-requirements';
 import { NormalizedSipensiunCaseFilters } from './sipensiun.types';
 
@@ -31,6 +33,10 @@ export class SipensiunService {
 
   getRequirements() {
     return SIPENSIUN_REQUIREMENTS;
+  }
+
+  getTemplates() {
+    return SIPENSIUN_LETTER_TEMPLATES;
   }
 
   async createCase(dto: CreateSipensiunCaseDto, user: AuthUser) {
@@ -183,6 +189,7 @@ export class SipensiunService {
       catatan: record.catatan,
       siapCase: record.siapCase,
       asn: record.asn,
+      recipient: resolvePensiunRecipient(record.asn.golonganNama),
       requirements: SIPENSIUN_REQUIREMENTS[record.jenisPensiun],
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -196,6 +203,7 @@ export class SipensiunService {
       siapCase,
       sipensiunDetail: detail,
       asn,
+      recipient: resolvePensiunRecipient(asn.golonganNama),
       requirements:
         SIPENSIUN_REQUIREMENTS[detail.jenisPensiun as JenisPensiun],
       tasks: siapCase.tasks,

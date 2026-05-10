@@ -1,130 +1,379 @@
-Langkah Berikutnya: Phase 5.1 — Real Upload Middleware
+Phase 6.2 — Enterprise UI Polish / Metronic-Like Workspace
 
-Karena saat ini SIARSIP masih metadata-only, tahap berikutnya adalah membuat upload file nyata ke storage lokal.
+Tujuannya:
 
-Target Phase 5.1
+Mengubah frontend dari “berfungsi” menjadi “layak dipakai demo pimpinan dan terasa seperti aplikasi enterprise.”
+
+Bukan tambah fitur besar dulu, tetapi memperhalus:
+
+layout
+sidebar
+topbar
+card
+tabel
+badge
+form
+detail workspace
+timeline
+checklist
+empty/loading/error state
+Prinsip Desain Phase 6.2
+Jangan seperti form biasa
+
+Tampilan harus terasa sebagai:
+
+BKPSDM Command Workspace
+
+Bukan halaman CRUD sederhana.
+
+Target Tampilan
 Area	Target
-Upload file	multipart/form-data
-Storage lokal	simpan file ke folder uploads/
-Metadata otomatis	fileName, originalFileName, mimeType, fileSize
-Checksum	hash file untuk integritas
-File validation	hanya PDF/JPG/PNG, batas ukuran
-Download endpoint	akses file by id
-Security	path traversal protection
-Endpoint tambahan
-POST /api/v1/siarsip/cases/:caseId/upload
-GET  /api/v1/siarsip/documents/:id/download
-Struktur folder storage
-api/
- └── uploads/
-     └── cases/
-         └── {caseId}/
-             └── {documentType}-{timestamp}.pdf
-Prompt Codex Phase 5.1
-# CODEX TASK — Phase 5.1 SIARSIP Real Upload Middleware
+Login	lebih elegan, government enterprise
+Sidebar	lebih modern, ikon, active state, grouping
+Topbar	user profile, role badge, logout rapi
+Dashboard	KPI cards + quick actions
+SIDATA ASN	tabel profesional
+SIPENSIUN list	filter + status badge
+SIPENSIUN detail	workspace lengkap
+Checklist	progress visual
+Timeline	vertical timeline
+Task SIAP	action workflow jelas
+SIARSIP	dokumen rapi, download jelas
+Phase 6.2 Jangan Mengubah Backend
 
-Working directory: `D:\Silakap_V1.0\api`
+Backend sudah cukup.
+Fokus hanya di:
+
+apps/web
+
+Backend hanya dipakai sebagai sumber data.
+
+Prompt Codex Phase 6.2
+
+Tempel ini ke Codex:
+
+# CODEX TASK — Phase 6.2 Enterprise UI Polish / Metronic-Like Workspace
+
+Working directory: `D:\Silakap_V1.0\apps\web`
 
 ## Goal
 
-Add real file upload support to SIARSIP while preserving the existing metadata-only document API.
+Polish SILAKAP frontend into a professional, enterprise-grade, Metronic-inspired government workspace.
+
+The frontend already works functionally, but the UI still feels rough. Improve the visual design, layout consistency, spacing, cards, tables, badges, forms, timeline, checklist, and workspace feel.
 
 ## Current Status
 
 Already completed:
-- Auth + RBAC
-- SIDATA minimal
-- SIAP Core Engine + hardening
-- SIPENSIUN pilot + hardening
-- SIARSIP Basic:
-  - document metadata create
-  - document list/detail
-  - documents by case
-  - checklist by case
-  - SIPENSIUN requirements normalized as `{ documentType, label }`
+- Login works with backend
+- AuthProvider/session restore works
+- ProtectedRoute works
+- Dashboard loads current user
+- SIDATA ASN list/search works
+- SIPENSIUN list/detail works
+- SIPENSIUN requirements now structured
+- SIPENSIUN templates endpoint exists
+- SIARSIP upload/download/checklist works
+- SIAP tasks start/complete works
+- Build passes
+
+Backend endpoints are already available. Do not change backend in this task.
+
+## Design Direction
+
+Make the UI feel like a modern enterprise/government workspace:
+
+- clean
+- dense but readable
+- professional
+- card-based
+- soft borders
+- subtle shadows
+- strong status badges
+- clear workflow states
+- dashboard/workspace oriented
+- similar quality direction to Metronic/Trezo enterprise admin UI
+
+Do not copy external commercial code. Create original styling inspired by enterprise admin patterns.
 
 ## Required Scope
 
-### 1. Upload Endpoint
+### 1. Global Visual System
 
-Add endpoint:
+Create or improve shared UI primitives:
 
-```text
-POST /api/v1/siarsip/cases/:caseId/upload
+- `PageHeader`
+- `SectionCard`
+- `StatCard`
+- `StatusBadge`
+- `RoleBadge`
+- `WorkflowBadge`
+- `SlaBadge`
+- `DataTable`
+- `EmptyState`
+- `LoadingState`
+- `ErrorAlert`
+- `ActionButton`
+- `Toolbar`
+- `FilterBar`
+- `Timeline`
+- `ChecklistItem`
+- `FileUploadButton`
 
-Use multipart/form-data fields:
+Use consistent:
 
-file
-documentType
+- spacing
+- border radius
+- colors
+- typography
+- hover states
+- focus states
+- disabled states
 
-Optional fields:
+### 2. Layout Polish
 
-description
-2. Download Endpoint
+Improve the main workspace layout:
 
-Add endpoint:
+- fixed sidebar
+- clean sidebar header
+- grouped navigation
+- active menu highlight
+- compact topbar
+- user name + role badge
+- logout icon/button
+- responsive content width
+- subtle background color
+- card-based content areas
 
-GET /api/v1/siarsip/documents/:id/download
+Sidebar menu:
 
-Return the stored file safely.
+- Dashboard
+- SIDATA ASN
+- SIPENSIUN
+- SIAP Tasks
+- SIARSIP
 
-3. File Storage
+### 3. Login Page Polish
 
-Store files under:
+Improve `/login`:
 
-api/uploads/cases/{caseId}/
+- stronger branding
+- cleaner split layout
+- better typography
+- refined login card
+- password field style
+- loading state on submit
+- error alert if login fails
+- professional footer/label
 
-Generate safe stored filename:
+Keep login using:
 
-{documentType}-{timestamp}-{random}.{ext}
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+4. Dashboard Polish
 
-Never trust original filename as storage filename.
+Improve /dashboard:
 
-4. Metadata
+Show real or derived cards:
 
-When upload succeeds, create Document record with:
+Total ASN
+Total SIPENSIUN
+Pending Task
+Uploaded Documents
+Current User
+Unit Kerja
+Platform Status
 
+Create quick action cards:
+
+Cari ASN
+Buat Usulan Pensiun
+Lihat Task SIAP
+Arsip Dokumen
+
+Cards should look polished, not plain boxes.
+
+5. SIDATA ASN Page Polish
+
+Improve /sidata/asn:
+
+page header
+search/filter toolbar
+professional table
+status/unit/jabatan display
+pagination
+row action: Buat Usulan Pensiun
+empty state
+loading state
+
+Table columns:
+
+NIP
+Nama
+Unit Kerja
+Jabatan
+Golongan
+Status ASN
+Action
+6. SIPENSIUN List Polish
+
+Improve /sipensiun:
+
+filter toolbar:
+q
+jenisPensiun
+currentState
+professional table/card list
+badge for jenis pensiun
+badge for SIAP state
+badge for status
+action: open detail
+
+Columns:
+
+Nomor Case
+Nama ASN
+NIP
+Jenis Pensiun
+TMT Pensiun
+State
+Status
+Action
+7. SIPENSIUN Detail Workspace Polish
+
+Improve /sipensiun/:id into a true workspace.
+
+Layout:
+
+Top summary header:
+
+case number
+ASN name
+NIP
+jenis pensiun
+currentState badge
+status badge
+submit button
+
+Main sections:
+
+ASN Profile Card
+nama
+NIP
+unit kerja
+jabatan
+golongan
+status ASN
+SIPENSIUN Detail Card
+jenis pensiun
+TMT pensiun
+catatan
+recipient rule:
+BKN Pusat / Kanreg
+city
+needsReview if any
+Requirement Checklist Card
+progress count uploaded/required
+progress bar
+group by category:
+KEPEGAWAIAN
+KELUARGA
+PERNYATAAN
+KEMATIAN
+FOTO
+FISIK
+LAINNYA
+uploaded item green
+missing item warning
+upload button per documentType
+download button if uploaded
+SIAP Task Card
+list tasks
+status badge
+start button only when ASSIGNED
+complete button only when IN_PROGRESS
+invalid actions hidden or disabled
+Timeline Card
+vertical timeline
+event title
+event type
+timestamp
+actor if available
+Workflow Log Card
+from/to state
+action
+note
+performedAt
+8. SIAP Tasks Page Polish
+
+Improve /siap/tasks:
+
+filter by status if already available
+task cards or table
+status badge
+due date/SLA if available
+start/complete buttons
+refresh after action
+empty state if no task
+9. SIARSIP Page Polish
+
+Improve /siarsip:
+
+document list table
+filters:
+q
 caseId
-documentType
-fileName
-originalFileName
-storagePath
-mimeType
-fileSize
-checksum
-uploadedBy
-5. Validation
+document type badge
+file metadata:
+original file name
+mime type
+size
+download button
+empty/loading/error states
+10. Frontend Types
 
-Allow only:
+Update frontend types if needed to match Phase 5.2 backend:
 
-application/pdf
-image/jpeg
-image/png
+SIPENSIUN requirements now include:
 
-Max size:
+{
+  documentType: string;
+  label: string;
+  category: string;
+  required: boolean;
+  digital: boolean;
+  notes?: string;
+}
 
-2 MB
+SIPENSIUN detail/list may include:
 
-Reject invalid file type with BadRequestException.
-
-Reject missing case with NotFoundException.
-
-6. Checksum
-
-Generate SHA-256 checksum from file buffer.
-
-7. Security Rules
-prevent path traversal
-do not expose absolute server path in API response
-download only by document id
-keep JWT + RolesGuard active
-no public unauthenticated file access
-8. Architecture Rules
+recipient?: {
+  category: string;
+  recipientName: string;
+  recipientCity: string;
+  needsReview?: boolean;
+}
+11. UX Rules
+No dummy data
+Use backend data only
+All pages must have loading state
+All pages must have empty state
+All API errors must show readable message
+Do not expose token
+Do not break current working flow
+Do not redesign backend calls unnecessarily
+Keep forms simple and reliable
+12. Technical Rules
 Strict TypeScript
 No any
-Controller stays thin
-Service orchestrates
-Repository handles DB only
-Use existing response helper
+Keep existing Vite setup
+Keep current routing
+Keep AuthProvider
+Keep protected routes
 Build must pass
-Do not remove metadata-only document creation endpoint
+Do not introduce heavy UI library unless already installed
+Use existing icons if available
+Keep code modular and maintainable

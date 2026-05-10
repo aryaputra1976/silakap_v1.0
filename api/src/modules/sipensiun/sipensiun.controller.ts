@@ -32,6 +32,11 @@ export class SipensiunController {
     return ok(this.sipensiunService.getRequirements());
   }
 
+  @Get('templates')
+  templates() {
+    return ok(this.sipensiunService.getTemplates());
+  }
+
   @Get('cases')
   async findCases(@Query() query: SipensiunCaseListQueryDto) {
     const result = await this.sipensiunService.findCases(query);

@@ -69,6 +69,7 @@ enum JenisPensiun {
   SAK
   HLG
   PTDH
+  YATIM_PIATU
 }
 
 model User {

@@ -1,36 +1,114 @@
+export type SipensiunRequirementCategory =
+  | 'KEPEGAWAIAN'
+  | 'KELUARGA'
+  | 'PERNYATAAN'
+  | 'KEMATIAN'
+  | 'FOTO'
+  | 'FISIK'
+  | 'LAINNYA';
+
+export type SipensiunRequirementItem = {
+  documentType: string;
+  label: string;
+  category: SipensiunRequirementCategory;
+  required: boolean;
+  digital: boolean;
+  notes?: string;
+};
+
 export const SIPENSIUN_REQUIREMENTS = {
   BUP: [
-    { documentType: 'SK_TERAKHIR', label: 'SK terakhir' },
-    { documentType: 'KP_TERAKHIR', label: 'KP terakhir' },
-    { documentType: 'KARPEG_IDENTITAS', label: 'Kartu Pegawai / Identitas' },
+    requirement('DPCP', 'Data Perorangan Calon Penerima Pensiun', 'KEPEGAWAIAN'),
+    requirement('SK_CPNS', 'SK CPNS', 'KEPEGAWAIAN'),
+    requirement('SK_PNS', 'SK PNS', 'KEPEGAWAIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('SKP_TERAKHIR', 'SKP terakhir', 'KEPEGAWAIAN'),
+    requirement('DAFTAR_RIWAYAT_HIDUP', 'Daftar riwayat hidup', 'KEPEGAWAIAN'),
+    requirement('DAFTAR_SUSUNAN_KELUARGA', 'Daftar susunan keluarga', 'KELUARGA'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('AKTA_NIKAH_CERAI_KEMATIAN', 'Akta nikah/cerai/kematian pasangan', 'KELUARGA'),
+    requirement('PAS_FOTO', 'Pas foto terbaru', 'FOTO'),
+    requirement('SURAT_TIDAK_HUKDIS', 'Surat keterangan tidak sedang hukuman disiplin', 'PERNYATAAN'),
+    requirement('SURAT_TIDAK_PIDANA', 'Surat keterangan tidak sedang proses pidana', 'PERNYATAAN'),
   ],
   APS: [
-    { documentType: 'SURAT_PERMOHONAN', label: 'Surat permohonan' },
-    { documentType: 'SK_CPNS_PNS', label: 'SK CPNS/PNS' },
+    requirement('SURAT_PERMOHONAN_APS', 'Surat permohonan pensiun atas permintaan sendiri', 'PERNYATAAN'),
+    requirement('DPCP', 'Data Perorangan Calon Penerima Pensiun', 'KEPEGAWAIAN'),
+    requirement('SK_CPNS', 'SK CPNS', 'KEPEGAWAIAN'),
+    requirement('SK_PNS', 'SK PNS', 'KEPEGAWAIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('SKP_TERAKHIR', 'SKP terakhir', 'KEPEGAWAIAN'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('PAS_FOTO', 'Pas foto terbaru', 'FOTO'),
+    requirement('MAP_SNELHEKTER', 'Map/snelhecter berkas fisik', 'FISIK', true, false),
   ],
   JDU: [
-    { documentType: 'AKTA_KEMATIAN', label: 'Akta kematian' },
-    { documentType: 'KARTU_KELUARGA', label: 'Kartu keluarga' },
-    { documentType: 'SURAT_NIKAH', label: 'Surat nikah' },
+    requirement('AKTA_KEMATIAN', 'Akta kematian PNS/pensiunan', 'KEMATIAN'),
+    requirement('SURAT_KETERANGAN_JANDA_DUDA', 'Surat keterangan janda/duda', 'KEMATIAN'),
+    requirement('AKTA_NIKAH_CERAI_KEMATIAN', 'Akta nikah/cerai/kematian pasangan', 'KELUARGA'),
+    requirement('DAFTAR_SUSUNAN_KELUARGA', 'Daftar susunan keluarga', 'KELUARGA'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('PAS_FOTO', 'Pas foto janda/duda', 'FOTO'),
+  ],
+  YATIM_PIATU: [
+    requirement('AKTA_KEMATIAN', 'Akta kematian PNS/pensiunan dan pasangan', 'KEMATIAN'),
+    requirement('AKTA_KELAHIRAN_ANAK', 'Akta kelahiran anak', 'KELUARGA'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('SURAT_KETERANGAN_JANDA_DUDA', 'Surat keterangan ahli waris/yatim piatu', 'KEMATIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('PAS_FOTO', 'Pas foto penerima manfaat', 'FOTO'),
   ],
   TWS: [
-    { documentType: 'SURAT_KETERANGAN_TEWAS', label: 'Surat keterangan tewas' },
-    { documentType: 'SK_TERAKHIR', label: 'SK terakhir' },
+    requirement('SURAT_KETERANGAN_TEWAS', 'Surat keterangan tewas', 'KEMATIAN'),
+    requirement('DPCP', 'Data Perorangan Calon Penerima Pensiun', 'KEPEGAWAIAN'),
+    requirement('SK_CPNS', 'SK CPNS', 'KEPEGAWAIAN'),
+    requirement('SK_PNS', 'SK PNS', 'KEPEGAWAIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('PAS_FOTO', 'Pas foto terbaru', 'FOTO'),
   ],
   SAK: [
-    { documentType: 'SURAT_KETERANGAN_DOKTER', label: 'Surat keterangan dokter' },
-    { documentType: 'SK_TERAKHIR', label: 'SK terakhir' },
+    requirement('SURAT_KETERANGAN_DOKTER', 'Surat keterangan dokter/tim penguji kesehatan', 'LAINNYA'),
+    requirement('DPCP', 'Data Perorangan Calon Penerima Pensiun', 'KEPEGAWAIAN'),
+    requirement('SK_CPNS', 'SK CPNS', 'KEPEGAWAIAN'),
+    requirement('SK_PNS', 'SK PNS', 'KEPEGAWAIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('SKP_TERAKHIR', 'SKP terakhir', 'KEPEGAWAIAN'),
+    requirement('PAS_FOTO', 'Pas foto terbaru', 'FOTO'),
   ],
   HLG: [
-    { documentType: 'SURAT_KETERANGAN_HILANG', label: 'Surat keterangan hilang' },
-    { documentType: 'SK_TERAKHIR', label: 'SK terakhir' },
+    requirement('SURAT_KETERANGAN_HILANG', 'Surat keterangan hilang dari pejabat berwenang', 'LAINNYA'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('KARTU_KELUARGA', 'Kartu keluarga', 'KELUARGA'),
+    requirement('PAS_FOTO', 'Pas foto terbaru', 'FOTO'),
   ],
   PTDH: [
-    { documentType: 'KEPUTUSAN_HUKUMAN_DISIPLIN', label: 'Keputusan hukuman disiplin' },
-    { documentType: 'SK_TERAKHIR', label: 'SK terakhir' },
+    requirement('KEPUTUSAN_HUKDIS', 'Keputusan hukuman disiplin/PTDH', 'PERNYATAAN'),
+    requirement('SK_CPNS', 'SK CPNS', 'KEPEGAWAIAN'),
+    requirement('SK_PNS', 'SK PNS', 'KEPEGAWAIAN'),
+    requirement('SK_PANGKAT_TERAKHIR', 'SK pangkat terakhir', 'KEPEGAWAIAN'),
+    requirement('DAFTAR_RIWAYAT_HIDUP', 'Daftar riwayat hidup', 'KEPEGAWAIAN'),
+    requirement('MAP_SNELHEKTER', 'Map/snelhecter berkas fisik', 'FISIK', true, false),
   ],
-} as const;
+} as const satisfies Record<string, readonly SipensiunRequirementItem[]>;
 
 export type SipensiunRequirementType = keyof typeof SIPENSIUN_REQUIREMENTS;
-export type SipensiunRequirementItem =
-  (typeof SIPENSIUN_REQUIREMENTS)[SipensiunRequirementType][number];
+
+function requirement(
+  documentType: string,
+  label: string,
+  category: SipensiunRequirementCategory,
+  required = true,
+  digital = true,
+  notes?: string,
+): SipensiunRequirementItem {
+  return {
+    documentType,
+    label,
+    category,
+    required,
+    digital,
+    ...(notes ? { notes } : {}),
+  };
+}

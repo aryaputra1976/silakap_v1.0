@@ -10,6 +10,7 @@ const sipensiunListInclude = {
       id: true,
       nip: true,
       nama: true,
+      golonganNama: true,
       unitKerja: {
         select: {
           id: true,

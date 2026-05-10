@@ -9,9 +9,16 @@ config({ quiet: true });
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const webOrigin = process.env.WEB_ORIGIN || '*';
+  const allowedOrigins =
+    webOrigin === '*'
+      ? true
+      : webOrigin
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean);
 
   app.enableCors({
-    origin: webOrigin === '*' ? true : webOrigin,
+    origin: allowedOrigins,
     credentials: true,
   });
   app.useGlobalPipes(
