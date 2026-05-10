@@ -5,6 +5,7 @@ import {
   FileText,
   Play,
   RefreshCcw,
+  Save,
   Send,
   UploadCloud,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import type {
   SipensiunGeneratedLetter,
   SipensiunLetterPreview,
   SiapTask,
+  UpdateSipensiunLetterData,
 } from '@/lib/api/types';
 import {
   ActionButton,
@@ -26,11 +28,13 @@ import {
   DownloadButton,
   EmptyState,
   ErrorAlert,
+  Field,
   FileMeta,
   FileUploadButton,
   formatDate,
   formatDateTime,
   formatFileSize,
+  inputClass,
   LoadingState,
   PageHeader,
   SectionCard,
@@ -49,6 +53,50 @@ const categoryOrder = [
   'LAINNYA',
 ];
 
+type LetterDataForm = Required<UpdateSipensiunLetterData>;
+
+const emptyLetterDataForm: LetterDataForm = {
+  nomorKarpeg: '',
+  alamatSekarang: '',
+  alamatSesudahPensiun: '',
+  noHp: '',
+  namaPemohon: '',
+  nikPemohon: '',
+  hubunganPemohon: '',
+  alamatPemohon: '',
+  noHpPemohon: '',
+  namaPenerimaManfaat: '',
+  tanggalMeninggal: '',
+};
+
+function toDateInputValue(value: string | null | undefined) {
+  if (!value) {
+    return '';
+  }
+
+  return value.slice(0, 10);
+}
+
+function toLetterDataForm(detail: SipensiunCaseDetail): LetterDataForm {
+  return {
+    nomorKarpeg: detail.sipensiunDetail.nomorKarpeg ?? '',
+    alamatSekarang: detail.sipensiunDetail.alamatSekarang ?? '',
+    alamatSesudahPensiun:
+      detail.sipensiunDetail.alamatSesudahPensiun ?? '',
+    noHp: detail.sipensiunDetail.noHp ?? '',
+    namaPemohon: detail.sipensiunDetail.namaPemohon ?? '',
+    nikPemohon: detail.sipensiunDetail.nikPemohon ?? '',
+    hubunganPemohon: detail.sipensiunDetail.hubunganPemohon ?? '',
+    alamatPemohon: detail.sipensiunDetail.alamatPemohon ?? '',
+    noHpPemohon: detail.sipensiunDetail.noHpPemohon ?? '',
+    namaPenerimaManfaat:
+      detail.sipensiunDetail.namaPenerimaManfaat ?? '',
+    tanggalMeninggal: toDateInputValue(
+      detail.sipensiunDetail.tanggalMeninggal,
+    ),
+  };
+}
+
 export function SipensiunDetailPage() {
   const { id = '' } = useParams();
 
@@ -63,6 +111,9 @@ export function SipensiunDetailPage() {
   const [letterLoading, setLetterLoading] = useState(false);
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+  const [letterSaving, setLetterSaving] = useState(false);
+  const [letterForm, setLetterForm] =
+    useState<LetterDataForm>(emptyLetterDataForm);
   const [taskActionId, setTaskActionId] = useState('');
 
   async function load() {
@@ -75,6 +126,7 @@ export function SipensiunDetailPage() {
       );
 
       setDetail(result);
+      setLetterForm(toLetterDataForm(result));
 
       const checklistResult = await apiClient.get<DocumentChecklist>(
         `/siarsip/cases/${result.siapCase.id}/checklist`,
@@ -200,6 +252,44 @@ export function SipensiunDetailPage() {
       );
     } finally {
       setWorking(false);
+    }
+  }
+
+  function updateLetterForm(
+    name: keyof LetterDataForm,
+    value: string,
+  ) {
+    setLetterForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  async function saveLetterData() {
+    if (!detail) {
+      return;
+    }
+
+    setLetterSaving(true);
+    setError('');
+
+    try {
+      const result = await apiClient.patch<SipensiunCaseDetail>(
+        `/sipensiun/cases/${detail.sipensiunDetail.id}/letter-data`,
+        letterForm,
+      );
+
+      setDetail(result);
+      setLetterForm(toLetterDataForm(result));
+      await loadLetterPreview(result.sipensiunDetail.id, false);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal menyimpan data surat',
+      );
+    } finally {
+      setLetterSaving(false);
     }
   }
 
@@ -406,6 +496,141 @@ export function SipensiunDetailPage() {
       </section>
 
       <SectionCard
+        title="Data Surat"
+        description="Data tambahan untuk preview dan PDF permohonan pensiun."
+        actions={
+          <ActionButton
+            icon={Save}
+            disabled={letterSaving || working}
+            onClick={saveLetterData}
+          >
+            {letterSaving ? 'Menyimpan' : 'Simpan Data'}
+          </ActionButton>
+        }
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Field label="Nomor Seri Karpeg">
+            <input
+              className={inputClass}
+              value={letterForm.nomorKarpeg}
+              onChange={(event) =>
+                updateLetterForm('nomorKarpeg', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="No. HP ASN">
+            <input
+              className={inputClass}
+              value={letterForm.noHp}
+              onChange={(event) =>
+                updateLetterForm('noHp', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Tanggal Meninggal">
+            <input
+              className={inputClass}
+              type="date"
+              value={letterForm.tanggalMeninggal}
+              onChange={(event) =>
+                updateLetterForm('tanggalMeninggal', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Alamat Sekarang">
+            <textarea
+              className={`${inputClass} h-auto min-h-24 py-2`}
+              value={letterForm.alamatSekarang}
+              onChange={(event) =>
+                updateLetterForm('alamatSekarang', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Alamat Sesudah Pensiun">
+            <textarea
+              className={`${inputClass} h-auto min-h-24 py-2`}
+              value={letterForm.alamatSesudahPensiun}
+              onChange={(event) =>
+                updateLetterForm(
+                  'alamatSesudahPensiun',
+                  event.target.value,
+                )
+              }
+            />
+          </Field>
+
+          <Field label="Nama Penerima Manfaat">
+            <input
+              className={inputClass}
+              value={letterForm.namaPenerimaManfaat}
+              onChange={(event) =>
+                updateLetterForm(
+                  'namaPenerimaManfaat',
+                  event.target.value,
+                )
+              }
+            />
+          </Field>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <Field label="Nama Pemohon / Ahli Waris">
+            <input
+              className={inputClass}
+              value={letterForm.namaPemohon}
+              onChange={(event) =>
+                updateLetterForm('namaPemohon', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="NIK Pemohon">
+            <input
+              className={inputClass}
+              value={letterForm.nikPemohon}
+              onChange={(event) =>
+                updateLetterForm('nikPemohon', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Hubungan Pemohon">
+            <input
+              className={inputClass}
+              value={letterForm.hubunganPemohon}
+              onChange={(event) =>
+                updateLetterForm('hubunganPemohon', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Alamat Pemohon">
+            <textarea
+              className={`${inputClass} h-auto min-h-24 py-2 lg:col-span-2`}
+              value={letterForm.alamatPemohon}
+              onChange={(event) =>
+                updateLetterForm('alamatPemohon', event.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="No. HP Pemohon">
+            <input
+              className={inputClass}
+              value={letterForm.noHpPemohon}
+              onChange={(event) =>
+                updateLetterForm('noHpPemohon', event.target.value)
+              }
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Surat Permohonan Pensiun"
         description="Preview surat resmi dan generate PDF ke SIARSIP."
         actions={
@@ -473,6 +698,10 @@ export function SipensiunDetailPage() {
                   <FileMeta label="Nama" value={letterPreview.fields.nama} />
                   <FileMeta label="NIP" value={letterPreview.fields.nip} />
                   <FileMeta
+                    label="Karpeg"
+                    value={letterPreview.fields.nomorSeriKarpeg || '-'}
+                  />
+                  <FileMeta
                     label="Golongan"
                     value={letterPreview.fields.golonganNama ?? '-'}
                   />
@@ -483,6 +712,26 @@ export function SipensiunDetailPage() {
                   <FileMeta
                     label="TMT"
                     value={letterPreview.fields.tmtPensiun ?? '-'}
+                  />
+                  <FileMeta
+                    label="Alamat"
+                    value={letterPreview.fields.alamatSekarang || '-'}
+                  />
+                  <FileMeta
+                    label="No. HP"
+                    value={letterPreview.fields.noHp || '-'}
+                  />
+                  <FileMeta
+                    label="Pemohon"
+                    value={letterPreview.fields.namaPemohon ?? '-'}
+                  />
+                  <FileMeta
+                    label="Penerima Manfaat"
+                    value={letterPreview.fields.namaPenerimaManfaat ?? '-'}
+                  />
+                  <FileMeta
+                    label="Tanggal Meninggal"
+                    value={letterPreview.fields.tanggalMeninggal ?? '-'}
                   />
                 </div>
               </div>

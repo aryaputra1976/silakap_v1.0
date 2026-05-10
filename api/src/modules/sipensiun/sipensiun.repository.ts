@@ -203,6 +203,33 @@ export class SipensiunRepository {
     });
   }
 
+  async updateLetterData(
+    id: string,
+    data: Prisma.SipensiunCaseUncheckedUpdateInput,
+  ): Promise<SipensiunCaseDetailRecord | null> {
+    const existing = await this.prisma.sipensiunCase.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    return this.prisma.sipensiunCase.update({
+      where: {
+        id,
+      },
+      data,
+      include: sipensiunDetailInclude,
+    });
+  }
+
   async findBySiapCaseId(
     siapCaseId: string,
   ): Promise<SipensiunCaseDetailRecord | null> {

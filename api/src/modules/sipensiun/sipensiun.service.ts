@@ -13,6 +13,7 @@ import { SiapRepository } from '../siap/siap.repository';
 import { SiapService } from '../siap/siap.service';
 import { CreateSipensiunCaseDto } from './dto/create-sipensiun-case.dto';
 import { SipensiunCaseListQueryDto } from './dto/sipensiun-case-list-query.dto';
+import { UpdateSipensiunLetterDataDto } from './dto/update-sipensiun-letter-data.dto';
 import {
   GeneratedLetterDocumentRecord,
   SipensiunCaseDetailRecord,
@@ -147,6 +148,39 @@ export class SipensiunService {
     return this.toDetailResponse(found);
   }
 
+  async updateLetterData(
+    id: string,
+    dto: UpdateSipensiunLetterDataDto,
+    user: AuthUser,
+  ) {
+    const updated = await this.sipensiunRepository.updateLetterData(id.trim(), {
+      nomorKarpeg: this.normalizeNullableText(dto.nomorKarpeg),
+      alamatSekarang: this.normalizeNullableText(dto.alamatSekarang),
+      alamatSesudahPensiun: this.normalizeNullableText(
+        dto.alamatSesudahPensiun,
+      ),
+      noHp: this.normalizeNullableText(dto.noHp),
+
+      namaPemohon: this.normalizeNullableText(dto.namaPemohon),
+      nikPemohon: this.normalizeNullableText(dto.nikPemohon),
+      hubunganPemohon: this.normalizeNullableText(dto.hubunganPemohon),
+      alamatPemohon: this.normalizeNullableText(dto.alamatPemohon),
+      noHpPemohon: this.normalizeNullableText(dto.noHpPemohon),
+
+      namaPenerimaManfaat: this.normalizeNullableText(
+        dto.namaPenerimaManfaat,
+      ),
+      tanggalMeninggal: this.parseNullableDate(dto.tanggalMeninggal),
+      updatedBy: user.id,
+    });
+
+    if (!updated) {
+      throw new NotFoundException('Data SIPENSIUN tidak ditemukan');
+    }
+
+    return this.toDetailResponse(updated);
+  }
+
   async getLetterPreview(id: string) {
     const source = await this.buildLetterPreviewSource(id.trim());
 
@@ -221,6 +255,17 @@ export class SipensiunService {
       jenisPensiun: record.jenisPensiun,
       tmtPensiun: record.tmtPensiun,
       catatan: record.catatan,
+      nomorKarpeg: record.nomorKarpeg,
+      alamatSekarang: record.alamatSekarang,
+      alamatSesudahPensiun: record.alamatSesudahPensiun,
+      noHp: record.noHp,
+      namaPemohon: record.namaPemohon,
+      nikPemohon: record.nikPemohon,
+      hubunganPemohon: record.hubunganPemohon,
+      alamatPemohon: record.alamatPemohon,
+      noHpPemohon: record.noHpPemohon,
+      namaPenerimaManfaat: record.namaPenerimaManfaat,
+      tanggalMeninggal: record.tanggalMeninggal,
       recipient,
       asn: {
         id: record.asn.id,
@@ -255,6 +300,12 @@ export class SipensiunService {
     return normalized ? normalized : undefined;
   }
 
+  private normalizeNullableText(value: string | undefined) {
+    const normalized = value?.trim();
+
+    return normalized ? normalized : null;
+  }
+
   private parseOptionalDate(value: string | undefined) {
     const normalized = this.normalizeOptionalText(value);
 
@@ -266,6 +317,22 @@ export class SipensiunService {
 
     if (Number.isNaN(parsed.getTime())) {
       throw new BadRequestException('TMT pensiun tidak valid');
+    }
+
+    return parsed;
+  }
+
+  private parseNullableDate(value: string | undefined) {
+    const normalized = this.normalizeNullableText(value);
+
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = new Date(normalized);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Tanggal tidak valid');
     }
 
     return parsed;

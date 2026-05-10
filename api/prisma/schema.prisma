@@ -526,6 +526,20 @@ model SipensiunCase {
   tmtPensiun   DateTime?    @map("tmt_pensiun")
   catatan      String?      @db.Text
 
+  nomorKarpeg          String?   @map("nomor_karpeg") @db.VarChar(80)
+  alamatSekarang       String?   @map("alamat_sekarang") @db.Text
+  alamatSesudahPensiun String?   @map("alamat_sesudah_pensiun") @db.Text
+  noHp                 String?   @map("no_hp") @db.VarChar(40)
+
+  namaPemohon         String? @map("nama_pemohon") @db.VarChar(150)
+  nikPemohon          String? @map("nik_pemohon") @db.VarChar(40)
+  hubunganPemohon     String? @map("hubungan_pemohon") @db.VarChar(80)
+  alamatPemohon       String? @map("alamat_pemohon") @db.Text
+  noHpPemohon         String? @map("no_hp_pemohon") @db.VarChar(40)
+
+  namaPenerimaManfaat String?   @map("nama_penerima_manfaat") @db.VarChar(150)
+  tanggalMeninggal    DateTime? @map("tanggal_meninggal")
+
   createdAt DateTime  @default(now()) @map("created_at")
   createdBy String?   @map("created_by") @db.VarChar(36)
   updatedAt DateTime  @updatedAt @map("updated_at")

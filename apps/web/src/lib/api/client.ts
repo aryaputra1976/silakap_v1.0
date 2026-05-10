@@ -105,6 +105,12 @@ export const apiClient = {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
+  patch<T>(path: string, body?: unknown) {
+    return request<T>(path, {
+      method: 'PATCH',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  },
   upload<T>(path: string, formData: FormData) {
     return request<T>(path, {
       method: 'POST',

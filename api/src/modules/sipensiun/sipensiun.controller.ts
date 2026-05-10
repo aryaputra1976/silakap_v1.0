@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { CreateSipensiunCaseDto } from './dto/create-sipensiun-case.dto';
 import { SipensiunCaseListQueryDto } from './dto/sipensiun-case-list-query.dto';
+import { UpdateSipensiunLetterDataDto } from './dto/update-sipensiun-letter-data.dto';
 import { SipensiunService } from './sipensiun.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,6 +51,17 @@ export class SipensiunController {
     const result = await this.sipensiunService.getLetterPreview(id);
 
     return ok(result, 'Preview surat SIPENSIUN berhasil dimuat');
+  }
+
+  @Patch('cases/:id/letter-data')
+  async updateLetterData(
+    @Param('id') id: string,
+    @Body() dto: UpdateSipensiunLetterDataDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.sipensiunService.updateLetterData(id, dto, user);
+
+    return ok(result, 'Data surat SIPENSIUN berhasil diperbarui');
   }
 
   @Get('cases/:id')

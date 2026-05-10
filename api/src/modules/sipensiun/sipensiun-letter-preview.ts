@@ -28,6 +28,21 @@ export type LetterPreviewSource = {
   jenisPensiun: SipensiunJenis;
   tmtPensiun: Date | null;
   catatan: string | null;
+
+  nomorKarpeg: string | null;
+  alamatSekarang: string | null;
+  alamatSesudahPensiun: string | null;
+  noHp: string | null;
+
+  namaPemohon: string | null;
+  nikPemohon: string | null;
+  hubunganPemohon: string | null;
+  alamatPemohon: string | null;
+  noHpPemohon: string | null;
+
+  namaPenerimaManfaat: string | null;
+  tanggalMeninggal: Date | null;
+
   recipient: LetterRecipient;
   asn: {
     id: string;
@@ -65,6 +80,13 @@ export type LetterPreviewResponse = {
     noHp: string;
     statusAsn: string | null;
     tmtPensiun: string | null;
+    namaPemohon: string | null;
+    nikPemohon: string | null;
+    hubunganPemohon: string | null;
+    alamatPemohon: string | null;
+    noHpPemohon: string | null;
+    namaPenerimaManfaat: string | null;
+    tanggalMeninggal: string | null;
   };
   body: string;
   requirements: LetterRequirementItem[];
@@ -105,16 +127,25 @@ export function buildSipensiunLetterPreview(
     fields: {
       nama: source.asn.nama,
       nip: source.asn.nip,
-      nomorSeriKarpeg: '',
+      nomorSeriKarpeg: source.nomorKarpeg ?? '',
       jabatanNama: source.asn.jabatanNama,
       golonganNama: source.asn.golonganNama,
       unitKerjaNama: source.asn.unitKerjaNama,
-      alamatSekarang: '',
-      alamatSesudahPensiun: '',
-      noHp: '',
+      alamatSekarang: source.alamatSekarang ?? '',
+      alamatSesudahPensiun: source.alamatSesudahPensiun ?? '',
+      noHp: source.noHp ?? '',
       statusAsn: source.asn.statusAsn,
       tmtPensiun: source.tmtPensiun
         ? formatDateIndonesia(source.tmtPensiun)
+        : null,
+      namaPemohon: source.namaPemohon,
+      nikPemohon: source.nikPemohon,
+      hubunganPemohon: source.hubunganPemohon,
+      alamatPemohon: source.alamatPemohon,
+      noHpPemohon: source.noHpPemohon,
+      namaPenerimaManfaat: source.namaPenerimaManfaat,
+      tanggalMeninggal: source.tanggalMeninggal
+        ? formatDateIndonesia(source.tanggalMeninggal)
         : null,
     },
     body: buildBlankoBody(source, requirements),
@@ -165,14 +196,20 @@ function buildBlankoBody(
     `    ${source.recipient.recipientCity}`,
     '',
     '1. Yang bertanda tangan dibawah ini :',
-    `   a. N a m a                 : ${source.asn.nama}`,
-    `   b. N i p                   : ${source.asn.nip}`,
-    `   c. Nomor Seri Karpeg       : ${SHORT_BLANK}`,
+    `   a. N a m a                 : ${resolveApplicantName(source)}`,
+    `   b. N i p                   : ${resolveApplicantNip(source)}`,
+    `   c. Nomor Seri Karpeg       : ${source.nomorKarpeg ?? SHORT_BLANK}`,
     `   d. Pangkat/Gol.Ruang       : ${source.asn.golonganNama ?? SHORT_BLANK}`,
     `   e. Unit Organisasi         : ${source.asn.unitKerjaNama ?? SHORT_BLANK}`,
-    `   f. Alamat Sekarang         : ${BLANK}`,
-    `   g. Alamat sesudah pensiun  : ${BLANK}`,
-    `   h. No. HP                  : ${SHORT_BLANK}`,
+    `   f. Alamat Sekarang         : ${
+      source.alamatSekarang ?? source.alamatPemohon ?? BLANK
+    }`,
+    `   g. Alamat sesudah pensiun  : ${
+      source.alamatSesudahPensiun ?? BLANK
+    }`,
+    `   h. No. HP                  : ${
+      source.noHp ?? source.noHpPemohon ?? SHORT_BLANK
+    }`,
     '',
     ...buildOpeningParagraph(source, tmtPensiun),
     '',
@@ -180,7 +217,9 @@ function buildBlankoBody(
     ...buildAttachmentLines(requiredAttachments),
     '',
     ...buildAdditionalStatement(source.jenisPensiun),
-    `${source.jenisPensiun === 'APS' ? '4' : '3'}. Demikian surat ini saya buat untuk dapat dipergunakan sebagaimana mestinya.`,
+    `${
+      source.jenisPensiun === 'APS' ? '4' : '3'
+    }. Demikian surat ini saya buat untuk dapat dipergunakan sebagaimana mestinya.`,
     '',
     `                                            Tolitoli, ${SHORT_BLANK}`,
     '',
@@ -198,6 +237,22 @@ function buildBlankoBody(
   }
 
   return lines.join('\n');
+}
+
+function resolveApplicantName(source: LetterPreviewSource): string {
+  if (source.jenisPensiun === 'JDU' || source.jenisPensiun === 'YATIM_PIATU') {
+    return source.namaPemohon ?? SHORT_BLANK;
+  }
+
+  return source.asn.nama;
+}
+
+function resolveApplicantNip(source: LetterPreviewSource): string {
+  if (source.jenisPensiun === 'JDU' || source.jenisPensiun === 'YATIM_PIATU') {
+    return '-';
+  }
+
+  return source.asn.nip;
 }
 
 function buildOpeningParagraph(
@@ -220,16 +275,32 @@ function buildOpeningParagraph(
 
     case 'JDU':
       return [
-        `   Dengan ini mengajukan permohonan Pensiun Janda/Duda a.n. ${LONG_BLANK} sebagai`,
-        `   Pegawai Negeri Sipil pada ${LONG_BLANK} Kabupaten Tolitoli meninggal pada`,
-        `   tanggal ${SHORT_BLANK}.`,
+        `   Dengan ini mengajukan permohonan Pensiun Janda/Duda a.n. ${
+          source.namaPenerimaManfaat ?? LONG_BLANK
+        } sebagai`,
+        `   Pegawai Negeri Sipil pada ${
+          source.asn.unitKerjaNama ?? LONG_BLANK
+        } Kabupaten Tolitoli meninggal pada`,
+        `   tanggal ${
+          source.tanggalMeninggal
+            ? formatDateIndonesia(source.tanggalMeninggal)
+            : SHORT_BLANK
+        }.`,
       ];
 
     case 'YATIM_PIATU':
       return [
-        `   Dengan ini mengajukan permohonan Pensiun Yatim Piatu a.n. ${LONG_BLANK} sebagai`,
-        `   Pegawai Negeri Sipil pada ${LONG_BLANK} Kabupaten Tolitoli meninggal pada`,
-        `   tanggal ${SHORT_BLANK}.`,
+        `   Dengan ini mengajukan permohonan Pensiun Yatim Piatu a.n. ${
+          source.namaPenerimaManfaat ?? LONG_BLANK
+        } sebagai`,
+        `   Pegawai Negeri Sipil pada ${
+          source.asn.unitKerjaNama ?? LONG_BLANK
+        } Kabupaten Tolitoli meninggal pada`,
+        `   tanggal ${
+          source.tanggalMeninggal
+            ? formatDateIndonesia(source.tanggalMeninggal)
+            : SHORT_BLANK
+        }.`,
       ];
 
     case 'TWS':
@@ -277,7 +348,10 @@ function normalizeRequirementLabel(label: string): string {
   return label
     .replace(/^SK CPNS$/i, 'Fotokopi surat keputusan pengangkatan CPNS')
     .replace(/^SK PNS$/i, 'Fotokopi surat keputusan pengangkatan PNS')
-    .replace(/^SK pangkat terakhir$/i, 'Fotokopi surat keputusan pangkat terakhir')
+    .replace(
+      /^SK pangkat terakhir$/i,
+      'Fotokopi surat keputusan pangkat terakhir',
+    )
     .replace(/^Kartu keluarga$/i, 'Fotokopi Kartu Keluarga (KK)')
     .replace(/^Pas foto$/i, 'Pas foto terbaru ukuran 3x4 sebanyak 4 Lembar')
     .replace(/^DPCP$/i, 'Data Perorangan Calon Penerima Pensiun (DPCP)');

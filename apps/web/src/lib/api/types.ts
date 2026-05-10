@@ -180,6 +180,17 @@ export type SipensiunCaseDetail = {
     jenisPensiun: string;
     tmtPensiun: string | null;
     catatan: string | null;
+    nomorKarpeg: string | null;
+    alamatSekarang: string | null;
+    alamatSesudahPensiun: string | null;
+    noHp: string | null;
+    namaPemohon: string | null;
+    nikPemohon: string | null;
+    hubunganPemohon: string | null;
+    alamatPemohon: string | null;
+    noHpPemohon: string | null;
+    namaPenerimaManfaat: string | null;
+    tanggalMeninggal: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -199,30 +210,59 @@ export type SipensiunLetterPreview = {
   recipient: SipensiunRecipient;
   subject: string;
   metadata?: {
-    governmentName: string;
-    agencyName: string;
-    addressLine: string;
-    cityLine: string;
-    letterNumber: string;
-    attachmentText: string;
-    subject: string;
-    letterDate: string;
-    signerTitle: string;
-    signerName: string;
-    signerNip: string;
+    governmentName?: string;
+    agencyName?: string;
+    addressLine?: string;
+    cityLine?: string;
+    letterNumber?: string;
+    attachmentText?: string;
+    subject?: string;
+    letterDate?: string;
+    signerTitle?: string;
+    signerName?: string;
+    signerNip?: string;
+    referenceTitle?: string;
+    referenceNumber?: string;
+    referenceDate?: string;
+    note?: string;
   };
   fields: {
     nama: string;
     nip: string;
+    nomorSeriKarpeg: string;
     jabatanNama: string | null;
     golonganNama: string | null;
     unitKerjaNama: string | null;
+    alamatSekarang: string;
+    alamatSesudahPensiun: string;
+    noHp: string;
     statusAsn: string | null;
     tmtPensiun: string | null;
+    namaPemohon: string | null;
+    nikPemohon: string | null;
+    hubunganPemohon: string | null;
+    alamatPemohon: string | null;
+    noHpPemohon: string | null;
+    namaPenerimaManfaat: string | null;
+    tanggalMeninggal: string | null;
   };
   body: string;
   requirements: ChecklistItem[];
   missingDocuments: ChecklistItem[];
+};
+
+export type UpdateSipensiunLetterData = {
+  nomorKarpeg?: string;
+  alamatSekarang?: string;
+  alamatSesudahPensiun?: string;
+  noHp?: string;
+  namaPemohon?: string;
+  nikPemohon?: string;
+  hubunganPemohon?: string;
+  alamatPemohon?: string;
+  noHpPemohon?: string;
+  namaPenerimaManfaat?: string;
+  tanggalMeninggal?: string;
 };
 
 export type SipensiunGeneratedLetter = {
