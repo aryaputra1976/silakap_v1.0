@@ -198,6 +198,19 @@ export type SipensiunLetterPreview = {
   jenisPensiun: string;
   recipient: SipensiunRecipient;
   subject: string;
+  metadata?: {
+    governmentName: string;
+    agencyName: string;
+    addressLine: string;
+    cityLine: string;
+    letterNumber: string;
+    attachmentText: string;
+    subject: string;
+    letterDate: string;
+    signerTitle: string;
+    signerName: string;
+    signerNip: string;
+  };
   fields: {
     nama: string;
     nip: string;
