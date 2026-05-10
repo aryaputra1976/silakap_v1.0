@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SlaStatus, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
 
@@ -89,6 +89,26 @@ export type SiapCaseDetailRecord = Prisma.SiapCaseGetPayload<{
 
 export type SiapTaskRecord = Prisma.SiapTaskGetPayload<{
   include: typeof taskInclude;
+}>;
+
+const overdueSlaInclude = {
+  case: {
+    select: {
+      id: true,
+      caseNumber: true,
+      serviceType: true,
+      title: true,
+      currentState: true,
+      status: true,
+    },
+  },
+  task: {
+    include: taskInclude,
+  },
+} satisfies Prisma.SlaTrackingInclude;
+
+export type OverdueSlaRecord = Prisma.SlaTrackingGetPayload<{
+  include: typeof overdueSlaInclude;
 }>;
 
 @Injectable()
@@ -252,6 +272,52 @@ export class SiapRepository {
     client: SiapDbClient = this.prisma,
   ) {
     return client.slaTracking.create({ data });
+  }
+
+  async findOverdueSlaCandidates(
+    now: Date,
+    limit: number,
+  ): Promise<OverdueSlaRecord[]> {
+    return this.prisma.slaTracking.findMany({
+      where: {
+        status: {
+          in: [SlaStatus.ON_TRACK, SlaStatus.WARNING],
+        },
+        completedAt: null,
+        dueAt: {
+          lt: now,
+        },
+        taskId: {
+          not: null,
+        },
+        task: {
+          deletedAt: null,
+          status: {
+            in: [
+              TaskStatus.ASSIGNED,
+              TaskStatus.IN_PROGRESS,
+              TaskStatus.WAITING,
+              TaskStatus.RETURNED,
+            ],
+          },
+        },
+        case: {
+          deletedAt: null,
+        },
+      },
+      include: overdueSlaInclude,
+      orderBy: [{ dueAt: 'asc' }],
+      take: limit,
+    });
+  }
+
+  async markSlaOverdue(id: string, client: SiapDbClient = this.prisma) {
+    return client.slaTracking.update({
+      where: { id },
+      data: {
+        status: SlaStatus.OVERDUE,
+      },
+    });
   }
 
   private buildCaseWhere(

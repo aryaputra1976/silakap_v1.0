@@ -19,6 +19,8 @@ import type {
   AnalyticsDashboard,
   AnalyticsGroup,
   AnalyticsRecentTimeline,
+  PaginatedResult,
+  SiapTask,
 } from '@/lib/api/types';
 import {
   EmptyState,
@@ -62,6 +64,7 @@ const quickLinks = [
 export function DashboardPage() {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsDashboard | null>(null);
+  const [slaOverdueFallback, setSlaOverdueFallback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -71,11 +74,18 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
 
-    apiClient
-      .get<AnalyticsDashboard>('/analytics/dashboard')
-      .then((result) => {
+    Promise.all([
+      apiClient.get<AnalyticsDashboard>('/analytics/dashboard'),
+      apiClient.get<PaginatedResult<SiapTask>>('/siap/tasks', {
+        status: 'OVERDUE',
+        page: 1,
+        limit: 1,
+      }),
+    ])
+      .then(([result, overdueTasks]) => {
         if (active) {
           setAnalytics(result);
+          setSlaOverdueFallback(overdueTasks.total);
         }
       })
       .catch((caught) => {
@@ -97,6 +107,8 @@ export function DashboardPage() {
       active = false;
     };
   }, []);
+
+  const slaOverdue = analytics?.summary.slaOverdue ?? slaOverdueFallback;
 
   return (
     <div className="space-y-6">
@@ -152,13 +164,15 @@ export function DashboardPage() {
               icon={Archive}
               tone="success"
             />
-            <StatCard
-              label="SLA Overdue"
-              value={formatNumber(analytics.summary.slaOverdue)}
-              description="Butuh perhatian"
-              icon={AlertTriangle}
-              tone={analytics.summary.slaOverdue > 0 ? 'danger' : 'success'}
-            />
+            <Link to="/siap/tasks?status=OVERDUE">
+              <StatCard
+                label="SLA Overdue"
+                value={formatNumber(slaOverdue)}
+                description={slaOverdue > 0 ? 'Klik untuk lihat task' : 'Terkendali'}
+                icon={AlertTriangle}
+                tone={slaOverdue > 0 ? 'danger' : 'success'}
+              />
+            </Link>
           </section>
 
           <section className="grid gap-4 xl:grid-cols-3">

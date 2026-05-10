@@ -172,6 +172,10 @@ export function WorkflowBadge({ value }: { value: string | null | undefined }) {
 }
 
 export function SlaBadge({ dueDate, status }: { dueDate?: string | null; status?: string | null }) {
+  if (status === 'OVERDUE') {
+    return <StatusBadge value="OVERDUE" tone="danger" />;
+  }
+
   if (!dueDate) {
     return <StatusBadge value={status ?? 'NO SLA'} tone="neutral" />;
   }

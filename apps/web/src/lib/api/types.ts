@@ -357,3 +357,9 @@ export type NotificationUnreadCount = {
 export type NotificationMarkAllResult = {
   updated: number;
 };
+
+export type SlaProcessOverdueResult = {
+  total: number;
+  escalated: number;
+  failed: number;
+};

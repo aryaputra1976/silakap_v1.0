@@ -8,6 +8,7 @@ import { SiapModule } from './siap/siap.module';
 import { SiarsipModule } from './siarsip/siarsip.module';
 import { SidataModule } from './sidata/sidata.module';
 import { SipensiunModule } from './sipensiun/sipensiun.module';
+import { SlaModule } from './sla/sla.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SiapModule,
     SipensiunModule,
     SiarsipModule,
+    SlaModule,
   ],
   controllers: [
     HealthController,
