@@ -5,6 +5,7 @@ import { EventsModule } from './events/events.module';
 import { HealthController } from './health/health.controller';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SiapModule } from './siap/siap.module';
+import { SiapWorklogModule } from './siap-worklog/siap-worklog.module';
 import { SiarsipModule } from './siarsip/siarsip.module';
 import { SidataModule } from './sidata/sidata.module';
 import { SipensiunModule } from './sipensiun/sipensiun.module';
@@ -21,6 +22,7 @@ import { SecurityHeadersMiddleware } from './shared/security-headers.middleware'
     NotificationsModule,
     SidataModule,
     SiapModule,
+    SiapWorklogModule,
     SipensiunModule,
     SiarsipModule,
     SlaModule,

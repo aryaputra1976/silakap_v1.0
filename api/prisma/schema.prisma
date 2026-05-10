@@ -61,6 +61,14 @@ enum EventStatus {
   CANCELLED
 }
 
+enum SiapWorklogStatus {
+  DRAFT
+  SUBMITTED
+  REVISION_REQUIRED
+  APPROVED
+  REJECTED
+}
+
 enum JenisPensiun {
   BUP
   APS
@@ -102,6 +110,8 @@ model User {
   timelineLogs TimelineEntry[]
   auditLogs    AuditLog[]
   notifications Notification[]
+  siapWorklogs         SiapWorklog[] @relation("WorklogUser")
+  reviewedSiapWorklogs SiapWorklog[] @relation("WorklogReviewer")
 
   @@index([username])
   @@index([email])
@@ -221,6 +231,7 @@ model UnitKerja {
 
   users User[]
   asn   Asn[]
+  siapWorklogs SiapWorklog[]
 
   @@index([kode])
   @@index([parentId])
@@ -293,6 +304,7 @@ model SiapCase {
   timelines    TimelineEntry[]
   sipensiunCase SipensiunCase?
   notifications Notification[]
+  worklogs SiapWorklog[]
 
   @@index([caseNumber])
   @@index([serviceType])
@@ -330,6 +342,7 @@ model SiapTask {
   assigner    User?    @relation("TaskAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
   slaTracking SlaTracking[]
   timelines   TimelineEntry[]
+  worklogs    SiapWorklog[]
 
   @@index([caseId])
   @@index([taskType])
@@ -337,6 +350,51 @@ model SiapTask {
   @@index([assignedTo])
   @@index([dueDate])
   @@map("siap_tasks")
+}
+
+model SiapWorklog {
+  id          String            @id @default(uuid()) @db.VarChar(36)
+  userId      String            @map("user_id") @db.VarChar(36)
+  unitKerjaId String?           @map("unit_kerja_id") @db.VarChar(36)
+  caseId      String?           @map("case_id") @db.VarChar(36)
+  taskId      String?           @map("task_id") @db.VarChar(36)
+
+  workDate    DateTime          @map("work_date")
+  category    String            @db.VarChar(80)
+  title       String            @db.VarChar(200)
+  description String            @db.Text
+  output      String?           @db.Text
+  volume      Int?
+  obstacle    String?           @db.Text
+  status      SiapWorklogStatus @default(DRAFT)
+
+  submittedAt DateTime? @map("submitted_at")
+  reviewedBy  String?   @map("reviewed_by") @db.VarChar(36)
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewNote  String?   @map("review_note") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  user      User       @relation("WorklogUser", fields: [userId], references: [id], onDelete: Cascade)
+  unitKerja UnitKerja? @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
+  case      SiapCase?  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  task      SiapTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewer  User?      @relation("WorklogReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([unitKerjaId])
+  @@index([caseId])
+  @@index([taskId])
+  @@index([workDate])
+  @@index([category])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([reviewedBy])
+  @@map("siap_worklogs")
 }
 
 model WorkflowDefinition {
