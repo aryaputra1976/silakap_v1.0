@@ -1,142 +1,41 @@
-1. Perkuat Validasi Create SIPENSIUN
+Langkah Berikutnya: Phase 5 — SIARSIP Basic
 
-Saat create SIPENSIUN, sistem harus validasi:
+Sekarang yang paling tepat adalah dokumen syarat dan arsip, karena SIPENSIUN sudah punya requirement matrix tapi belum punya upload/checklist dokumen.
 
-Validasi	Aturan
-ASN wajib ada	asnId harus valid
-jenis pensiun valid	harus salah satu enum
-TMT pensiun valid	tidak boleh format tanggal rusak
-case aktif dobel	ASN tidak boleh punya SIPENSIUN aktif yang sama
-catatan opsional	boleh kosong
-
-Status aktif yang perlu dicegah dobel:
-
-DRAFT
-ACTIVE
-
-Jadi kalau ASN sudah punya case SIPENSIUN aktif, sistem jangan buat case baru untuk jenis yang sama.
-
-2. Response Detail Harus Lengkap
-
-Endpoint:
-
-GET /api/v1/sipensiun/cases/:id
-
-Harus mengembalikan data gabungan:
-
-sipensiunDetail
-siapCase
-asn
-tasks
-workflowLogs
-slaTracking
-timelines
-
-Ini penting untuk frontend nanti, karena halaman detail SIPENSIUN harus menjadi workspace, bukan sekadar form.
-
-3. Tambah Filter List
-
-Endpoint:
-
-GET /api/v1/sipensiun/cases
-
-Minimal mendukung query:
-
-q
-jenisPensiun
-currentState
-status
-asnId
-page
-limit
-
-Contoh:
-
-/api/v1/sipensiun/cases?q=andi
-/api/v1/sipensiun/cases?jenisPensiun=BUP
-/api/v1/sipensiun/cases?currentState=SUBMITTED
-/api/v1/sipensiun/cases?page=1&limit=10
-
-Response tetap:
-
-{
-  "items": [],
-  "page": 1,
-  "limit": 10,
-  "total": 0
-}
-4. Submit Guard
-
-Submit SIPENSIUN harus tetap mengikuti SIAP.
-
-Aturan:
-
-Aksi	Aturan
-submit	hanya jika SIAP case masih DRAFT
-submit ulang	harus gagal 400
-case tidak ada	404
-user tanpa hak	403
-tanpa token	401
-
-Jangan buat logic workflow baru di SIPENSIUN. Tetap panggil:
-
-SiapService.submitCase()
-5. Requirement Matrix Dokumen
-
-Untuk sekarang belum perlu upload dokumen penuh. Tapi siapkan struktur requirement matrix sebagai fondasi Phase 5.
-
-Contoh minimal:
-
-export const SIPENSIUN_REQUIREMENTS = {
-  BUP: [
-    'SK terakhir',
-    'KP terakhir',
-    'Kartu Pegawai / Identitas',
-  ],
-  APS: [
-    'Surat permohonan',
-    'SK CPNS/PNS',
-  ],
-  JDU: [
-    'Akta kematian',
-    'Kartu keluarga',
-    'Surat nikah',
-  ],
-  TWS: [
-    'Surat keterangan tewas',
-    'SK terakhir',
-  ],
-  SAK: [
-    'Surat keterangan dokter',
-    'SK terakhir',
-  ],
-  HLG: [
-    'Surat keterangan hilang',
-    'SK terakhir',
-  ],
-  PTDH: [
-    'Keputusan hukuman disiplin',
-    'SK terakhir',
-  ],
-} as const;
-
-Nanti matrix ini dipakai untuk:
-
-checklist dokumen
-validasi submit
-UI persyaratan
-dashboard kelengkapan
-Prompt Codex Phase 4.1
-
-Tempel ini ke Codex:
-
-# CODEX TASK — Phase 4.1 SIPENSIUN Hardening
+Target Phase 5
+Area	Target
+Document upload metadata	simpan metadata dokumen ke documents
+Document list	lihat dokumen per case
+Document requirement	bandingkan requirement vs dokumen upload
+Checklist	status lengkap/belum
+Preview metadata	belum perlu preview file kompleks
+Protected endpoint	JWT + RBAC tetap aktif
+Endpoint minimal Phase 5
+GET  /api/v1/siarsip/documents
+GET  /api/v1/siarsip/documents/:id
+GET  /api/v1/siarsip/cases/:caseId/documents
+POST /api/v1/siarsip/cases/:caseId/documents
+GET  /api/v1/siarsip/cases/:caseId/checklist
+Alur Phase 5
+SIPENSIUN case dibuat
+↓
+Requirement matrix tersedia
+↓
+Upload dokumen ke SIARSIP
+↓
+Dokumen terkait ke SIAP case
+↓
+Checklist membandingkan required docs vs uploaded docs
+↓
+Status kelengkapan bisa dibaca UI
+Prompt Codex Phase 5
+# CODEX TASK — Phase 5 SIARSIP Basic + Document Checklist
 
 Working directory: `D:\Silakap_V1.0\api`
 
 ## Goal
 
-Harden SIPENSIUN pilot so it becomes the standard pattern for future business domains.
+Implement SIARSIP basic document management and document checklist foundation for SIAP/SIPENSIUN cases.
 
 ## Current Status
 
@@ -144,113 +43,140 @@ Already completed:
 - Auth + RBAC
 - SIDATA minimal
 - SIAP Core Engine + hardening
-- SIPENSIUN pilot:
-  - create SIPENSIUN creates SiapCase
-  - create SIPENSIUN creates SipensiunCase detail
-  - submit SIPENSIUN calls SiapService.submitCase()
-  - SIAP creates task, workflow log, SLA, and timeline
+- SIPENSIUN pilot + hardening
+- SIPENSIUN requirement matrix:
+  - `GET /api/v1/sipensiun/requirements`
 
 ## Required Scope
 
-### 1. Business Validation
+### 1. SIARSIP Repository
 
-Improve SIPENSIUN create validation:
+Implement/complete `siarsip.repository.ts`:
 
-- ASN must exist
-- jenisPensiun must be valid enum
-- tmtPensiun must be valid if provided
-- prevent duplicate active SIPENSIUN case for the same ASN and same jenisPensiun
-- active means related SiapCase status is `DRAFT` or `ACTIVE`
-- return clean `BadRequestException` or `NotFoundException`
+- `findDocuments(filters)`
+- `findDocumentById(id)`
+- `findDocumentsByCaseId(caseId)`
+- `createDocument(data)`
+- `countDocumentsByCaseId(caseId)`
 
-### 2. Detail Response
+Repository handles DB query only.
 
-Improve:
+### 2. SIARSIP Service
 
-`GET /api/v1/sipensiun/cases/:id`
+Implement/complete `siarsip.service.ts`:
 
-Return combined detail:
+- list documents with filters:
+  - caseId
+  - documentType
+  - q
+  - page
+  - limit
+- get document detail
+- get documents by case
+- create document metadata for a case
+- generate checklist for a case
 
-- sipensiun detail
-- siapCase
-- asn
-- tasks
-- workflowLogs
-- slaTracking
-- timelines
+For Phase 5, file storage can be metadata-only if upload middleware is not ready yet.
 
-No dummy data.
+### 3. SIARSIP Controller
 
-### 3. List Filters
+Implement endpoints:
 
-Improve:
+```text
+GET  /api/v1/siarsip/documents
+GET  /api/v1/siarsip/documents/:id
+GET  /api/v1/siarsip/cases/:caseId/documents
+POST /api/v1/siarsip/cases/:caseId/documents
+GET  /api/v1/siarsip/cases/:caseId/checklist
 
-`GET /api/v1/sipensiun/cases`
+Keep guards:
 
-Support filters:
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
+4. DTO
 
-- q
-- jenisPensiun
-- currentState
-- status
-- asnId
-- page
-- limit
+Create DTOs:
+
+document-list-query.dto.ts
+create-document.dto.ts
+
+Create document metadata body:
+
+{
+  "documentType": "SK_TERAKHIR",
+  "fileName": "sk-terakhir.pdf",
+  "originalFileName": "SK Terakhir.pdf",
+  "storagePath": "local/dev/sk-terakhir.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 120000,
+  "checksum": "dev-checksum"
+}
+5. Checklist Logic
+
+For GET /api/v1/siarsip/cases/:caseId/checklist:
+
+load SIAP case
+if case serviceType is SIPENSIUN, load SIPENSIUN detail
+get jenisPensiun
+load SIPENSIUN requirements matrix
+compare required documents with uploaded documents.documentType
 
 Return:
 
-```json
 {
-  "items": [],
-  "page": 1,
-  "limit": 10,
-  "total": 0
+  "caseId": "...",
+  "serviceType": "SIPENSIUN",
+  "isComplete": false,
+  "required": [
+    {
+      "documentType": "SK_TERAKHIR",
+      "label": "SK terakhir",
+      "uploaded": true
+    }
+  ],
+  "missing": [
+    {
+      "documentType": "KP_TERAKHIR",
+      "label": "KP terakhir"
+    }
+  ],
+  "uploadedDocuments": []
 }
-4. Submit Guard
+6. Requirement Code Alignment
 
-Keep submit delegated to SiapService.submitCase().
+If current SIPENSIUN requirements are text labels only, normalize them into code + label:
 
-Ensure:
+{
+  documentType: 'SK_TERAKHIR',
+  label: 'SK terakhir'
+}
 
-submit only works if underlying SiapCase is DRAFT
-repeated submit returns clean 400
-missing case returns clean 404
-unauthenticated request returns 401
-unauthorized role returns 403
-5. Requirement Matrix
+Do not break existing /sipensiun/requirements.
 
-Add a SIPENSIUN requirement matrix constant, for example:
-
-sipensiun-requirements.ts
-
-Include requirements for:
-
-BUP
-APS
-JDU
-TWS
-SAK
-HLG
-PTDH
-
-Expose it through service response if useful, or prepare for Phase 5.
-
-6. Optional Endpoint
-
-Add:
-
-GET /api/v1/sipensiun/requirements
-
-Return requirement matrix by jenis pensiun.
-
-Architecture Rules
+7. Rules
 Strict TypeScript
 No any
 No dummy response
 Controller stays thin
 Service orchestrates
-Repository handles DB query only
-SIPENSIUN must not duplicate SIAP workflow logic
-Use existing response helper
+Repository handles DB only
 Keep JWT + RolesGuard active
 Build must pass
+Do not implement real file upload yet unless already available
+Metadata-only document creation is acceptable for Phase 5
+Validation
+
+Run:
+
+npm run build
+
+Smoke test:
+
+Login as admin
+Create or use existing SIPENSIUN case
+Get checklist before upload → missing documents shown
+Create document metadata for case
+Get documents by case → document appears
+Get checklist again → uploaded document marked true
+List documents with filter caseId
+Unauthenticated requests return 401
