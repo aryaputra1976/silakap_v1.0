@@ -1,6 +1,8 @@
+import {
+  buildSipensiunTemplate,
+  SipensiunJenis,
+} from './sipensiun-letter-template';
 import { SIPENSIUN_REQUIREMENTS } from './sipensiun-requirements';
-
-export type SipensiunJenis = keyof typeof SIPENSIUN_REQUIREMENTS;
 
 export type LetterRecipient = {
   recipientName: string;
@@ -93,10 +95,7 @@ export type LetterPreviewResponse = {
   missingDocuments: LetterRequirementItem[];
 };
 
-const BLANK = '. . . . . . . . . . . . . . . .';
 const SHORT_BLANK = '. . . . . . . . . . . .';
-const LONG_BLANK =
-  '. . . . . . . . . . . . . . . . . . . . . . . . . . .';
 
 export function buildSipensiunLetterPreview(
   source: LetterPreviewSource,
@@ -110,19 +109,51 @@ export function buildSipensiunLetterPreview(
     (item) => item.required && !item.uploaded,
   );
 
-  const subject = buildSubject(source.jenisPensiun);
+  const tmtPensiun = source.tmtPensiun
+    ? formatDateIndonesia(source.tmtPensiun)
+    : SHORT_BLANK;
+
+  const tanggalMeninggal = source.tanggalMeninggal
+    ? formatDateIndonesia(source.tanggalMeninggal)
+    : SHORT_BLANK;
+
+  const applicantName = resolveApplicantName(source);
+  const applicantNip = resolveApplicantNip(source);
+  const template = buildSipensiunTemplate({
+    jenisPensiun: source.jenisPensiun,
+    recipientCategory: source.recipient.category,
+    defaultRecipientName: source.recipient.recipientName,
+    defaultRecipientCity: source.recipient.recipientCity,
+    applicantName,
+    applicantNip,
+    nomorKarpeg: source.nomorKarpeg ?? SHORT_BLANK,
+    golonganNama: source.asn.golonganNama ?? SHORT_BLANK,
+    unitKerjaNama: source.asn.unitKerjaNama ?? SHORT_BLANK,
+    alamatSekarang: source.alamatSekarang ?? source.alamatPemohon ?? SHORT_BLANK,
+    alamatSesudahPensiun: source.alamatSesudahPensiun ?? SHORT_BLANK,
+    noHp: source.noHp ?? source.noHpPemohon ?? SHORT_BLANK,
+    tmtPensiun,
+    namaPenerimaManfaat: source.namaPenerimaManfaat ?? SHORT_BLANK,
+    tanggalMeninggal,
+  });
+
+  const effectiveRecipient: LetterRecipient = {
+    ...source.recipient,
+    recipientName: template.recipient.recipientName,
+    recipientCity: template.recipient.recipientCity,
+  };
 
   return {
     caseId: source.caseId,
     caseNumber: source.caseNumber,
     jenisPensiun: source.jenisPensiun,
-    recipient: source.recipient,
-    subject,
+    recipient: effectiveRecipient,
+    subject: template.subject,
     metadata: {
       referenceTitle: 'Surat Edaran Kepala BKN',
       referenceNumber: '04/SE/1980',
       referenceDate: '11 Pebruari 1980',
-      note: buildRecipientNote(source),
+      note: template.recipient.note,
     },
     fields: {
       nama: source.asn.nama,
@@ -148,7 +179,7 @@ export function buildSipensiunLetterPreview(
         ? formatDateIndonesia(source.tanggalMeninggal)
         : null,
     },
-    body: buildBlankoBody(source, requirements),
+    body: buildBlankoBody(template, applicantName, applicantNip, source),
     requirements,
     missingDocuments,
   };
@@ -172,56 +203,43 @@ function getRequirementsWithUploadStatus(
   }));
 }
 
-function buildSubject(jenisPensiun: SipensiunJenis): string {
-  return toJenisPensiunLabel(jenisPensiun);
-}
-
 function buildBlankoBody(
+  template: ReturnType<typeof buildSipensiunTemplate>,
+  applicantName: string,
+  applicantNip: string,
   source: LetterPreviewSource,
-  requirements: LetterRequirementItem[],
 ): string {
-  const requiredAttachments = requirements.filter((item) => item.required);
-  const tmtPensiun = source.tmtPensiun
-    ? formatDateIndonesia(source.tmtPensiun)
-    : SHORT_BLANK;
-
   const lines: string[] = [
     'Lampiran : Surat Edaran Kepala BKN',
     'Nomor    : 04/SE/1980',
     'Tanggal  : 11 Pebruari 1980',
     '',
     'Kepada',
-    `Yth. ${source.recipient.recipientName}`,
+    `Yth. ${template.recipient.recipientName}`,
     'Di -',
-    `    ${source.recipient.recipientCity}`,
+    `    ${template.recipient.recipientCity}`,
     '',
-    '1. Yang bertanda tangan dibawah ini :',
-    `   a. N a m a                 : ${resolveApplicantName(source)}`,
-    `   b. N i p                   : ${resolveApplicantNip(source)}`,
+    `${template.identityNumber ? `${template.identityNumber}. ` : ''}Yang bertanda tangan dibawah ini :`,
+    `   a. N a m a                 : ${applicantName}`,
+    `   b. N i p                   : ${applicantNip}`,
     `   c. Nomor Seri Karpeg       : ${source.nomorKarpeg ?? SHORT_BLANK}`,
     `   d. Pangkat/Gol.Ruang       : ${source.asn.golonganNama ?? SHORT_BLANK}`,
     `   e. Unit Organisasi         : ${source.asn.unitKerjaNama ?? SHORT_BLANK}`,
-    `   f. Alamat Sekarang         : ${
-      source.alamatSekarang ?? source.alamatPemohon ?? BLANK
-    }`,
-    `   g. Alamat sesudah pensiun  : ${
-      source.alamatSesudahPensiun ?? BLANK
-    }`,
-    `   h. No. HP                  : ${
-      source.noHp ?? source.noHpPemohon ?? SHORT_BLANK
-    }`,
+    `   f. Alamat Sekarang         : ${source.alamatSekarang ?? source.alamatPemohon ?? SHORT_BLANK}`,
+    `   g. Alamat sesudah pensiun  : ${source.alamatSesudahPensiun ?? SHORT_BLANK}`,
+    `   h. No. HP                  : ${source.noHp ?? source.noHpPemohon ?? SHORT_BLANK}`,
     '',
-    ...buildOpeningParagraph(source, tmtPensiun),
+    ...template.openingLines,
     '',
-    '2. Sebagai bahan pertimbangan bersama ini saya lampirkan :',
-    ...buildAttachmentLines(requiredAttachments),
+    `${Number(template.identityNumber || '1') + 1}. Sebagai bahan pertimbangan bersama ini saya lampirkan :`,
+    ...template.attachmentLines.map((line, index) => {
+      return `   ${toAlphabet(index)}. ${line}`;
+    }),
     '',
-    ...buildAdditionalStatement(source.jenisPensiun),
-    `${
-      source.jenisPensiun === 'APS' ? '4' : '3'
-    }. Demikian surat ini saya buat untuk dapat dipergunakan sebagaimana mestinya.`,
+    ...template.additionalStatementLines,
+    `${template.closingNumber}. Demikian surat ini saya buat untuk dapat dipergunakan sebagaimana mestinya.`,
     '',
-    `                                            Tolitoli, ${SHORT_BLANK}`,
+    '                                            Tolitoli, . . . . . . . . . . . .',
     '',
     '                                            Hormat Saya,',
     '',
@@ -231,9 +249,8 @@ function buildBlankoBody(
     '                                            NIP.',
   ];
 
-  const note = buildRecipientNote(source);
-  if (note) {
-    lines.push('', note);
+  if (template.recipient.note) {
+    lines.push('', template.recipient.note);
   }
 
   return lines.join('\n');
@@ -255,149 +272,10 @@ function resolveApplicantNip(source: LetterPreviewSource): string {
   return source.asn.nip;
 }
 
-function buildOpeningParagraph(
-  source: LetterPreviewSource,
-  tmtPensiun: string,
-): string[] {
-  switch (source.jenisPensiun) {
-    case 'BUP':
-      return [
-        '   Dengan ini mengajukan permintaan berhenti dengan hormat sebagai Pegawai Negeri',
-        `   Sipil dengan hak pensiun terhitung mulai tanggal ${tmtPensiun} karena telah mencapai batas`,
-        '   usia pensiun.',
-      ];
-
-    case 'APS':
-      return [
-        '   Dengan ini mengajukan permintaan berhenti dengan hormat sebagai Pegawai Negeri',
-        `   Sipil dengan hak pensiun terhitung mulai tanggal ${tmtPensiun} karena atas permintaan sendiri.`,
-      ];
-
-    case 'JDU':
-      return [
-        `   Dengan ini mengajukan permohonan Pensiun Janda/Duda a.n. ${
-          source.namaPenerimaManfaat ?? LONG_BLANK
-        } sebagai`,
-        `   Pegawai Negeri Sipil pada ${
-          source.asn.unitKerjaNama ?? LONG_BLANK
-        } Kabupaten Tolitoli meninggal pada`,
-        `   tanggal ${
-          source.tanggalMeninggal
-            ? formatDateIndonesia(source.tanggalMeninggal)
-            : SHORT_BLANK
-        }.`,
-      ];
-
-    case 'YATIM_PIATU':
-      return [
-        `   Dengan ini mengajukan permohonan Pensiun Yatim Piatu a.n. ${
-          source.namaPenerimaManfaat ?? LONG_BLANK
-        } sebagai`,
-        `   Pegawai Negeri Sipil pada ${
-          source.asn.unitKerjaNama ?? LONG_BLANK
-        } Kabupaten Tolitoli meninggal pada`,
-        `   tanggal ${
-          source.tanggalMeninggal
-            ? formatDateIndonesia(source.tanggalMeninggal)
-            : SHORT_BLANK
-        }.`,
-      ];
-
-    case 'TWS':
-      return [
-        '   Dengan ini mengajukan permohonan pensiun karena Pegawai Negeri Sipil yang bersangkutan',
-        '   dinyatakan tewas berdasarkan dokumen keterangan pejabat yang berwenang.',
-      ];
-
-    case 'SAK':
-      return [
-        '   Dengan ini mengajukan permohonan pensiun karena sakit berdasarkan dokumen keterangan',
-        '   dokter/pejabat yang berwenang sesuai ketentuan peraturan perundang-undangan.',
-      ];
-
-    case 'HLG':
-      return [
-        '   Dengan ini mengajukan permohonan pensiun karena Pegawai Negeri Sipil yang bersangkutan',
-        '   dinyatakan hilang berdasarkan surat keterangan pejabat yang berwenang.',
-      ];
-
-    case 'PTDH':
-      return [
-        '   Dengan ini mengajukan permohonan penyelesaian pemberhentian tidak dengan hormat',
-        '   Pegawai Negeri Sipil sesuai ketentuan peraturan perundang-undangan.',
-      ];
-
-    default:
-      return [
-        '   Dengan ini mengajukan permohonan pensiun sesuai ketentuan yang berlaku.',
-      ];
-  }
-}
-
-function buildAttachmentLines(requirements: LetterRequirementItem[]): string[] {
-  if (requirements.length === 0) {
-    return ['   a. -'];
-  }
-
-  return requirements.map((item, index) => {
-    return `   ${toAlphabet(index)}. ${normalizeRequirementLabel(item.label)}`;
-  });
-}
-
-function normalizeRequirementLabel(label: string): string {
-  return label
-    .replace(/^SK CPNS$/i, 'Fotokopi surat keputusan pengangkatan CPNS')
-    .replace(/^SK PNS$/i, 'Fotokopi surat keputusan pengangkatan PNS')
-    .replace(
-      /^SK pangkat terakhir$/i,
-      'Fotokopi surat keputusan pangkat terakhir',
-    )
-    .replace(/^Kartu keluarga$/i, 'Fotokopi Kartu Keluarga (KK)')
-    .replace(/^Pas foto$/i, 'Pas foto terbaru ukuran 3x4 sebanyak 4 Lembar')
-    .replace(/^DPCP$/i, 'Data Perorangan Calon Penerima Pensiun (DPCP)');
-}
-
-function buildAdditionalStatement(jenisPensiun: SipensiunJenis): string[] {
-  if (jenisPensiun !== 'APS') {
-    return [];
-  }
-
-  return [
-    '3. Dengan ini saya nyatakan bahwa saya tidak akan menjalankan beban tugas.',
-    '',
-  ];
-}
-
-function buildRecipientNote(source: LetterPreviewSource): string {
-  if (source.jenisPensiun === 'APS') {
-    return '';
-  }
-
-  if (source.recipient.category === 'BKN_PUSAT') {
-    return 'Nb : Khusus Gol IV/b s/d keatas';
-  }
-
-  return 'Nb : Khusus Gol IV/a s/d kebawah';
-}
-
 function toAlphabet(index: number): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+
   return alphabet[index] ?? `${index + 1}`;
-}
-
-function toJenisPensiunLabel(jenisPensiun: SipensiunJenis): string {
-  const labels: Record<SipensiunJenis, string> = {
-    BUP: 'Permohonan Pensiun Batas Usia Pensiun',
-    APS: 'Permohonan Pensiun Atas Permintaan Sendiri',
-    JDU: 'Permohonan Pensiun Janda/Duda',
-    TWS: 'Permohonan Pensiun Tewas',
-    SAK: 'Permohonan Pensiun Karena Sakit',
-    HLG: 'Permohonan Pensiun Karena Hilang',
-    PTDH: 'Permohonan Pemberhentian Tidak Dengan Hormat',
-    YATIM_PIATU: 'Permohonan Pensiun Yatim Piatu',
-  };
-
-  return labels[jenisPensiun];
 }
 
 function formatDateIndonesia(value: Date): string {
