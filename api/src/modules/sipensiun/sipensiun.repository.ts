@@ -92,6 +92,19 @@ const sipensiunLetterPreviewInclude = {
   },
 } satisfies Prisma.SipensiunCaseInclude;
 
+const generatedLetterDocumentInclude = {
+  case: {
+    select: {
+      id: true,
+      caseNumber: true,
+      serviceType: true,
+      title: true,
+      currentState: true,
+      status: true,
+    },
+  },
+} satisfies Prisma.DocumentInclude;
+
 export type SipensiunCaseListRecord = Prisma.SipensiunCaseGetPayload<{
   include: typeof sipensiunListInclude;
 }>;
@@ -102,6 +115,10 @@ export type SipensiunCaseDetailRecord = Prisma.SipensiunCaseGetPayload<{
 
 export type SipensiunLetterPreviewRecord = Prisma.SipensiunCaseGetPayload<{
   include: typeof sipensiunLetterPreviewInclude;
+}>;
+
+export type GeneratedLetterDocumentRecord = Prisma.DocumentGetPayload<{
+  include: typeof generatedLetterDocumentInclude;
 }>;
 
 @Injectable()
@@ -207,6 +224,15 @@ export class SipensiunRepository {
         deletedAt: null,
       },
       include: sipensiunLetterPreviewInclude,
+    });
+  }
+
+  async createGeneratedLetterDocument(
+    data: Prisma.DocumentUncheckedCreateInput,
+  ): Promise<GeneratedLetterDocumentRecord> {
+    return this.prisma.document.create({
+      data,
+      include: generatedLetterDocumentInclude,
     });
   }
 

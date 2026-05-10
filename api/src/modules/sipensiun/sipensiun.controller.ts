@@ -74,4 +74,14 @@ export class SipensiunController {
 
     return ok(result, 'Usulan pensiun berhasil disubmit');
   }
+
+  @Post('cases/:id/generate-letter')
+  async generateLetter(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.sipensiunService.generateLetter(id, user);
+
+    return ok(result, 'Surat permohonan pensiun berhasil digenerate');
+  }
 }
