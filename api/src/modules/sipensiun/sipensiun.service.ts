@@ -1,5 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CasePriority } from '@prisma/client';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CasePriority, JenisPensiun } from '@prisma/client';
 import { AuthUser } from '../auth/auth.types';
 import { SiapRepository } from '../siap/siap.repository';
 import { SiapService } from '../siap/siap.service';
@@ -10,6 +15,7 @@ import {
   SipensiunCaseListRecord,
   SipensiunRepository,
 } from './sipensiun.repository';
+import { SIPENSIUN_REQUIREMENTS } from './sipensiun-requirements';
 import { NormalizedSipensiunCaseFilters } from './sipensiun.types';
 
 @Injectable()
@@ -23,11 +29,28 @@ export class SipensiunService {
     private readonly siapService: SiapService,
   ) {}
 
+  getRequirements() {
+    return SIPENSIUN_REQUIREMENTS;
+  }
+
   async createCase(dto: CreateSipensiunCaseDto, user: AuthUser) {
     const asn = await this.sipensiunRepository.findAsnById(dto.asnId.trim());
 
     if (!asn) {
       throw new NotFoundException('ASN tidak ditemukan');
+    }
+
+    const tmtPensiun = this.parseOptionalDate(dto.tmtPensiun);
+    const existingActive =
+      await this.sipensiunRepository.findActiveCaseByAsnAndJenis(
+        asn.id,
+        dto.jenisPensiun,
+      );
+
+    if (existingActive) {
+      throw new BadRequestException(
+        'ASN sudah memiliki usulan pensiun aktif untuk jenis pensiun yang sama',
+      );
     }
 
     const created = await this.siapRepository.withTransaction(async (client) => {
@@ -48,7 +71,7 @@ export class SipensiunService {
           siapCaseId: siapCase.id,
           asnId: asn.id,
           jenisPensiun: dto.jenisPensiun,
-          tmtPensiun: dto.tmtPensiun ? new Date(dto.tmtPensiun) : undefined,
+          tmtPensiun,
           catatan: this.normalizeOptionalText(dto.catatan),
           createdBy: user.id,
           updatedBy: user.id,
@@ -106,6 +129,7 @@ export class SipensiunService {
     return {
       q: this.normalizeOptionalText(query.q),
       jenisPensiun: query.jenisPensiun,
+      asnId: this.normalizeOptionalText(query.asnId),
       currentState: this.normalizeOptionalText(query.currentState),
       status: query.status,
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
@@ -116,6 +140,22 @@ export class SipensiunService {
   private normalizeOptionalText(value: string | undefined) {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
+  }
+
+  private parseOptionalDate(value: string | undefined) {
+    const normalized = this.normalizeOptionalText(value);
+
+    if (!normalized) {
+      return undefined;
+    }
+
+    const parsed = new Date(normalized);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('TMT pensiun tidak valid');
+    }
+
+    return parsed;
   }
 
   private normalizePositiveNumber(
@@ -143,6 +183,7 @@ export class SipensiunService {
       catatan: record.catatan,
       siapCase: record.siapCase,
       asn: record.asn,
+      requirements: SIPENSIUN_REQUIREMENTS[record.jenisPensiun],
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
@@ -155,6 +196,8 @@ export class SipensiunService {
       siapCase,
       sipensiunDetail: detail,
       asn,
+      requirements:
+        SIPENSIUN_REQUIREMENTS[detail.jenisPensiun as JenisPensiun],
       tasks: siapCase.tasks,
       workflowLogs: siapCase.workflowLogs,
       slaTracking: siapCase.slaTracking,

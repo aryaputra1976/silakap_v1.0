@@ -12,6 +12,10 @@ export class SipensiunCaseListQueryDto {
 
   @IsString()
   @IsOptional()
+  asnId?: string;
+
+  @IsString()
+  @IsOptional()
   currentState?: string;
 
   @IsEnum(CaseStatus)

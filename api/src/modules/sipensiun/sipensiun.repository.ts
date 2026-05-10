@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CaseStatus, JenisPensiun, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SiapDbClient } from '../siap/siap.repository';
 import { NormalizedSipensiunCaseFilters } from './sipensiun.types';
@@ -105,6 +105,26 @@ export class SipensiunRepository {
     });
   }
 
+  async findActiveCaseByAsnAndJenis(
+    asnId: string,
+    jenisPensiun: JenisPensiun,
+  ): Promise<SipensiunCaseDetailRecord | null> {
+    return this.prisma.sipensiunCase.findFirst({
+      where: {
+        asnId,
+        jenisPensiun,
+        deletedAt: null,
+        siapCase: {
+          status: {
+            in: [CaseStatus.DRAFT, CaseStatus.ACTIVE],
+          },
+          deletedAt: null,
+        },
+      },
+      include: sipensiunDetailInclude,
+    });
+  }
+
   async findCases(filters: NormalizedSipensiunCaseFilters): Promise<{
     items: SipensiunCaseListRecord[];
     total: number;
@@ -158,6 +178,10 @@ export class SipensiunRepository {
 
     if (filters.jenisPensiun) {
       where.jenisPensiun = filters.jenisPensiun;
+    }
+
+    if (filters.asnId) {
+      where.asnId = filters.asnId;
     }
 
     if (filters.currentState) {

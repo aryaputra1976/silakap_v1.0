@@ -27,6 +27,11 @@ export class SipensiunController {
     private readonly sipensiunService: SipensiunService,
   ) {}
 
+  @Get('requirements')
+  requirements() {
+    return ok(this.sipensiunService.getRequirements());
+  }
+
   @Get('cases')
   async findCases(@Query() query: SipensiunCaseListQueryDto) {
     const result = await this.sipensiunService.findCases(query);
