@@ -40,12 +40,21 @@ export class SipensiunController {
   @Get('cases')
   async findCases(@Query() query: SipensiunCaseListQueryDto) {
     const result = await this.sipensiunService.findCases(query);
+
     return ok(result);
+  }
+
+  @Get('cases/:id/letter-preview')
+  async getLetterPreview(@Param('id') id: string) {
+    const result = await this.sipensiunService.getLetterPreview(id);
+
+    return ok(result, 'Preview surat SIPENSIUN berhasil dimuat');
   }
 
   @Get('cases/:id')
   async findCaseById(@Param('id') id: string) {
     const result = await this.sipensiunService.findCaseById(id);
+
     return ok(result);
   }
 
@@ -55,12 +64,14 @@ export class SipensiunController {
     @CurrentUser() user: AuthUser,
   ) {
     const result = await this.sipensiunService.createCase(dto, user);
+
     return ok(result, 'Usulan pensiun berhasil dibuat');
   }
 
   @Post('cases/:id/submit')
   async submitCase(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const result = await this.sipensiunService.submitCase(id, user);
+
     return ok(result, 'Usulan pensiun berhasil disubmit');
   }
 }

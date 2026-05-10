@@ -66,12 +66,42 @@ const sipensiunDetailInclude = {
   },
 } satisfies Prisma.SipensiunCaseInclude;
 
+const sipensiunLetterPreviewInclude = {
+  asn: {
+    include: {
+      unitKerja: {
+        select: {
+          id: true,
+          kode: true,
+          nama: true,
+        },
+      },
+    },
+  },
+  siapCase: {
+    include: {
+      documents: {
+        where: {
+          deletedAt: null,
+        },
+        select: {
+          documentType: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.SipensiunCaseInclude;
+
 export type SipensiunCaseListRecord = Prisma.SipensiunCaseGetPayload<{
   include: typeof sipensiunListInclude;
 }>;
 
 export type SipensiunCaseDetailRecord = Prisma.SipensiunCaseGetPayload<{
   include: typeof sipensiunDetailInclude;
+}>;
+
+export type SipensiunLetterPreviewRecord = Prisma.SipensiunCaseGetPayload<{
+  include: typeof sipensiunLetterPreviewInclude;
 }>;
 
 @Injectable()
@@ -126,10 +156,9 @@ export class SipensiunRepository {
     });
   }
 
-  async findCases(filters: NormalizedSipensiunCaseFilters): Promise<{
-    items: SipensiunCaseListRecord[];
-    total: number;
-  }> {
+  async findCases(
+    filters: NormalizedSipensiunCaseFilters,
+  ): Promise<{ items: SipensiunCaseListRecord[]; total: number }> {
     const where = this.buildWhere(filters);
     const skip = (filters.page - 1) * filters.limit;
 
@@ -169,12 +198,25 @@ export class SipensiunRepository {
     });
   }
 
+  async findLetterPreviewSourceById(
+    id: string,
+  ): Promise<SipensiunLetterPreviewRecord | null> {
+    return this.prisma.sipensiunCase.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      include: sipensiunLetterPreviewInclude,
+    });
+  }
+
   private buildWhere(
     filters: NormalizedSipensiunCaseFilters,
   ): Prisma.SipensiunCaseWhereInput {
     const where: Prisma.SipensiunCaseWhereInput = {
       deletedAt: null,
     };
+
     const siapCaseWhere: Prisma.SiapCaseWhereInput = {};
 
     if (filters.jenisPensiun) {

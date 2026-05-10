@@ -1,25 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AccountStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
-const authUserInclude = {
-  userRoles: {
-    include: {
-      role: true,
-    },
-  },
-  unitKerja: {
-    select: {
-      id: true,
-      kode: true,
-      nama: true,
-    },
-  },
-} satisfies Prisma.UserInclude;
-
-type AuthUserEntity = Prisma.UserGetPayload<{
-  include: typeof authUserInclude;
-}>;
 
 export interface UserRecord {
   id: string;
@@ -37,23 +17,35 @@ export interface UserRecord {
   isActive: boolean;
 }
 
+type UserRoleRecord = {
+  role: {
+    code: string;
+  };
+};
+
+type AuthUserDbRecord = {
+  id: string;
+  username: string;
+  name: string;
+  email: string | null;
+  passwordHash: string;
+  status: string;
+  unitKerjaId: string | null;
+  unitKerja: {
+    id: string;
+    kode: string;
+    nama: string;
+  } | null;
+  userRoles: UserRoleRecord[];
+  deletedAt: Date | null;
+};
+
 @Injectable()
 export class AuthRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
-
-  private toUserRecord(user: AuthUserEntity): UserRecord {
-    return {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      passwordHash: user.passwordHash,
-      roles: user.userRoles.map((userRole) => userRole.role.code),
-      unitKerjaId: user.unitKerjaId,
-      unitKerja: user.unitKerja,
-      isActive: user.status === AccountStatus.ACTIVE,
-    };
-  }
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   async findByUsername(username: string): Promise<UserRecord | null> {
     const normalizedUsername = username.trim().toLowerCase();
@@ -62,14 +54,27 @@ export class AuthRepository {
       where: {
         username: normalizedUsername,
       },
-      include: authUserInclude,
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+        unitKerja: {
+          select: {
+            id: true,
+            kode: true,
+            nama: true,
+          },
+        },
+      },
     });
 
     if (!user || user.deletedAt) {
       return null;
     }
 
-    return this.toUserRecord(user);
+    return this.toUserRecord(user as AuthUserDbRecord);
   }
 
   async findById(id: string): Promise<UserRecord | null> {
@@ -77,14 +82,27 @@ export class AuthRepository {
       where: {
         id,
       },
-      include: authUserInclude,
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+        unitKerja: {
+          select: {
+            id: true,
+            kode: true,
+            nama: true,
+          },
+        },
+      },
     });
 
     if (!user || user.deletedAt) {
       return null;
     }
 
-    return this.toUserRecord(user);
+    return this.toUserRecord(user as AuthUserDbRecord);
   }
 
   async updateLastLogin(userId: string): Promise<void> {
@@ -96,5 +114,19 @@ export class AuthRepository {
         lastLoginAt: new Date(),
       },
     });
+  }
+
+  private toUserRecord(user: AuthUserDbRecord): UserRecord {
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      roles: user.userRoles.map((userRole: UserRoleRecord) => userRole.role.code),
+      unitKerjaId: user.unitKerjaId,
+      unitKerja: user.unitKerja,
+      isActive: user.status === 'ACTIVE',
+    };
   }
 }

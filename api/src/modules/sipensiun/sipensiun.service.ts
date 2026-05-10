@@ -16,9 +16,17 @@ import {
   SipensiunRepository,
 } from './sipensiun.repository';
 import { SIPENSIUN_LETTER_TEMPLATES } from './sipensiun-letter-templates';
+import {
+  buildSipensiunLetterPreview,
+  LetterPreviewSource,
+} from './sipensiun-letter-preview';
 import { resolvePensiunRecipient } from './sipensiun-recipient';
 import { SIPENSIUN_REQUIREMENTS } from './sipensiun-requirements';
 import { NormalizedSipensiunCaseFilters } from './sipensiun.types';
+
+type UploadedDocumentType = {
+  documentType: string;
+};
 
 @Injectable()
 export class SipensiunService {
@@ -47,6 +55,7 @@ export class SipensiunService {
     }
 
     const tmtPensiun = this.parseOptionalDate(dto.tmtPensiun);
+
     const existingActive =
       await this.sipensiunRepository.findActiveCaseByAsnAndJenis(
         asn.id,
@@ -101,7 +110,9 @@ export class SipensiunService {
     const submitted = await this.sipensiunRepository.findCaseById(existing.id);
 
     if (!submitted) {
-      throw new NotFoundException('Data SIPENSIUN tidak ditemukan setelah submit');
+      throw new NotFoundException(
+        'Data SIPENSIUN tidak ditemukan setelah submit',
+      );
     }
 
     return this.toDetailResponse(submitted);
@@ -129,6 +140,45 @@ export class SipensiunService {
     return this.toDetailResponse(found);
   }
 
+  async getLetterPreview(id: string) {
+    const record = await this.sipensiunRepository.findLetterPreviewSourceById(
+      id.trim(),
+    );
+
+    if (!record) {
+      throw new NotFoundException('Data SIPENSIUN tidak ditemukan');
+    }
+
+    const recipient = resolvePensiunRecipient(record.asn.golonganNama);
+    const uploadedDocumentTypes = record.siapCase.documents.map(
+      (document: UploadedDocumentType) => document.documentType,
+    );
+
+    const source: LetterPreviewSource = {
+      caseId: record.siapCase.id,
+      caseNumber: record.siapCase.caseNumber,
+      serviceType: record.siapCase.serviceType,
+      currentState: record.siapCase.currentState,
+      status: String(record.siapCase.status),
+      jenisPensiun: record.jenisPensiun,
+      tmtPensiun: record.tmtPensiun,
+      catatan: record.catatan,
+      recipient,
+      asn: {
+        id: record.asn.id,
+        nip: record.asn.nip,
+        nama: record.asn.nama,
+        jabatanNama: record.asn.jabatanNama,
+        golonganNama: record.asn.golonganNama,
+        unitKerjaNama: record.asn.unitKerja?.nama ?? null,
+        statusAsn: record.asn.statusAsn,
+      },
+      uploadedDocumentTypes,
+    };
+
+    return buildSipensiunLetterPreview(source);
+  }
+
   private normalizeFilters(
     query: SipensiunCaseListQueryDto,
   ): NormalizedSipensiunCaseFilters {
@@ -145,6 +195,7 @@ export class SipensiunService {
 
   private normalizeOptionalText(value: string | undefined) {
     const normalized = value?.trim();
+
     return normalized ? normalized : undefined;
   }
 
@@ -179,6 +230,10 @@ export class SipensiunService {
     return Math.min(Math.max(Math.trunc(parsed), min), max);
   }
 
+  private getRequirementsByJenis(jenisPensiun: JenisPensiun) {
+    return SIPENSIUN_REQUIREMENTS[jenisPensiun];
+  }
+
   private toListResponse(record: SipensiunCaseListRecord) {
     return {
       id: record.id,
@@ -190,7 +245,7 @@ export class SipensiunService {
       siapCase: record.siapCase,
       asn: record.asn,
       recipient: resolvePensiunRecipient(record.asn.golonganNama),
-      requirements: SIPENSIUN_REQUIREMENTS[record.jenisPensiun],
+      requirements: this.getRequirementsByJenis(record.jenisPensiun),
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
@@ -204,8 +259,7 @@ export class SipensiunService {
       sipensiunDetail: detail,
       asn,
       recipient: resolvePensiunRecipient(asn.golonganNama),
-      requirements:
-        SIPENSIUN_REQUIREMENTS[detail.jenisPensiun as JenisPensiun],
+      requirements: this.getRequirementsByJenis(detail.jenisPensiun),
       tasks: siapCase.tasks,
       workflowLogs: siapCase.workflowLogs,
       slaTracking: siapCase.slaTracking,

@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CaseStatus, SlaStatus, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type GroupCount = {
@@ -27,6 +26,51 @@ export type RecentTimelineItem = {
   description: string | null;
   createdAt: Date;
   actor: {
+    id: string;
+    name: string;
+    username: string;
+  } | null;
+  case: {
+    id: string;
+    caseNumber: string;
+    serviceType: string;
+    currentState: string;
+    status: string;
+  };
+};
+
+type CurrentStateRow = {
+  currentState: string;
+};
+
+type ServiceTypeRow = {
+  serviceType: string;
+};
+
+type TaskStatusRow = {
+  status: string;
+};
+
+type DocumentTypeRow = {
+  documentType: string;
+};
+
+type SlaStatusRow = {
+  status: string;
+};
+
+type JenisPensiunRow = {
+  jenisPensiun: string;
+};
+
+type RecentTimelineDbRow = {
+  id: string;
+  caseId: string;
+  eventType: string;
+  title: string;
+  description: string | null;
+  createdAt: Date;
+  user: {
     id: string;
     name: string;
     username: string;
@@ -74,12 +118,12 @@ export class AnalyticsRepository {
         deletedAt: null,
         status: {
           in: [
-            TaskStatus.CREATED,
-            TaskStatus.ASSIGNED,
-            TaskStatus.IN_PROGRESS,
-            TaskStatus.WAITING,
-            TaskStatus.RETURNED,
-            TaskStatus.OVERDUE,
+            'CREATED',
+            'ASSIGNED',
+            'IN_PROGRESS',
+            'WAITING',
+            'RETURNED',
+            'OVERDUE',
           ],
         },
       },
@@ -90,7 +134,7 @@ export class AnalyticsRepository {
     return this.prisma.siapTask.count({
       where: {
         deletedAt: null,
-        status: TaskStatus.COMPLETED,
+        status: 'COMPLETED',
       },
     });
   }
@@ -106,126 +150,84 @@ export class AnalyticsRepository {
   async countSlaOverdue(): Promise<number> {
     return this.prisma.slaTracking.count({
       where: {
-        status: SlaStatus.OVERDUE,
+        status: 'OVERDUE',
       },
     });
   }
 
   async groupCasesByState(): Promise<GroupCount[]> {
-    const rows = await this.prisma.siapCase.groupBy({
-      by: ['currentState'],
+    const rows: CurrentStateRow[] = await this.prisma.siapCase.findMany({
       where: {
         deletedAt: null,
       },
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        currentState: 'asc',
+      select: {
+        currentState: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.currentState,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => row.currentState);
   }
 
   async groupCasesByServiceType(): Promise<GroupCount[]> {
-    const rows = await this.prisma.siapCase.groupBy({
-      by: ['serviceType'],
+    const rows: ServiceTypeRow[] = await this.prisma.siapCase.findMany({
       where: {
         deletedAt: null,
       },
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        serviceType: 'asc',
+      select: {
+        serviceType: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.serviceType,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => row.serviceType);
   }
 
   async groupTasksByStatus(): Promise<GroupCount[]> {
-    const rows = await this.prisma.siapTask.groupBy({
-      by: ['status'],
+    const rows: TaskStatusRow[] = await this.prisma.siapTask.findMany({
       where: {
         deletedAt: null,
       },
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        status: 'asc',
+      select: {
+        status: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.status,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => String(row.status));
   }
 
   async groupDocumentsByType(): Promise<GroupCount[]> {
-    const rows = await this.prisma.document.groupBy({
-      by: ['documentType'],
+    const rows: DocumentTypeRow[] = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
       },
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        documentType: 'asc',
+      select: {
+        documentType: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.documentType,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => row.documentType);
   }
 
   async groupSlaByStatus(): Promise<GroupCount[]> {
-    const rows = await this.prisma.slaTracking.groupBy({
-      by: ['status'],
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        status: 'asc',
+    const rows: SlaStatusRow[] = await this.prisma.slaTracking.findMany({
+      select: {
+        status: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.status,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => String(row.status));
   }
 
   async groupSipensiunByJenis(): Promise<GroupCount[]> {
-    const rows = await this.prisma.sipensiunCase.groupBy({
-      by: ['jenisPensiun'],
+    const rows: JenisPensiunRow[] = await this.prisma.sipensiunCase.findMany({
       where: {
         deletedAt: null,
       },
-      _count: {
-        _all: true,
-      },
-      orderBy: {
-        jenisPensiun: 'asc',
+      select: {
+        jenisPensiun: true,
       },
     });
 
-    return rows.map((row) => ({
-      key: row.jenisPensiun,
-      total: row._count._all,
-    }));
+    return this.countByKey(rows, (row) => String(row.jenisPensiun));
   }
 
   async countActiveCases(): Promise<ActiveCasesSummary> {
@@ -233,13 +235,13 @@ export class AnalyticsRepository {
       this.prisma.siapCase.count({
         where: {
           deletedAt: null,
-          status: CaseStatus.ACTIVE,
+          status: 'ACTIVE',
         },
       }),
       this.prisma.siapCase.count({
         where: {
           deletedAt: null,
-          status: CaseStatus.DRAFT,
+          status: 'DRAFT',
         },
       }),
       this.prisma.siapCase.count({
@@ -290,43 +292,44 @@ export class AnalyticsRepository {
   }
 
   async getRecentTimeline(limit = 10): Promise<RecentTimelineItem[]> {
-    const rows = await this.prisma.timelineEntry.findMany({
-      where: {
-        case: {
-          deletedAt: null,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      select: {
-        id: true,
-        caseId: true,
-        eventType: true,
-        title: true,
-        description: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
+    const rows: RecentTimelineDbRow[] =
+      await this.prisma.timelineEntry.findMany({
+        where: {
+          case: {
+            deletedAt: null,
           },
         },
-        case: {
-          select: {
-            id: true,
-            caseNumber: true,
-            serviceType: true,
-            currentState: true,
-            status: true,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+        select: {
+          id: true,
+          caseId: true,
+          eventType: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+            },
+          },
+          case: {
+            select: {
+              id: true,
+              caseNumber: true,
+              serviceType: true,
+              currentState: true,
+              status: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    return rows.map((row) => ({
+    return rows.map((row: RecentTimelineDbRow) => ({
       id: row.id,
       caseId: row.caseId,
       eventType: row.eventType,
@@ -335,9 +338,31 @@ export class AnalyticsRepository {
       createdAt: row.createdAt,
       actor: row.user,
       case: {
-        ...row.case,
-        status: row.case.status,
+        id: row.case.id,
+        caseNumber: row.case.caseNumber,
+        serviceType: row.case.serviceType,
+        currentState: row.case.currentState,
+        status: String(row.case.status),
       },
     }));
+  }
+
+  private countByKey<T>(
+    rows: T[],
+    getKey: (row: T) => string,
+  ): GroupCount[] {
+    const counter = new Map<string, number>();
+
+    rows.forEach((row) => {
+      const key = getKey(row);
+      counter.set(key, (counter.get(key) ?? 0) + 1);
+    });
+
+    return Array.from(counter.entries())
+      .map(([key, total]) => ({
+        key,
+        total,
+      }))
+      .sort((left, right) => left.key.localeCompare(right.key));
   }
 }
