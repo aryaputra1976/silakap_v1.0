@@ -1,41 +1,33 @@
-Langkah Berikutnya: Phase 5 — SIARSIP Basic
+Langkah Berikutnya: Phase 5.1 — Real Upload Middleware
 
-Sekarang yang paling tepat adalah dokumen syarat dan arsip, karena SIPENSIUN sudah punya requirement matrix tapi belum punya upload/checklist dokumen.
+Karena saat ini SIARSIP masih metadata-only, tahap berikutnya adalah membuat upload file nyata ke storage lokal.
 
-Target Phase 5
+Target Phase 5.1
 Area	Target
-Document upload metadata	simpan metadata dokumen ke documents
-Document list	lihat dokumen per case
-Document requirement	bandingkan requirement vs dokumen upload
-Checklist	status lengkap/belum
-Preview metadata	belum perlu preview file kompleks
-Protected endpoint	JWT + RBAC tetap aktif
-Endpoint minimal Phase 5
-GET  /api/v1/siarsip/documents
-GET  /api/v1/siarsip/documents/:id
-GET  /api/v1/siarsip/cases/:caseId/documents
-POST /api/v1/siarsip/cases/:caseId/documents
-GET  /api/v1/siarsip/cases/:caseId/checklist
-Alur Phase 5
-SIPENSIUN case dibuat
-↓
-Requirement matrix tersedia
-↓
-Upload dokumen ke SIARSIP
-↓
-Dokumen terkait ke SIAP case
-↓
-Checklist membandingkan required docs vs uploaded docs
-↓
-Status kelengkapan bisa dibaca UI
-Prompt Codex Phase 5
-# CODEX TASK — Phase 5 SIARSIP Basic + Document Checklist
+Upload file	multipart/form-data
+Storage lokal	simpan file ke folder uploads/
+Metadata otomatis	fileName, originalFileName, mimeType, fileSize
+Checksum	hash file untuk integritas
+File validation	hanya PDF/JPG/PNG, batas ukuran
+Download endpoint	akses file by id
+Security	path traversal protection
+Endpoint tambahan
+POST /api/v1/siarsip/cases/:caseId/upload
+GET  /api/v1/siarsip/documents/:id/download
+Struktur folder storage
+api/
+ └── uploads/
+     └── cases/
+         └── {caseId}/
+             └── {documentType}-{timestamp}.pdf
+Prompt Codex Phase 5.1
+# CODEX TASK — Phase 5.1 SIARSIP Real Upload Middleware
 
 Working directory: `D:\Silakap_V1.0\api`
 
 ## Goal
 
-Implement SIARSIP basic document management and document checklist foundation for SIAP/SIPENSIUN cases.
+Add real file upload support to SIARSIP while preserving the existing metadata-only document API.
 
 ## Current Status
 
@@ -44,139 +36,95 @@ Already completed:
 - SIDATA minimal
 - SIAP Core Engine + hardening
 - SIPENSIUN pilot + hardening
-- SIPENSIUN requirement matrix:
-  - `GET /api/v1/sipensiun/requirements`
+- SIARSIP Basic:
+  - document metadata create
+  - document list/detail
+  - documents by case
+  - checklist by case
+  - SIPENSIUN requirements normalized as `{ documentType, label }`
 
 ## Required Scope
 
-### 1. SIARSIP Repository
+### 1. Upload Endpoint
 
-Implement/complete `siarsip.repository.ts`:
-
-- `findDocuments(filters)`
-- `findDocumentById(id)`
-- `findDocumentsByCaseId(caseId)`
-- `createDocument(data)`
-- `countDocumentsByCaseId(caseId)`
-
-Repository handles DB query only.
-
-### 2. SIARSIP Service
-
-Implement/complete `siarsip.service.ts`:
-
-- list documents with filters:
-  - caseId
-  - documentType
-  - q
-  - page
-  - limit
-- get document detail
-- get documents by case
-- create document metadata for a case
-- generate checklist for a case
-
-For Phase 5, file storage can be metadata-only if upload middleware is not ready yet.
-
-### 3. SIARSIP Controller
-
-Implement endpoints:
+Add endpoint:
 
 ```text
-GET  /api/v1/siarsip/documents
-GET  /api/v1/siarsip/documents/:id
-GET  /api/v1/siarsip/cases/:caseId/documents
-POST /api/v1/siarsip/cases/:caseId/documents
-GET  /api/v1/siarsip/cases/:caseId/checklist
+POST /api/v1/siarsip/cases/:caseId/upload
 
-Keep guards:
+Use multipart/form-data fields:
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
-4. DTO
+file
+documentType
 
-Create DTOs:
+Optional fields:
 
-document-list-query.dto.ts
-create-document.dto.ts
+description
+2. Download Endpoint
 
-Create document metadata body:
+Add endpoint:
 
-{
-  "documentType": "SK_TERAKHIR",
-  "fileName": "sk-terakhir.pdf",
-  "originalFileName": "SK Terakhir.pdf",
-  "storagePath": "local/dev/sk-terakhir.pdf",
-  "mimeType": "application/pdf",
-  "fileSize": 120000,
-  "checksum": "dev-checksum"
-}
-5. Checklist Logic
+GET /api/v1/siarsip/documents/:id/download
 
-For GET /api/v1/siarsip/cases/:caseId/checklist:
+Return the stored file safely.
 
-load SIAP case
-if case serviceType is SIPENSIUN, load SIPENSIUN detail
-get jenisPensiun
-load SIPENSIUN requirements matrix
-compare required documents with uploaded documents.documentType
+3. File Storage
 
-Return:
+Store files under:
 
-{
-  "caseId": "...",
-  "serviceType": "SIPENSIUN",
-  "isComplete": false,
-  "required": [
-    {
-      "documentType": "SK_TERAKHIR",
-      "label": "SK terakhir",
-      "uploaded": true
-    }
-  ],
-  "missing": [
-    {
-      "documentType": "KP_TERAKHIR",
-      "label": "KP terakhir"
-    }
-  ],
-  "uploadedDocuments": []
-}
-6. Requirement Code Alignment
+api/uploads/cases/{caseId}/
 
-If current SIPENSIUN requirements are text labels only, normalize them into code + label:
+Generate safe stored filename:
 
-{
-  documentType: 'SK_TERAKHIR',
-  label: 'SK terakhir'
-}
+{documentType}-{timestamp}-{random}.{ext}
 
-Do not break existing /sipensiun/requirements.
+Never trust original filename as storage filename.
 
-7. Rules
+4. Metadata
+
+When upload succeeds, create Document record with:
+
+caseId
+documentType
+fileName
+originalFileName
+storagePath
+mimeType
+fileSize
+checksum
+uploadedBy
+5. Validation
+
+Allow only:
+
+application/pdf
+image/jpeg
+image/png
+
+Max size:
+
+2 MB
+
+Reject invalid file type with BadRequestException.
+
+Reject missing case with NotFoundException.
+
+6. Checksum
+
+Generate SHA-256 checksum from file buffer.
+
+7. Security Rules
+prevent path traversal
+do not expose absolute server path in API response
+download only by document id
+keep JWT + RolesGuard active
+no public unauthenticated file access
+8. Architecture Rules
 Strict TypeScript
 No any
-No dummy response
 Controller stays thin
 Service orchestrates
 Repository handles DB only
-Keep JWT + RolesGuard active
+Use existing response helper
 Build must pass
-Do not implement real file upload yet unless already available
-Metadata-only document creation is acceptable for Phase 5
-Validation
-
-Run:
-
-npm run build
-
-Smoke test:
-
-Login as admin
-Create or use existing SIPENSIUN case
-Get checklist before upload → missing documents shown
-Create document metadata for case
-Get documents by case → document appears
-Get checklist again → uploaded document marked true
-List documents with filter caseId
-Unauthenticated requests return 401
+Do not remove metadata-only document creation endpoint

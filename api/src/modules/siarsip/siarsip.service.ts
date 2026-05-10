@@ -1,15 +1,30 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { JenisPensiun } from '@prisma/client';
+import { createHash, randomBytes } from 'crypto';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { basename, extname, isAbsolute, relative, resolve } from 'path';
 import { AuthUser } from '../auth/auth.types';
 import { SIPENSIUN_REQUIREMENTS } from '../sipensiun/sipensiun-requirements';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DocumentListQueryDto } from './dto/document-list-query.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
 import {
   ChecklistCaseRecord,
   DocumentRecord,
   SiarsipRepository,
 } from './siarsip.repository';
-import { NormalizedDocumentFilters } from './siarsip.types';
+import {
+  DownloadDocumentPayload,
+  NormalizedDocumentFilters,
+  UploadedDocumentFile,
+} from './siarsip.types';
+
+const MAX_UPLOAD_SIZE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_MIME_EXTENSIONS = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+} as const;
 
 @Injectable()
 export class SiarsipService {
@@ -65,6 +80,75 @@ export class SiarsipService {
     });
 
     return this.toDocumentResponse(created);
+  }
+
+  async uploadDocument(
+    caseId: string,
+    dto: UploadDocumentDto,
+    file: UploadedDocumentFile | undefined,
+    user: AuthUser,
+  ) {
+    const siapCase = await this.getCaseOrThrow(caseId);
+
+    if (!file) {
+      throw new BadRequestException('File wajib diunggah');
+    }
+
+    const documentType = this.normalizeDocumentType(dto.documentType);
+    const extension = this.getAllowedExtension(file.mimetype);
+
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      throw new BadRequestException('Ukuran file maksimal 2 MB');
+    }
+
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    const timestamp = Date.now();
+    const random = randomBytes(4).toString('hex');
+    const storedFileName = `${documentType}-${timestamp}-${random}.${extension}`;
+    const relativeStoragePath = this.toStoragePath(
+      siapCase.id,
+      storedFileName,
+    );
+    const absoluteStoragePath =
+      this.resolveSafeStoragePath(relativeStoragePath);
+
+    await mkdir(resolve(this.getUploadRoot(), 'cases', siapCase.id), {
+      recursive: true,
+    });
+    await writeFile(absoluteStoragePath, file.buffer);
+
+    const created = await this.siarsipRepository.createDocument({
+      caseId: siapCase.id,
+      documentType,
+      fileName: storedFileName,
+      originalFileName: basename(file.originalname),
+      storagePath: relativeStoragePath,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      checksum,
+      uploadedBy: user.id,
+    });
+
+    return this.toDocumentResponse(created);
+  }
+
+  async downloadDocument(id: string): Promise<DownloadDocumentPayload> {
+    const document = await this.siarsipRepository.findDocumentById(id.trim());
+
+    if (!document) {
+      throw new NotFoundException('Dokumen tidak ditemukan');
+    }
+
+    const absoluteStoragePath = this.resolveSafeStoragePath(
+      document.storagePath,
+    );
+    const buffer = await this.readStoredFile(absoluteStoragePath);
+
+    return {
+      buffer,
+      mimeType: document.mimeType ?? 'application/octet-stream',
+      fileName: document.originalFileName ?? document.fileName,
+    };
   }
 
   async getChecklist(caseId: string) {
@@ -137,6 +221,71 @@ export class SiarsipService {
   private normalizeOptionalText(value: string | undefined) {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
+  }
+
+  private normalizeDocumentType(value: string) {
+    const normalized = value.trim().toUpperCase();
+
+    if (!/^[A-Z0-9_]+$/.test(normalized)) {
+      throw new BadRequestException(
+        'Tipe dokumen hanya boleh berisi huruf, angka, dan underscore',
+      );
+    }
+
+    return normalized;
+  }
+
+  private getAllowedExtension(mimeType: string) {
+    const extension =
+      ALLOWED_MIME_EXTENSIONS[
+        mimeType as keyof typeof ALLOWED_MIME_EXTENSIONS
+      ];
+
+    if (!extension) {
+      throw new BadRequestException(
+        'Tipe file tidak didukung. Gunakan PDF, JPG, atau PNG',
+      );
+    }
+
+    return extension;
+  }
+
+  private getUploadRoot() {
+    return resolve(process.cwd(), 'uploads');
+  }
+
+  private toStoragePath(caseId: string, fileName: string) {
+    return ['uploads', 'cases', caseId, fileName].join('/');
+  }
+
+  private resolveSafeStoragePath(storagePath: string) {
+    if (isAbsolute(storagePath)) {
+      throw new BadRequestException('Path dokumen tidak valid');
+    }
+
+    const uploadRoot = this.getUploadRoot();
+    const absolutePath = resolve(process.cwd(), storagePath);
+    const relativePath = relative(uploadRoot, absolutePath);
+
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+      throw new BadRequestException('Path dokumen tidak valid');
+    }
+
+    const extension = extname(absolutePath).toLowerCase();
+
+    if (!['.pdf', '.jpg', '.jpeg', '.png'].includes(extension)) {
+      throw new BadRequestException('Ekstensi dokumen tidak valid');
+    }
+
+    return absolutePath;
+  }
+
+  private async readStoredFile(absoluteStoragePath: string) {
+    try {
+      return await readFile(absoluteStoragePath);
+    } catch {
+      throw new NotFoundException('File dokumen tidak ditemukan di storage');
+    }
   }
 
   private normalizePositiveNumber(

@@ -6,8 +6,12 @@ import {
   Param,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -16,7 +20,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DocumentListQueryDto } from './dto/document-list-query.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
 import { SiarsipService } from './siarsip.service';
+import { UploadedDocumentFile } from './siarsip.types';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
@@ -39,6 +45,16 @@ export class SiarsipController {
     return ok(result);
   }
 
+  @Get('documents/:id/download')
+  async downloadDocument(@Param('id') id: string) {
+    const result = await this.siarsipService.downloadDocument(id);
+
+    return new StreamableFile(result.buffer, {
+      type: result.mimeType,
+      disposition: this.toContentDisposition(result.fileName),
+    });
+  }
+
   @Get('cases/:caseId/documents')
   async findDocumentsByCaseId(@Param('caseId') caseId: string) {
     const result = await this.siarsipService.findDocumentsByCaseId(caseId);
@@ -55,9 +71,37 @@ export class SiarsipController {
     return ok(result, 'Metadata dokumen berhasil disimpan');
   }
 
+  @Post('cases/:caseId/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 2 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadDocument(
+    @Param('caseId') caseId: string,
+    @Body() dto: UploadDocumentDto,
+    @UploadedFile() file: UploadedDocumentFile | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.siarsipService.uploadDocument(
+      caseId,
+      dto,
+      file,
+      user,
+    );
+    return ok(result, 'Dokumen berhasil diunggah');
+  }
+
   @Get('cases/:caseId/checklist')
   async getChecklist(@Param('caseId') caseId: string) {
     const result = await this.siarsipService.getChecklist(caseId);
     return ok(result);
+  }
+
+  private toContentDisposition(fileName: string) {
+    const safeFileName = fileName.replace(/["\r\n]/g, '_');
+    return `attachment; filename="${safeFileName}"`;
   }
 }
