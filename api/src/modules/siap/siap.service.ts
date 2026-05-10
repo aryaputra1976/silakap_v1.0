@@ -13,6 +13,7 @@ import {
   TaskStatus,
 } from '@prisma/client';
 import { AuthUser } from '../auth/auth.types';
+import { EventBusService } from '../events/event-bus.service';
 import { CaseListQueryDto } from './dto/case-list-query.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { CreateCaseDto } from './dto/create-case.dto';
@@ -36,6 +37,8 @@ export class SiapService {
   constructor(
     @Inject(SiapRepository)
     private readonly siapRepository: SiapRepository,
+    @Inject(EventBusService)
+    private readonly eventBusService: EventBusService,
   ) {}
 
   async createCase(dto: CreateCaseDto, user: AuthUser) {
@@ -176,6 +179,21 @@ export class SiapService {
       throw new NotFoundException('Case tidak ditemukan setelah submit');
     }
 
+    await this.eventBusService.publishNotification({
+      type: 'CASE_SUBMITTED',
+      title: 'Case baru disubmit',
+      body: `${submitted.caseNumber} menunggu verifikasi administrasi`,
+      caseId: submitted.id,
+      actionUrl: '/siap/tasks',
+      recipientRoleCodes: ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'],
+      createdBy: user.id,
+      metadata: {
+        caseNumber: submitted.caseNumber,
+        serviceType: submitted.serviceType,
+        currentState: submitted.currentState,
+      },
+    });
+
     return this.toCaseDetailResponse(submitted);
   }
 
@@ -240,6 +258,22 @@ export class SiapService {
       createdAt: now,
     });
 
+    await this.eventBusService.publishNotification({
+      type: 'TASK_STARTED',
+      title: 'Task mulai diproses',
+      body: `${updated.title} mulai diproses`,
+      caseId: updated.caseId,
+      actionUrl: '/siap/tasks',
+      recipientUserIds: [user.id],
+      recipientRoleCodes: ['SUPER_ADMIN', 'ADMIN_BKPSDM'],
+      createdBy: user.id,
+      metadata: {
+        taskId: updated.id,
+        taskType: updated.taskType,
+        status: updated.status,
+      },
+    });
+
     return this.toTaskResponse(updated);
   }
 
@@ -276,6 +310,22 @@ export class SiapService {
         `Task ${task.taskType} selesai diproses`,
       performedBy: user.id,
       createdAt: now,
+    });
+
+    await this.eventBusService.publishNotification({
+      type: 'TASK_COMPLETED',
+      title: 'Task selesai',
+      body: `${updated.title} selesai diproses`,
+      caseId: updated.caseId,
+      actionUrl: '/siap/tasks',
+      recipientUserIds: [user.id],
+      recipientRoleCodes: ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'],
+      createdBy: user.id,
+      metadata: {
+        taskId: updated.id,
+        taskType: updated.taskType,
+        status: updated.status,
+      },
     });
 
     return this.toTaskResponse(updated);

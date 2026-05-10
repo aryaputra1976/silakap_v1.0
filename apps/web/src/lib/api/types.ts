@@ -318,3 +318,42 @@ export type AnalyticsDashboard = {
   sipensiunByJenis?: AnalyticsGroup[];
   recentTimeline?: AnalyticsRecentTimeline[];
 };
+
+export type NotificationCaseSummary = {
+  id: string;
+  caseNumber: string;
+  serviceType: string;
+  title: string;
+  currentState: string;
+  status: string;
+};
+
+export type NotificationUserSummary = {
+  id: string;
+  username: string;
+  name: string;
+};
+
+export type NotificationRecord = {
+  id: string;
+  userId: string | null;
+  caseId: string | null;
+  type: string;
+  title: string;
+  body: string | null;
+  actionUrl: string | null;
+  metadata: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  case: NotificationCaseSummary | null;
+  user: NotificationUserSummary | null;
+};
+
+export type NotificationUnreadCount = {
+  unread: number;
+};
+
+export type NotificationMarkAllResult = {
+  updated: number;
+};

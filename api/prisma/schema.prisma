@@ -101,6 +101,7 @@ model User {
   workflowLogs WorkflowLog[]
   timelineLogs TimelineEntry[]
   auditLogs    AuditLog[]
+  notifications Notification[]
 
   @@index([username])
   @@index([email])
@@ -291,6 +292,7 @@ model SiapCase {
   slaTracking  SlaTracking[]
   timelines    TimelineEntry[]
   sipensiunCase SipensiunCase?
+  notifications Notification[]
 
   @@index([caseNumber])
   @@index([serviceType])
@@ -516,6 +518,32 @@ model DomainEvent {
   @@index([status])
   @@index([createdAt])
   @@map("domain_events")
+}
+
+model Notification {
+  id     String  @id @default(uuid()) @db.VarChar(36)
+  userId String? @map("user_id") @db.VarChar(36)
+  caseId String? @map("case_id") @db.VarChar(36)
+
+  type      String  @db.VarChar(80)
+  title     String  @db.VarChar(200)
+  body      String? @db.Text
+  actionUrl String? @map("action_url") @db.VarChar(300)
+  metadata  Json?
+
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+
+  user User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case SiapCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([caseId])
+  @@index([type])
+  @@index([readAt])
+  @@index([createdAt])
+  @@map("notifications")
 }
 
 model SipensiunCase {

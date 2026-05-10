@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
+import { EventsModule } from './events/events.module';
 import { HealthController } from './health/health.controller';
+import { NotificationsModule } from './notifications/notifications.module';
 import { SiapModule } from './siap/siap.module';
 import { SiarsipModule } from './siarsip/siarsip.module';
 import { SidataModule } from './sidata/sidata.module';
@@ -13,6 +15,8 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     AnalyticsModule,
     AuthModule,
+    EventsModule,
+    NotificationsModule,
     SidataModule,
     SiapModule,
     SipensiunModule,
