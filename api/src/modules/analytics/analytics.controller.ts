@@ -1,23 +1,22 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
+import { AnalyticsService } from './analytics.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
 @Controller('api/v1/analytics')
 export class AnalyticsController {
+  constructor(
+    @Inject(AnalyticsService)
+    private readonly analyticsService: AnalyticsService,
+  ) {}
+
   @Get('dashboard')
-  dashboard() {
-    return ok(
-      {
-        approvalPending: 0,
-        slaMerah: 0,
-        backlog: 0,
-        workloadStaf: [],
-      },
-      'SIANALITIK dashboard endpoint ready',
-    );
+  async dashboard() {
+    const result = await this.analyticsService.getDashboard();
+    return ok(result, 'Analytics dashboard berhasil dimuat');
   }
 }

@@ -186,3 +186,24 @@ export type SipensiunCaseDetail = {
   workflowLogs: WorkflowLog[];
   timelines: TimelineEntry[];
 };
+
+export type AnalyticsGroup = {
+  key: string;
+  label: string;
+  total: number;
+};
+
+export type AnalyticsDashboard = {
+  summary: {
+    totalAsn: number;
+    totalSipensiun: number;
+    totalSiapCases: number;
+    pendingTasks: number;
+    completedTasks: number;
+    uploadedDocuments: number;
+  };
+  casesByState: AnalyticsGroup[];
+  casesByServiceType: AnalyticsGroup[];
+  tasksByStatus: AnalyticsGroup[];
+  documentsByType: AnalyticsGroup[];
+};

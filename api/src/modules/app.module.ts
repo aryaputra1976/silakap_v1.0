@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AnalyticsController } from './analytics/analytics.controller';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health/health.controller';
 import { SiapModule } from './siap/siap.module';
@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module';
 @Module({
   imports: [
     PrismaModule,
+    AnalyticsModule,
     AuthModule,
     SidataModule,
     SiapModule,
@@ -19,7 +20,6 @@ import { PrismaModule } from './prisma/prisma.module';
   ],
   controllers: [
     HealthController,
-    AnalyticsController,
   ],
 })
 export class AppModule {}

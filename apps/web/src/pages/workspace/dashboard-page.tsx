@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Archive, ClipboardList, Database, FileSearch, FileText, ShieldCheck, UserRound } from 'lucide-react';
+import { Archive, BarChart3, ClipboardList, Database, FileSearch, FileText, ShieldCheck, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient, ApiError } from '@/lib/api/client';
-import type { AsnRecord, DocumentRecord, PaginatedResult, SiapTask, SipensiunCaseListItem } from '@/lib/api/types';
+import type { AnalyticsDashboard, AnalyticsGroup } from '@/lib/api/types';
 import {
   EmptyState,
   ErrorAlert,
@@ -15,13 +15,6 @@ import {
 } from '@/components/workspace/ui';
 import { useAuth } from '@/lib/auth/session';
 
-type DashboardCounts = {
-  asn: number;
-  sipensiun: number;
-  pendingTask: number;
-  documents: number;
-};
-
 const quickLinks = [
   { to: '/sidata/asn', label: 'Cari ASN', description: 'Temukan data ASN dan mulai layanan', icon: Database },
   { to: '/sipensiun', label: 'Buat Usulan Pensiun', description: 'Kelola pilot SIPENSIUN', icon: FileText },
@@ -31,7 +24,7 @@ const quickLinks = [
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const [counts, setCounts] = useState<DashboardCounts | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -40,25 +33,16 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
 
-    Promise.all([
-      apiClient.get<PaginatedResult<AsnRecord>>('/sidata/asn', { page: 1, limit: 1 }),
-      apiClient.get<PaginatedResult<SipensiunCaseListItem>>('/sipensiun/cases', { page: 1, limit: 1 }),
-      apiClient.get<PaginatedResult<SiapTask>>('/siap/tasks', { status: 'ASSIGNED', page: 1, limit: 1 }),
-      apiClient.get<PaginatedResult<DocumentRecord>>('/siarsip/documents', { page: 1, limit: 1 }),
-    ])
-      .then(([asn, sipensiun, tasks, documents]) => {
+    apiClient
+      .get<AnalyticsDashboard>('/analytics/dashboard')
+      .then((result) => {
         if (active) {
-          setCounts({
-            asn: asn.total,
-            sipensiun: sipensiun.total,
-            pendingTask: tasks.total,
-            documents: documents.total,
-          });
+          setAnalytics(result);
         }
       })
       .catch((caught) => {
         if (active) {
-          setError(caught instanceof ApiError ? caught.message : 'Gagal memuat dashboard');
+          setError(caught instanceof ApiError ? caught.message : 'Gagal memuat analytics dashboard');
         }
       })
       .finally(() => {
@@ -76,23 +60,34 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Ringkasan operasional SILAKAP berdasarkan data backend yang aktif."
-        meta={<StatusBadge value="API BACKEND" tone="success" />}
+        description="Control room awal SILAKAP berdasarkan endpoint analytics dan data database nyata."
+        meta={<StatusBadge value="ANALYTICS LIVE" tone="success" />}
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
       {loading ? (
-        <LoadingState label="Memuat ringkasan dashboard" />
-      ) : counts ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={Database} label="Total ASN" value={counts.asn} description="Data master SIDATA" tone="info" />
-          <StatCard icon={FileText} label="Total SIPENSIUN" value={counts.sipensiun} description="Usulan pensiun tercatat" tone="warning" />
-          <StatCard icon={ClipboardList} label="Pending Task" value={counts.pendingTask} description="Task ASSIGNED untuk role/user" tone="warning" />
-          <StatCard icon={Archive} label="Uploaded Documents" value={counts.documents} description="Dokumen tersimpan di SIARSIP" tone="success" />
-        </div>
+        <LoadingState label="Memuat analytics dashboard" />
+      ) : analytics ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <StatCard icon={Database} label="Total ASN" value={analytics.summary.totalAsn} description="Data master SIDATA" tone="info" />
+            <StatCard icon={FileText} label="SIPENSIUN" value={analytics.summary.totalSipensiun} description="Usulan pensiun" tone="warning" />
+            <StatCard icon={BarChart3} label="SIAP Case" value={analytics.summary.totalSiapCases} description="Seluruh case workflow" tone="neutral" />
+            <StatCard icon={ClipboardList} label="Pending Task" value={analytics.summary.pendingTasks} description="Task belum selesai" tone="warning" />
+            <StatCard icon={ShieldCheck} label="Completed Task" value={analytics.summary.completedTasks} description="Task selesai" tone="success" />
+            <StatCard icon={Archive} label="Documents" value={analytics.summary.uploadedDocuments} description="Dokumen terunggah" tone="success" />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <DistributionCard title="Case By State" description="Distribusi case berdasarkan currentState." items={analytics.casesByState} />
+            <DistributionCard title="Task By Status" description="Distribusi task SIAP berdasarkan status." items={analytics.tasksByStatus} />
+            <DistributionCard title="Case By Service Type" description="Sebaran case per jenis layanan." items={analytics.casesByServiceType} />
+            <DistributionCard title="Dokumen By Type" description="Dokumen yang tersimpan di SIARSIP berdasarkan tipe." items={analytics.documentsByType} />
+          </div>
+        </>
       ) : (
-        <EmptyState title="Dashboard belum tersedia" />
+        <EmptyState title="Analytics belum tersedia" />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -150,5 +145,42 @@ export function DashboardPage() {
         </SectionCard>
       </div>
     </div>
+  );
+}
+
+function DistributionCard({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description: string;
+  items: AnalyticsGroup[];
+}) {
+  const max = Math.max(...items.map((item) => item.total), 0);
+
+  return (
+    <SectionCard title={title} description={description}>
+      {items.length > 0 ? (
+        <div className="grid gap-3">
+          {items.map((item) => {
+            const width = max > 0 ? Math.max((item.total / max) * 100, 6) : 0;
+            return (
+              <div key={item.key} className="grid gap-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-zinc-900">{item.label}</span>
+                  <StatusBadge value={String(item.total)} tone="neutral" />
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                  <div className="h-full rounded-full bg-zinc-900" style={{ width: `${width}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState title="Belum ada data distribusi" />
+      )}
+    </SectionCard>
   );
 }
