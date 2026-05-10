@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
 
+type SiapDbClient = PrismaService | Prisma.TransactionClient;
+
 const caseListInclude = {
   asn: {
     select: {
@@ -93,8 +95,43 @@ export type SiapTaskRecord = Prisma.SiapTaskGetPayload<{
 export class SiapRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async createCase(data: Prisma.SiapCaseUncheckedCreateInput) {
-    return this.prisma.siapCase.create({
+  async withTransaction<T>(
+    callback: (client: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(callback);
+  }
+
+  async countCasesByNumberPrefix(
+    prefix: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<number> {
+    return client.siapCase.count({
+      where: {
+        caseNumber: {
+          startsWith: prefix,
+        },
+      },
+    });
+  }
+
+  async caseNumberExists(
+    caseNumber: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<boolean> {
+    const count = await client.siapCase.count({
+      where: {
+        caseNumber,
+      },
+    });
+
+    return count > 0;
+  }
+
+  async createCase(
+    data: Prisma.SiapCaseUncheckedCreateInput,
+    client: SiapDbClient = this.prisma,
+  ) {
+    return client.siapCase.create({
       data,
       include: caseListInclude,
     });
@@ -134,16 +171,20 @@ export class SiapRepository {
   async updateCaseState(
     id: string,
     data: Prisma.SiapCaseUpdateInput,
+    client: SiapDbClient = this.prisma,
   ): Promise<SiapCaseDetailRecord> {
-    return this.prisma.siapCase.update({
+    return client.siapCase.update({
       where: { id },
       data,
       include: caseDetailInclude,
     });
   }
 
-  async createTask(data: Prisma.SiapTaskUncheckedCreateInput): Promise<SiapTaskRecord> {
-    return this.prisma.siapTask.create({
+  async createTask(
+    data: Prisma.SiapTaskUncheckedCreateInput,
+    client: SiapDbClient = this.prisma,
+  ): Promise<SiapTaskRecord> {
+    return client.siapTask.create({
       data,
       include: taskInclude,
     });
@@ -183,24 +224,34 @@ export class SiapRepository {
   async updateTask(
     id: string,
     data: Prisma.SiapTaskUpdateInput,
+    client: SiapDbClient = this.prisma,
   ): Promise<SiapTaskRecord> {
-    return this.prisma.siapTask.update({
+    return client.siapTask.update({
       where: { id },
       data,
       include: taskInclude,
     });
   }
 
-  async createWorkflowLog(data: Prisma.WorkflowLogUncheckedCreateInput) {
-    return this.prisma.workflowLog.create({ data });
+  async createWorkflowLog(
+    data: Prisma.WorkflowLogUncheckedCreateInput,
+    client: SiapDbClient = this.prisma,
+  ) {
+    return client.workflowLog.create({ data });
   }
 
-  async createTimelineEntry(data: Prisma.TimelineEntryUncheckedCreateInput) {
-    return this.prisma.timelineEntry.create({ data });
+  async createTimelineEntry(
+    data: Prisma.TimelineEntryUncheckedCreateInput,
+    client: SiapDbClient = this.prisma,
+  ) {
+    return client.timelineEntry.create({ data });
   }
 
-  async createSlaTracking(data: Prisma.SlaTrackingUncheckedCreateInput) {
-    return this.prisma.slaTracking.create({ data });
+  async createSlaTracking(
+    data: Prisma.SlaTrackingUncheckedCreateInput,
+    client: SiapDbClient = this.prisma,
+  ) {
+    return client.slaTracking.create({ data });
   }
 
   private buildCaseWhere(

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -37,9 +38,10 @@ export class SiapService {
   ) {}
 
   async createCase(dto: CreateCaseDto, user: AuthUser) {
+    const serviceType = dto.serviceType.trim().toUpperCase();
     const created = await this.siapRepository.createCase({
-      caseNumber: this.createCaseNumber(dto.serviceType),
-      serviceType: dto.serviceType.trim().toUpperCase(),
+      caseNumber: await this.createCaseNumber(serviceType),
+      serviceType,
       title: dto.title.trim(),
       description: this.normalizeOptionalText(dto.description),
       asnId: this.normalizeOptionalText(dto.asnId),
@@ -54,7 +56,7 @@ export class SiapService {
       caseId: created.id,
       eventType: 'CASE_CREATED',
       title: 'Case dibuat',
-      description: 'Case dibuat dalam status DRAFT',
+      description: `Case ${created.caseNumber} dibuat dalam status DRAFT`,
       performedBy: user.id,
     });
 
@@ -75,58 +77,93 @@ export class SiapService {
     const now = new Date();
     const dueAt = this.addDays(now, FIRST_TASK_SLA_DAYS);
 
-    await this.siapRepository.updateCaseState(existing.id, {
-      currentState: SUBMITTED_STATE,
-      status: CaseStatus.ACTIVE,
-      submittedAt: now,
-      updatedBy: user.id,
-    });
+    await this.siapRepository.withTransaction(async (client) => {
+      await this.siapRepository.updateCaseState(
+        existing.id,
+        {
+          currentState: SUBMITTED_STATE,
+          status: CaseStatus.ACTIVE,
+          submittedAt: now,
+          updatedBy: user.id,
+        },
+        client,
+      );
 
-    await this.siapRepository.createWorkflowLog({
-      caseId: existing.id,
-      fromState: DRAFT_STATE,
-      toState: SUBMITTED_STATE,
-      action: 'SUBMIT',
-      note: 'Case disubmit untuk verifikasi admin',
-      performedBy: user.id,
-      performedAt: now,
-    });
+      await this.siapRepository.createWorkflowLog(
+        {
+          caseId: existing.id,
+          fromState: DRAFT_STATE,
+          toState: SUBMITTED_STATE,
+          action: 'SUBMIT',
+          note: 'Case disubmit untuk verifikasi admin',
+          performedBy: user.id,
+          performedAt: now,
+        },
+        client,
+      );
 
-    const task = await this.siapRepository.createTask({
-      caseId: existing.id,
-      taskType: FIRST_TASK_TYPE,
-      title: 'Verifikasi administrasi berkas',
-      description: 'Verifikasi awal kelengkapan data dan dokumen usulan',
-      status: TaskStatus.ASSIGNED,
-      priority: this.toTaskPriority(existing.priority),
-      assignedTo: user.id,
-      assignedBy: user.id,
-      dueDate: dueAt,
-      createdBy: user.id,
-      updatedBy: user.id,
-    });
+      const task = await this.siapRepository.createTask(
+        {
+          caseId: existing.id,
+          taskType: FIRST_TASK_TYPE,
+          title: 'Verifikasi administrasi berkas',
+          description: 'Verifikasi awal kelengkapan data dan dokumen usulan',
+          status: TaskStatus.ASSIGNED,
+          priority: this.toTaskPriority(existing.priority),
+          assignedTo: user.id,
+          assignedBy: user.id,
+          dueDate: dueAt,
+          createdBy: user.id,
+          updatedBy: user.id,
+        },
+        client,
+      );
 
-    await this.siapRepository.createSlaTracking({
-      caseId: existing.id,
-      taskId: task.id,
-      workflowState: SUBMITTED_STATE,
-      startedAt: now,
-      dueAt,
-      status: SlaStatus.ON_TRACK,
-    });
+      await this.siapRepository.createSlaTracking(
+        {
+          caseId: existing.id,
+          taskId: task.id,
+          workflowState: SUBMITTED_STATE,
+          startedAt: now,
+          dueAt,
+          status: SlaStatus.ON_TRACK,
+        },
+        client,
+      );
 
-    await this.siapRepository.createTimelineEntry({
-      caseId: existing.id,
-      taskId: task.id,
-      eventType: 'CASE_SUBMITTED',
-      title: 'Case disubmit',
-      description: 'Task verifikasi admin dibuat',
-      performedBy: user.id,
-      createdAt: now,
+      await this.siapRepository.createTimelineEntry(
+        {
+          caseId: existing.id,
+          eventType: 'CASE_SUBMITTED',
+          title: 'Case disubmit',
+          description: `Case ${existing.caseNumber} disubmit dari DRAFT ke SUBMITTED`,
+          performedBy: user.id,
+          createdAt: now,
+        },
+        client,
+      );
+
+      await this.siapRepository.createTimelineEntry(
+        {
+          caseId: existing.id,
+          taskId: task.id,
+          eventType: 'TASK_CREATED',
+          title: 'Task verifikasi admin dibuat',
+          description: `Task ${FIRST_TASK_TYPE} dibuat dan ditugaskan untuk verifikasi awal`,
+          performedBy: user.id,
+          createdAt: now,
+        },
+        client,
+      );
     });
 
     const submitted = await this.siapRepository.findCaseById(existing.id);
-    return submitted ? this.toCaseDetailResponse(submitted) : null;
+
+    if (!submitted) {
+      throw new NotFoundException('Case tidak ditemukan setelah submit');
+    }
+
+    return this.toCaseDetailResponse(submitted);
   }
 
   async findCases(query: CaseListQueryDto) {
@@ -171,13 +208,7 @@ export class SiapService {
   async startTask(id: string, user: AuthUser) {
     const task = await this.getTaskForUser(id, user);
 
-    if (task.status === TaskStatus.COMPLETED) {
-      throw new BadRequestException('Task sudah selesai');
-    }
-
-    if (task.status === TaskStatus.CANCELLED) {
-      throw new BadRequestException('Task sudah dibatalkan');
-    }
+    this.ensureTaskCanStart(task);
 
     const now = new Date();
     const updated = await this.siapRepository.updateTask(task.id, {
@@ -191,7 +222,7 @@ export class SiapService {
       taskId: task.id,
       eventType: 'TASK_STARTED',
       title: 'Task mulai diproses',
-      description: task.title,
+      description: `Task ${task.taskType} mulai diproses`,
       performedBy: user.id,
       createdAt: now,
     });
@@ -202,9 +233,7 @@ export class SiapService {
   async completeTask(id: string, dto: CompleteTaskDto, user: AuthUser) {
     const task = await this.getTaskForUser(id, user);
 
-    if (task.status === TaskStatus.COMPLETED) {
-      throw new BadRequestException('Task sudah selesai');
-    }
+    this.ensureTaskCanComplete(task);
 
     const now = new Date();
     const updated = await this.siapRepository.updateTask(task.id, {
@@ -229,7 +258,9 @@ export class SiapService {
       taskId: task.id,
       eventType: 'TASK_COMPLETED',
       title: 'Task selesai',
-      description: this.normalizeOptionalText(dto.note) ?? task.title,
+      description:
+        this.normalizeOptionalText(dto.note) ??
+        `Task ${task.taskType} selesai diproses`,
       performedBy: user.id,
       createdAt: now,
     });
@@ -244,25 +275,73 @@ export class SiapService {
       throw new NotFoundException('Task tidak ditemukan');
     }
 
-    if (!this.canAccessTask(task, user)) {
-      throw new NotFoundException('Task tidak ditemukan');
+    if (!this.canActOnTask(task, user)) {
+      throw new ForbiddenException('Anda tidak berwenang mengakses task ini');
     }
 
     return task;
   }
 
-  private canAccessTask(task: SiapTaskRecord, user: AuthUser) {
-    if (this.canSeeAllTasks(user)) {
+  private canActOnTask(task: SiapTaskRecord, user: AuthUser) {
+    if (this.hasRole(user, 'SUPER_ADMIN')) {
       return true;
     }
 
-    return task.assignedTo === user.id;
+    if (task.assignedTo === user.id) {
+      return true;
+    }
+
+    if (!task.assignedTo && this.hasPrivilegedRole(user)) {
+      return true;
+    }
+
+    return false;
   }
 
   private canSeeAllTasks(user: AuthUser) {
+    return this.hasPrivilegedRole(user);
+  }
+
+  private hasPrivilegedRole(user: AuthUser) {
     return user.roles.some((role) =>
       ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'].includes(role),
     );
+  }
+
+  private hasRole(user: AuthUser, expectedRole: string) {
+    return user.roles.includes(expectedRole);
+  }
+
+  private ensureTaskCanStart(task: SiapTaskRecord) {
+    this.ensureTaskCanBeModified(task);
+
+    if (task.status !== TaskStatus.ASSIGNED) {
+      throw new BadRequestException(
+        'Task hanya dapat dimulai dari status ASSIGNED',
+      );
+    }
+  }
+
+  private ensureTaskCanComplete(task: SiapTaskRecord) {
+    this.ensureTaskCanBeModified(task);
+
+    if (task.status !== TaskStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        'Task hanya dapat diselesaikan dari status IN_PROGRESS',
+      );
+    }
+  }
+
+  private ensureTaskCanBeModified(task: SiapTaskRecord) {
+    if (task.status === TaskStatus.COMPLETED) {
+      throw new BadRequestException('Task sudah selesai dan tidak dapat diubah');
+    }
+
+    if (task.status === TaskStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Task sudah dibatalkan dan tidak dapat diubah',
+      );
+    }
   }
 
   private normalizeCaseFilters(query: CaseListQueryDto): NormalizedCaseFilters {
@@ -310,17 +389,21 @@ export class SiapService {
     return Math.min(Math.max(Math.trunc(parsed), min), max);
   }
 
-  private createCaseNumber(serviceType: string) {
+  private async createCaseNumber(serviceType: string) {
     const now = new Date();
-    const date = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, '0'),
-      String(now.getDate()).padStart(2, '0'),
-    ].join('');
-    const time = String(now.getTime()).slice(-6);
-    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const prefix = `${serviceType}-${now.getFullYear()}-`;
+    let sequence =
+      (await this.siapRepository.countCasesByNumberPrefix(prefix)) + 1;
 
-    return `${serviceType.trim().toUpperCase()}-${date}-${time}${random}`;
+    while (true) {
+      const candidate = `${prefix}${String(sequence).padStart(6, '0')}`;
+
+      if (!(await this.siapRepository.caseNumberExists(candidate))) {
+        return candidate;
+      }
+
+      sequence += 1;
+    }
   }
 
   private addDays(date: Date, days: number) {
