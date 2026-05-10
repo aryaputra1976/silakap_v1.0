@@ -61,6 +61,16 @@ enum EventStatus {
   CANCELLED
 }
 
+enum JenisPensiun {
+  BUP
+  APS
+  JDU
+  TWS
+  SAK
+  HLG
+  PTDH
+}
+
 model User {
   id           String        @id @default(uuid()) @db.VarChar(36)
   username     String        @unique @map("user") @db.VarChar(50)
@@ -242,6 +252,7 @@ model Asn {
   deletedAt DateTime? @map("deleted_at")
 
   cases SiapCase[]
+  sipensiunCases SipensiunCase[]
 
   @@index([nip])
   @@index([nama])
@@ -278,6 +289,7 @@ model SiapCase {
   workflowLogs WorkflowLog[]
   slaTracking  SlaTracking[]
   timelines    TimelineEntry[]
+  sipensiunCase SipensiunCase?
 
   @@index([caseNumber])
   @@index([serviceType])
@@ -503,4 +515,27 @@ model DomainEvent {
   @@index([status])
   @@index([createdAt])
   @@map("domain_events")
+}
+
+model SipensiunCase {
+  id           String       @id @default(uuid()) @db.VarChar(36)
+  siapCaseId   String       @unique @map("siap_case_id") @db.VarChar(36)
+  asnId        String       @map("asn_id") @db.VarChar(36)
+  jenisPensiun JenisPensiun @map("jenis_pensiun")
+  tmtPensiun   DateTime?    @map("tmt_pensiun")
+  catatan      String?      @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  siapCase SiapCase @relation(fields: [siapCaseId], references: [id], onDelete: Cascade)
+  asn      Asn      @relation(fields: [asnId], references: [id], onDelete: Cascade)
+
+  @@index([asnId])
+  @@index([jenisPensiun])
+  @@index([tmtPensiun])
+  @@map("sipensiun_cases")
 }

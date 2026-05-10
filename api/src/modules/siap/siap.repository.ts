@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
 
-type SiapDbClient = PrismaService | Prisma.TransactionClient;
+export type SiapDbClient = PrismaService | Prisma.TransactionClient;
 
 const caseListInclude = {
   asn: {

@@ -20,6 +20,7 @@ import { TaskListQueryDto } from './dto/task-list-query.dto';
 import {
   SiapCaseDetailRecord,
   SiapCaseListRecord,
+  SiapDbClient,
   SiapRepository,
   SiapTaskRecord,
 } from './siap.repository';
@@ -38,9 +39,18 @@ export class SiapService {
   ) {}
 
   async createCase(dto: CreateCaseDto, user: AuthUser) {
+    const created = await this.createCaseRecord(dto, user);
+    return this.toCaseListResponse(created);
+  }
+
+  async createCaseRecord(
+    dto: CreateCaseDto,
+    user: AuthUser,
+    client?: SiapDbClient,
+  ): Promise<SiapCaseListRecord> {
     const serviceType = dto.serviceType.trim().toUpperCase();
     const created = await this.siapRepository.createCase({
-      caseNumber: await this.createCaseNumber(serviceType),
+      caseNumber: await this.createCaseNumber(serviceType, client),
       serviceType,
       title: dto.title.trim(),
       description: this.normalizeOptionalText(dto.description),
@@ -50,17 +60,20 @@ export class SiapService {
       priority: dto.priority ?? CasePriority.NORMAL,
       createdBy: user.id,
       updatedBy: user.id,
-    });
+    }, client);
 
-    await this.siapRepository.createTimelineEntry({
-      caseId: created.id,
-      eventType: 'CASE_CREATED',
-      title: 'Case dibuat',
-      description: `Case ${created.caseNumber} dibuat dalam status DRAFT`,
-      performedBy: user.id,
-    });
+    await this.siapRepository.createTimelineEntry(
+      {
+        caseId: created.id,
+        eventType: 'CASE_CREATED',
+        title: 'Case dibuat',
+        description: `Case ${created.caseNumber} dibuat dalam status DRAFT`,
+        performedBy: user.id,
+      },
+      client,
+    );
 
-    return this.toCaseListResponse(created);
+    return created;
   }
 
   async submitCase(id: string, user: AuthUser) {
@@ -389,16 +402,16 @@ export class SiapService {
     return Math.min(Math.max(Math.trunc(parsed), min), max);
   }
 
-  private async createCaseNumber(serviceType: string) {
+  private async createCaseNumber(serviceType: string, client?: SiapDbClient) {
     const now = new Date();
     const prefix = `${serviceType}-${now.getFullYear()}-`;
     let sequence =
-      (await this.siapRepository.countCasesByNumberPrefix(prefix)) + 1;
+      (await this.siapRepository.countCasesByNumberPrefix(prefix, client)) + 1;
 
     while (true) {
       const candidate = `${prefix}${String(sequence).padStart(6, '0')}`;
 
-      if (!(await this.siapRepository.caseNumberExists(candidate))) {
+      if (!(await this.siapRepository.caseNumberExists(candidate, client))) {
         return candidate;
       }
 

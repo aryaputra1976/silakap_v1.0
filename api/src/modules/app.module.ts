@@ -5,14 +5,13 @@ import { HealthController } from './health/health.controller';
 import { SiapModule } from './siap/siap.module';
 import { SiarsipController } from './siarsip/siarsip.controller';
 import { SidataModule } from './sidata/sidata.module';
-import { SipensiunController } from './sipensiun/sipensiun.controller';
+import { SipensiunModule } from './sipensiun/sipensiun.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, SidataModule, SiapModule],
+  imports: [PrismaModule, AuthModule, SidataModule, SiapModule, SipensiunModule],
   controllers: [
     HealthController,
-    SipensiunController,
     SiarsipController,
     AnalyticsController,
   ],

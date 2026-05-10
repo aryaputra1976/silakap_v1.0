@@ -9,5 +9,6 @@ import { SiapService } from './siap.service';
   imports: [AuthModule, PrismaModule],
   controllers: [SiapController],
   providers: [SiapRepository, SiapService],
+  exports: [SiapRepository, SiapService],
 })
 export class SiapModule {}
