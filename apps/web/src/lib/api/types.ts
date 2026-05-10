@@ -193,6 +193,20 @@ export type AnalyticsGroup = {
   total: number;
 };
 
+export type AnalyticsRecentTimeline = {
+  id: string;
+  caseId: string;
+  caseNumber: string;
+  serviceType: string;
+  currentState: string;
+  status: string;
+  eventType: string;
+  title: string;
+  description: string | null;
+  actorName: string | null;
+  createdAt: string;
+};
+
 export type AnalyticsDashboard = {
   summary: {
     totalAsn: number;
@@ -201,9 +215,23 @@ export type AnalyticsDashboard = {
     pendingTasks: number;
     completedTasks: number;
     uploadedDocuments: number;
+    slaOverdue: number;
+  };
+  activeCases: {
+    totalActive: number;
+    draft: number;
+    submitted: number;
+  };
+  documentCompleteness: {
+    totalDocuments: number;
+    casesWithDocuments: number;
+    casesWithoutDocuments: number;
   };
   casesByState: AnalyticsGroup[];
   casesByServiceType: AnalyticsGroup[];
   tasksByStatus: AnalyticsGroup[];
   documentsByType: AnalyticsGroup[];
+  slaSummary: AnalyticsGroup[];
+  sipensiunByJenis: AnalyticsGroup[];
+  recentTimeline: AnalyticsRecentTimeline[];
 };
