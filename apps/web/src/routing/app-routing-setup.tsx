@@ -3,11 +3,15 @@ import { Layout1 } from '@/components/layouts/layout-1';
 import { LoginPage } from '@/pages/auth/login-page';
 import { DashboardPage } from '@/pages/workspace/dashboard-page';
 import { SiapTasksPage } from '@/pages/workspace/siap-tasks-page';
+import { SiapWorklogsPage } from '@/pages/workspace/siap-worklogs-page';
+import { SiapWorklogTeamPage } from '@/pages/workspace/siap-worklog-team-page';
 import { SiarsipPage } from '@/pages/workspace/siarsip-page';
 import { SidataAsnPage } from '@/pages/workspace/sidata-asn-page';
 import { SipensiunDetailPage } from '@/pages/workspace/sipensiun-detail-page';
 import { SipensiunListPage } from '@/pages/workspace/sipensiun-list-page';
 import { ProtectedRoute } from './protected-route';
+import { SiapWorklogDashboardPage } from '@/pages/workspace/siap-worklog-dashboard-page';
+import { SiapWorklogExecutivePage } from '@/pages/workspace/siap-worklog-executive-page';
 
 export function AppRoutingSetup() {
   return (
@@ -21,6 +25,10 @@ export function AppRoutingSetup() {
           <Route path="/sipensiun" element={<SipensiunListPage />} />
           <Route path="/sipensiun/:id" element={<SipensiunDetailPage />} />
           <Route path="/siap/tasks" element={<SiapTasksPage />} />
+          <Route path="/siap/worklogs" element={<SiapWorklogsPage />} />
+          <Route path="/siap/worklogs/team" element={<SiapWorklogTeamPage />} />
+          <Route path="/siap/worklogs/dashboard" element={<SiapWorklogDashboardPage />} />
+          <Route path="/siap/worklogs/executive" element={<SiapWorklogExecutivePage />} />
           <Route path="/siarsip" element={<SiarsipPage />} />
         </Route>
       </Route>

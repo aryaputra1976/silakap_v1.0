@@ -363,3 +363,170 @@ export type SlaProcessOverdueResult = {
   escalated: number;
   failed: number;
 };
+
+export type SiapWorklogStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'REVISION_REQUIRED'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export type SiapWorklogUserSummary = {
+  id: string;
+  username: string;
+  name: string;
+  unitKerjaId: string | null;
+  unitKerja: UnitKerjaSummary | null;
+};
+
+export type SiapWorklogCaseSummary = {
+  id: string;
+  caseNumber: string;
+  serviceType: string;
+  title: string;
+  currentState: string;
+  status: string;
+};
+
+export type SiapWorklogTaskSummary = {
+  id: string;
+  taskType: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+};
+
+export type SiapWorklog = {
+  id: string;
+  userId: string;
+  unitKerjaId: string | null;
+  caseId: string | null;
+  taskId: string | null;
+  workDate: string;
+  category: string;
+  title: string;
+  description: string;
+  output: string | null;
+  volume: number | null;
+  obstacle: string | null;
+  status: SiapWorklogStatus;
+  submittedAt: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: SiapWorklogUserSummary;
+  unitKerja: UnitKerjaSummary | null;
+  case: SiapWorklogCaseSummary | null;
+  task: SiapWorklogTaskSummary | null;
+  reviewer: NotificationUserSummary | null;
+};
+
+export type SiapWorklogDashboardStaff = {
+  id: string;
+  username: string;
+  name: string;
+  unitKerjaId: string | null;
+  unitKerja: UnitKerjaSummary | null;
+  roles: string[];
+};
+
+export type SiapWorklogDashboardStaffRow = {
+  user: SiapWorklogDashboardStaff;
+  hasUpdatedToday: boolean;
+  todayWorklogCount: number;
+  worklogCount: number;
+  totalVolume: number;
+  draft: number;
+  submitted: number;
+  revisionRequired: number;
+  approved: number;
+  rejected: number;
+  obstacleCount: number;
+  lastWorklogAt: string | null;
+};
+
+export type SiapWorklogDashboardGroup = {
+  key: string;
+  label: string;
+  total: number;
+};
+
+export type SiapWorklogDashboardUnitRow = {
+  unit: {
+    id: string;
+    kode: string;
+    nama: string;
+    parentId: string | null;
+    level: number;
+  };
+  totalStaff: number;
+  updatedToday: number;
+  notUpdatedToday: number;
+  worklogCount: number;
+  totalVolume: number;
+  draft: number;
+  submitted: number;
+  pendingReview: number;
+  revisionRequired: number;
+  approved: number;
+  rejected: number;
+  obstacleCount: number;
+  healthScore: number;
+};
+
+export type SiapWorklogExecutiveDashboard = SiapWorklogTeamDashboard & {
+  byUnit: SiapWorklogDashboardUnitRow[];
+  strategicIssues: SiapWorklog[];
+  executiveNotes: {
+    attentionNeededUnits: number;
+    highRiskUnitCount: number;
+  };
+};
+
+export type SiapWorklogTeamDashboard = {
+  scope: {
+    unitKerjaId: string | null;
+    from: string;
+    to: string;
+    date: string;
+  };
+  summary: {
+    totalStaff: number;
+    updatedToday: number;
+    notUpdatedToday: number;
+    pendingReview: number;
+    approvedInPeriod: number;
+    revisionInPeriod: number;
+    submittedInPeriod: number;
+    draftInPeriod: number;
+    totalWorklogsInPeriod: number;
+    totalVolumeInPeriod: number;
+    obstacleCountInPeriod: number;
+  };
+  notUpdatedToday: SiapWorklogDashboardStaff[];
+  byStaff: SiapWorklogDashboardStaffRow[];
+  pendingReview: SiapWorklog[];
+  recentObstacles: SiapWorklog[];
+  statusDistribution: SiapWorklogDashboardGroup[];
+  categoryDistribution: SiapWorklogDashboardGroup[];
+};
+
+export type CreateSiapWorklogPayload = {
+  workDate: string;
+  category: string;
+  title: string;
+  description: string;
+  output?: string;
+  volume?: number;
+  obstacle?: string;
+  caseId?: string;
+  taskId?: string;
+};
+
+export type UpdateSiapWorklogPayload = Partial<CreateSiapWorklogPayload>;
+
+export type ReviewSiapWorklogPayload = {
+  note?: string;
+};

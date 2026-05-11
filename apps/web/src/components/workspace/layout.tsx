@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   Bell,
+  BookOpenCheck,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Database,
   FileText,
@@ -46,6 +48,12 @@ const menuGroups: Array<{ label: string; items: MenuItem[] }> = [
     label: 'Operasional',
     items: [
       { to: '/siap/tasks', label: 'SIAP Tasks', icon: ClipboardList },
+      { to: '/siap/worklogs', label: 'Buku Kerja Saya', icon: BookOpenCheck },
+      {
+        to: '/siap/worklogs/team',
+        label: 'Review Buku Kerja',
+        icon: ClipboardCheck,
+      },
       { to: '/siarsip', label: 'SIARSIP', icon: Archive },
     ],
   },

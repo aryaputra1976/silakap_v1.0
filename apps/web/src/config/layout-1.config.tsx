@@ -1,12 +1,14 @@
 import {
   Archive,
   BarChart3,
+  BookOpenCheck,
   ClipboardCheck,
   Database,
   FileText,
   Gauge,
   GitBranch,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -20,13 +22,36 @@ export const MENU_SIDEBAR: MenuConfig = [
     path: '/dashboard',
   },
   {
-    title: 'SIAP Core',
+    title: 'Inti SIAP',
     icon: GitBranch,
     children: [
-      { title: 'Task Engine', path: '/siap/tasks' },
-      { title: 'SLA Monitoring', path: '/siap/tasks?status=OVERDUE' },
-      { title: 'Case Management', path: '/sipensiun' },
-      { title: 'Workflow Engine', path: '/sipensiun' },
+      {
+        title: 'Dashboard Pimpinan',
+        path: '/siap/worklogs/executive',
+        icon: ShieldAlert,
+      },
+      {
+        title: 'Dashboard Buku Kerja',
+        path: '/siap/worklogs/dashboard',
+        icon: BarChart3,
+      },
+      {
+        title: 'Tugas SIAP',
+        path: '/siap/tasks',
+      },
+      {
+        title: 'Buku Kerja Saya',
+        path: '/siap/worklogs',
+        icon: BookOpenCheck,
+      },      
+      {
+        title: 'Tinjau Buku Kerja',
+        path: '/siap/worklogs/team',
+        icon: ClipboardCheck,
+      },
+      { title: 'Pemantauan SLA', path: '/siap/tasks?status=OVERDUE' },
+      { title: 'Manajemen Kasus', path: '/sipensiun' },
+      { title: 'Mesin Alur Kerja', path: '/sipensiun?view=workflow' },
     ],
   },
   {
@@ -43,8 +68,8 @@ export const MENU_SIDEBAR: MenuConfig = [
     icon: FileText,
     children: [
       { title: 'Usulan Pensiun', path: '/sipensiun' },
-      { title: 'Verifikasi OPD', path: '/sipensiun' },
-      { title: 'Approval', path: '/sipensiun' },
+      { title: 'Verifikasi OPD', path: '/sipensiun?view=verification' },
+      { title: 'Approval', path: '/sipensiun?view=approval' },
     ],
   },
   { heading: 'Control' },

@@ -19,13 +19,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function SidebarMenu() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const currentPath = `${pathname}${search}`;
+  const activeMenuPath = getActiveMenuPath(currentPath);
 
   // Memoize matchPath to prevent unnecessary re-renders
   const matchPath = useCallback(
-    (path: string): boolean =>
-      path === pathname || (path.length > 1 && pathname.startsWith(path) && path !== '/layout-1'),
-    [pathname],
+    (path: string): boolean => path === activeMenuPath,
+    [activeMenuPath],
   );
 
   // Global classNames for consistent styling
@@ -213,7 +214,7 @@ export function SidebarMenu() {
   return (
     <ScrollArea className="flex grow shrink-0 py-5 px-5 lg:h-[calc(100vh-5.5rem)]">
       <AccordionMenu
-        selectedValue={pathname}
+        selectedValue={activeMenuPath}
         matchPath={matchPath}
         type="single"
         collapsible
@@ -223,4 +224,39 @@ export function SidebarMenu() {
       </AccordionMenu>
     </ScrollArea>
   );
+}
+
+function getActiveMenuPath(currentPath: string) {
+  const current = normalizePath(currentPath);
+  const paths = getMenuPaths(MENU_SIDEBAR);
+  const exactMatch = paths.find((path) => normalizePath(path) === current);
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const prefixMatches = paths
+    .filter((path) => {
+      const normalized = normalizePath(path);
+
+      return (
+        normalized !== '/' &&
+        !normalized.includes('?') &&
+        current.startsWith(`${normalized}/`)
+      );
+    })
+    .sort((left, right) => right.length - left.length);
+
+  return prefixMatches[0] || currentPath;
+}
+
+function getMenuPaths(items: MenuConfig): string[] {
+  return items.flatMap((item) => [
+    ...(item.path ? [item.path] : []),
+    ...(item.children ? getMenuPaths(item.children) : []),
+  ]);
+}
+
+function normalizePath(path: string) {
+  return path.replace(/\/+$/, '') || '/';
 }
