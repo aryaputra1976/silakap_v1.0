@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   RefreshCcw,
   ShieldAlert,
   Users,
@@ -66,6 +67,15 @@ export function SiapWorklogExecutivePage() {
     }
   }
 
+  async function downloadExport(type: 'excel' | 'pdf') {
+    await apiClient.download(
+      `/siap/worklogs/export/${type}?from=${from}&to=${to}`,
+      type === 'excel'
+        ? `laporan-buku-kerja-pimpinan-${from}-${to}.csv`
+        : `laporan-buku-kerja-pimpinan-${from}-${to}.pdf`,
+    );
+  }
+
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,6 +107,21 @@ export function SiapWorklogExecutivePage() {
             <ActionButton icon={RefreshCcw} onClick={() => void load()}>
               Refresh
             </ActionButton>
+            <ActionButton
+              icon={Download}
+              onClick={() => void downloadExport('excel')}
+              variant="secondary"
+            >
+              Export Excel
+            </ActionButton>
+
+            <ActionButton
+              icon={Download}
+              onClick={() => void downloadExport('pdf')}
+              variant="secondary"
+            >
+              Export PDF
+            </ActionButton>            
           </>
         }
       />

@@ -64,7 +64,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       headers,
     });
   } catch {
-    throw new ApiError('API tidak tersambung. Pastikan backend lokal berjalan dan CORS sesuai.', 0);
+    throw new ApiError(
+      'API tidak tersambung. Pastikan backend lokal berjalan dan CORS sesuai.',
+      0,
+    );
   }
 
   if (response.status === 401) {
@@ -76,7 +79,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!contentType.includes('application/json')) {
     if (!response.ok) {
-      throw new ApiError(response.statusText, response.status);
+      const message = response.statusText || 'Request gagal';
+      throw new ApiError(message, response.status);
     }
 
     return response.blob() as Promise<T>;
@@ -95,45 +99,56 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   throw new ApiError('Format response API tidak valid', response.status);
 }
 
+function triggerBrowserDownload(blob: Blob, fileName: string) {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  window.URL.revokeObjectURL(url);
+}
+
 export const apiClient = {
   get<T>(path: string, params: Record<string, string | number | undefined> = {}) {
     return request<T>(`${path}${toQuery(params)}`);
   },
+
   post<T>(path: string, body?: unknown) {
     return request<T>(path, {
       method: 'POST',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
+
   patch<T>(path: string, body?: unknown) {
     return request<T>(path, {
       method: 'PATCH',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
+
   delete<T>(path: string) {
     return request<T>(path, {
       method: 'DELETE',
     });
   },
+
   upload<T>(path: string, formData: FormData) {
     return request<T>(path, {
       method: 'POST',
       body: formData,
     });
   },
-  async download(path: string, fileName?: string) {
-    const blob = await request<Blob>(path);
 
-    if (fileName) {
-      const url = URL.createObjectURL(blob);
-      const anchor = window.document.createElement('a');
-      anchor.href = url;
-      anchor.download = fileName;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    }
+  async download(path: string, fileName: string) {
+    const blob = await request<Blob>(path, {
+      method: 'GET',
+    });
 
-    return blob;
+    triggerBrowserDownload(blob, fileName);
   },
 };
