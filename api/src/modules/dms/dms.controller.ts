@@ -23,6 +23,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { getAuditContext } from '../shared/request-context';
 import { ok } from '../shared/respond';
+import {
+  DMS_ACCESS_ROLES,
+  DMS_VERIFY_ROLES,
+} from './constants/dms-permission.constant';
 import { CreateDmsDocumentDto } from './dto/create-dms-document.dto';
 import { DmsDocumentListQueryDto } from './dto/dms-document-list-query.dto';
 import { DmsRejectDto } from './dto/dms-reject.dto';
@@ -38,29 +42,8 @@ type UploadedDmsControllerFile = {
   buffer: Buffer;
 };
 
-const DMS_VIEW_ROLES = [
-  'SUPER_ADMIN',
-  'ADMIN_BKPSDM',
-  'KEPALA_BADAN',
-  'KABID',
-  'ANALIS_MADYA',
-  'ANALIS_MUDA',
-  'ANALIS_PERTAMA',
-  'PENELAAH',
-  'PPPK',
-];
-
-const DMS_VERIFY_ROLES = [
-  'SUPER_ADMIN',
-  'ADMIN_BKPSDM',
-  'KEPALA_BADAN',
-  'KABID',
-  'ANALIS_MADYA',
-  'ANALIS_MUDA',
-];
-
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...DMS_VIEW_ROLES)
+@Roles(...DMS_ACCESS_ROLES)
 @Controller('api/v1/dms/documents')
 export class DmsController {
   constructor(
@@ -87,9 +70,14 @@ export class DmsController {
   async download(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
+    @Req() request: Request,
     @Res() response: Response,
   ) {
-    const result = await this.dmsService.download(id, user);
+    const result = await this.dmsService.download(
+      id,
+      user,
+      getAuditContext(request),
+    );
 
     response.setHeader('Content-Type', result.mimeType);
     response.setHeader(

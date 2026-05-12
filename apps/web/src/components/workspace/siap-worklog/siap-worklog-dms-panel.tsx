@@ -1,9 +1,12 @@
-import { FolderArchive, RefreshCcw } from 'lucide-react';
-import type { DmsDocument } from '@/lib/api/dms';
+import { useState } from 'react';
+import { Download, FolderArchive, RefreshCcw } from 'lucide-react';
+import { ApiError } from '@/lib/api/client';
+import { dmsApi, type DmsDocument } from '@/lib/api/dms';
 import {
   ActionButton,
   DataTable,
   EmptyState,
+  ErrorAlert,
   formatDateTime,
   LoadingState,
 } from '@/components/workspace/ui';
@@ -23,6 +26,33 @@ export function SiapWorklogDmsPanel({
   onOpenDmsUpload: () => void;
   onOpenDmsDocument: (id: string) => void;
 }) {
+  const [downloadingId, setDownloadingId] = useState('');
+  const [error, setError] = useState('');
+
+  async function downloadDocument(document: DmsDocument) {
+    if (!document.fileName) {
+      return;
+    }
+
+    setDownloadingId(document.id);
+    setError('');
+
+    try {
+      await dmsApi.downloadDocument(
+        document.id,
+        document.originalFileName ?? document.fileName,
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal mengunduh dokumen DMS',
+      );
+    } finally {
+      setDownloadingId('');
+    }
+  }
+
   return (
     <section className="grid gap-4 border-t border-border pt-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -53,6 +83,8 @@ export function SiapWorklogDmsPanel({
           </ActionButton>
         </div>
       </div>
+
+      {error ? <ErrorAlert message={error} /> : null}
 
       {loading ? (
         <LoadingState label="Memuat dokumen DMS terkait" />
@@ -115,13 +147,26 @@ export function SiapWorklogDmsPanel({
               key: 'actions',
               header: 'Aksi',
               render: (item) => (
-                <ActionButton
-                  icon={FolderArchive}
-                  onClick={() => onOpenDmsDocument(item.id)}
-                  variant="secondary"
-                >
-                  Buka DMS
-                </ActionButton>
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton
+                    icon={FolderArchive}
+                    onClick={() => onOpenDmsDocument(item.id)}
+                    variant="secondary"
+                  >
+                    Buka DMS
+                  </ActionButton>
+
+                  {item.fileName ? (
+                    <ActionButton
+                      disabled={downloadingId === item.id}
+                      icon={Download}
+                      onClick={() => void downloadDocument(item)}
+                      variant="ghost"
+                    >
+                      {downloadingId === item.id ? 'Mengunduh...' : 'Download'}
+                    </ActionButton>
+                  ) : null}
+                </div>
               ),
             },
           ]}

@@ -5,8 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuthUser } from '../auth/auth.types';
+import { canAccessDmsDocument } from './constants/dms-permission.constant';
 import { DmsAuditLogRecord, DmsAuditRepository } from './dms-audit.repository';
-import { DmsDocumentRecord, DmsRepository } from './dms.repository';
+import { DmsRepository } from './dms.repository';
 
 export interface DmsAuditTimelineItem {
   id: string;
@@ -45,7 +46,7 @@ export class DmsAuditService {
       throw new NotFoundException('Dokumen DMS tidak ditemukan');
     }
 
-    if (!this.canSeeDocument(document, user)) {
+    if (!canAccessDmsDocument(document, user)) {
       throw new ForbiddenException(
         'Anda tidak berwenang mengakses audit dokumen DMS ini',
       );
@@ -82,6 +83,7 @@ export class DmsAuditService {
       DMS_DOCUMENT_REJECTED: 'Dokumen ditolak',
       DMS_DOCUMENT_ARCHIVED: 'Dokumen diarsipkan',
       DMS_DOCUMENT_DELETED: 'Dokumen dihapus',
+      DMS_DOCUMENT_DOWNLOADED: 'File dokumen diunduh',
     };
 
     return labels[action] ?? action.replaceAll('_', ' ');
@@ -120,6 +122,10 @@ export class DmsAuditService {
       return 'Dokumen dihapus dari daftar aktif DMS.';
     }
 
+    if (log.action === 'DMS_DOCUMENT_DOWNLOADED') {
+      return 'File dokumen DMS diunduh oleh pengguna.';
+    }
+
     return null;
   }
 
@@ -131,30 +137,6 @@ export class DmsAuditService {
     const note = value.rejectionNote;
 
     return typeof note === 'string' && note.trim() ? note : null;
-  }
-
-  private canSeeDocument(document: DmsDocumentRecord, user: AuthUser) {
-    if (document.createdById === user.id) {
-      return true;
-    }
-
-    if (this.hasAnyRole(user, ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN'])) {
-      return true;
-    }
-
-    if (
-      this.hasAnyRole(user, ['KABID', 'ANALIS_MADYA', 'ANALIS_MUDA']) &&
-      user.unitKerjaId &&
-      document.unitKerjaId === user.unitKerjaId
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private hasAnyRole(user: AuthUser, roles: string[]) {
-    return user.roles.some((role) => roles.includes(role));
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

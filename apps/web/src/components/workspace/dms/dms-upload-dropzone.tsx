@@ -1,5 +1,7 @@
 import type { ChangeEvent } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { AlertCircle, UploadCloud } from 'lucide-react';
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const allowedTypes = [
   'application/pdf',
@@ -9,19 +11,40 @@ const allowedTypes = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
 
+const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx'];
+
 export function DmsUploadDropzone({
   file,
   disabled,
+  error,
+  onError,
   onSelect,
 }: {
   file: File | null;
   disabled?: boolean;
+  error?: string;
+  onError?: (message: string) => void;
   onSelect: (file: File | null) => void;
 }) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
-    onSelect(selected);
     event.currentTarget.value = '';
+
+    if (!selected) {
+      onSelect(null);
+      return;
+    }
+
+    const validationError = validateFile(selected);
+
+    if (validationError) {
+      onSelect(null);
+      onError?.(validationError);
+      return;
+    }
+
+    onError?.('');
+    onSelect(selected);
   }
 
   return (
@@ -36,7 +59,7 @@ export function DmsUploadDropzone({
             {file ? file.name : 'Pilih file dokumen'}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
-            Format: PDF, JPG, PNG, DOCX, XLSX. Maksimal mengikuti aturan backend.
+            Format: PDF, JPG, PNG, DOCX, XLSX. Maksimal 10 MB.
           </div>
         </div>
 
@@ -55,13 +78,23 @@ export function DmsUploadDropzone({
         />
       </label>
 
+      {error ? (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
       {file ? (
         <div className="mt-4 flex justify-center">
           <button
             className="text-sm font-semibold text-rose-700 hover:text-rose-800"
             disabled={disabled}
             type="button"
-            onClick={() => onSelect(null)}
+            onClick={() => {
+              onError?.('');
+              onSelect(null);
+            }}
           >
             Hapus pilihan file
           </button>
@@ -69,6 +102,24 @@ export function DmsUploadDropzone({
       ) : null}
     </div>
   );
+}
+
+function validateFile(file: File) {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return 'Ukuran file maksimal 10 MB.';
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase();
+
+  if (!extension || !allowedExtensions.includes(extension)) {
+    return 'Ekstensi file tidak didukung. Gunakan PDF, JPG, PNG, DOCX, atau XLSX.';
+  }
+
+  if (file.type && !allowedTypes.includes(file.type)) {
+    return 'Tipe MIME file tidak didukung. Gunakan PDF, JPG, PNG, DOCX, atau XLSX.';
+  }
+
+  return '';
 }
 
 function formatFileSize(value: number) {

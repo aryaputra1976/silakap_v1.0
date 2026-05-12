@@ -3,6 +3,7 @@ import {
   Archive,
   BarChart3,
   CheckCircle2,
+  Download,
   FileText,
   Plus,
   RefreshCcw,
@@ -35,6 +36,7 @@ export function DmsDashboardPage() {
 
   const [summary, setSummary] = useState<DmsDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState('');
   const [error, setError] = useState('');
 
   async function loadDashboard() {
@@ -52,6 +54,30 @@ export function DmsDashboardPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadDocument(document: DmsDashboardLatestDocument) {
+    if (!document.fileName) {
+      return;
+    }
+
+    setDownloadingId(document.id);
+    setError('');
+
+    try {
+      await dmsApi.downloadDocument(
+        document.id,
+        document.originalFileName ?? document.fileName,
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal mengunduh dokumen DMS',
+      );
+    } finally {
+      setDownloadingId('');
     }
   }
 
@@ -182,6 +208,8 @@ export function DmsDashboardPage() {
             ) : (
               <LatestDocumentsTable
                 documents={latestDocuments}
+                downloadingId={downloadingId}
+                onDownload={(document) => void downloadDocument(document)}
                 onOpen={(id) => navigate(`/dms/documents/${id}`)}
               />
             )}
@@ -194,9 +222,13 @@ export function DmsDashboardPage() {
 
 function LatestDocumentsTable({
   documents,
+  downloadingId,
+  onDownload,
   onOpen,
 }: {
   documents: DmsDashboardLatestDocument[];
+  downloadingId: string;
+  onDownload: (document: DmsDashboardLatestDocument) => void;
   onOpen: (id: string) => void;
 }) {
   return (
@@ -258,9 +290,22 @@ function LatestDocumentsTable({
           key: 'actions',
           header: 'Aksi',
           render: (item) => (
-            <ActionButton onClick={() => onOpen(item.id)} variant="secondary">
-              Buka
-            </ActionButton>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton onClick={() => onOpen(item.id)} variant="secondary">
+                Buka
+              </ActionButton>
+
+              {item.fileName ? (
+                <ActionButton
+                  disabled={downloadingId === item.id}
+                  icon={Download}
+                  onClick={() => onDownload(item)}
+                  variant="ghost"
+                >
+                  {downloadingId === item.id ? 'Mengunduh...' : 'Download'}
+                </ActionButton>
+              ) : null}
+            </div>
           ),
         },
       ]}

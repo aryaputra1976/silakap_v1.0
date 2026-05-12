@@ -8,6 +8,7 @@ import {
   type DmsDocumentListQuery,
   type DmsDocumentListResponse,
 } from '@/lib/api/dms';
+
 import {
   ActionButton,
   ErrorAlert,
@@ -38,6 +39,7 @@ export function DmsDocumentsPage() {
   const [filter, setFilter] = useState<DmsFilterValue>(defaultFilter);
   const [appliedFilter, setAppliedFilter] = useState<DmsFilterValue>(defaultFilter);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState('');
   const [error, setError] = useState('');
 
   async function loadDocuments(nextFilter: DmsFilterValue = appliedFilter) {
@@ -61,6 +63,30 @@ export function DmsDocumentsPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadDocument(document: DmsDocument) {
+    if (!document.fileName) {
+      return;
+    }
+
+    setDownloadingId(document.id);
+    setError('');
+
+    try {
+      await dmsApi.downloadDocument(
+        document.id,
+        document.originalFileName ?? document.fileName,
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal mengunduh dokumen DMS',
+      );
+    } finally {
+      setDownloadingId('');
     }
   }
 
@@ -134,6 +160,8 @@ export function DmsDocumentsPage() {
         ) : (
           <DmsDocumentTable
             documents={documents}
+            downloadingId={downloadingId}
+            onDownloadDocument={(document) => void downloadDocument(document)}
             onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
           />
         )}

@@ -1,4 +1,4 @@
-import { Eye, FileText } from 'lucide-react';
+import { Download, Eye, FileText } from 'lucide-react';
 import {
   ActionButton,
   DataTable,
@@ -11,10 +11,14 @@ import { DmsStatusBadge } from './dms-status-badge';
 
 export function DmsDocumentTable({
   documents,
+  downloadingId,
   onOpenDocument,
+  onDownloadDocument,
 }: {
   documents: DmsDocument[];
+  downloadingId?: string;
   onOpenDocument: (id: string) => void;
+  onDownloadDocument?: (document: DmsDocument) => void;
 }) {
   return (
     <DataTable
@@ -121,13 +125,26 @@ export function DmsDocumentTable({
           key: 'actions',
           header: 'Aksi',
           render: (item) => (
-            <ActionButton
-              icon={Eye}
-              onClick={() => onOpenDocument(item.id)}
-              variant="secondary"
-            >
-              Buka
-            </ActionButton>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton
+                icon={Eye}
+                onClick={() => onOpenDocument(item.id)}
+                variant="secondary"
+              >
+                Buka
+              </ActionButton>
+
+              {onDownloadDocument && item.fileName ? (
+                <ActionButton
+                  disabled={downloadingId === item.id}
+                  icon={Download}
+                  onClick={() => onDownloadDocument(item)}
+                  variant="ghost"
+                >
+                  {downloadingId === item.id ? 'Mengunduh...' : 'Download'}
+                </ActionButton>
+              ) : null}
+            </div>
           ),
         },
       ]}

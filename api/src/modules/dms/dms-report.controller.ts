@@ -13,23 +13,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { DMS_VIEW_ROLES } from './constants/dms-permission.constant';
 import { DmsReportQueryDto } from './dto/dms-report-query.dto';
 import { DmsReportService } from './dms-report.service';
 
-const DMS_REPORT_ROLES = [
-  'SUPER_ADMIN',
-  'ADMIN_BKPSDM',
-  'KEPALA_BADAN',
-  'KABID',
-  'ANALIS_MADYA',
-  'ANALIS_MUDA',
-  'ANALIS_PERTAMA',
-  'PENELAAH',
-  'PPPK',
-];
-
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...DMS_REPORT_ROLES)
+@Roles(...DMS_VIEW_ROLES)
 @Controller('api/v1/dms/reports')
 export class DmsReportController {
   constructor(

@@ -11,6 +11,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, isAbsolute, relative, resolve } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
+import { canAccessDmsDocument } from './constants/dms-permission.constant';
 import { CreateDmsDocumentDto } from './dto/create-dms-document.dto';
 import { DmsDocumentListQueryDto } from './dto/dms-document-list-query.dto';
 import { DmsRejectDto } from './dto/dms-reject.dto';
@@ -126,7 +127,11 @@ export class DmsService {
     return DmsMapper.toResponse(document);
   }
 
-  async download(id: string, user: AuthUser): Promise<DownloadDmsDocumentPayload> {
+  async download(
+    id: string,
+    user: AuthUser,
+    context?: AuditContext,
+  ): Promise<DownloadDmsDocumentPayload> {
     const document = await this.getDocumentForUser(id, user);
 
     if (!document.fileName || !document.storagePath) {
@@ -135,6 +140,15 @@ export class DmsService {
 
     const absoluteStoragePath = this.resolveSafeStoragePath(document.storagePath);
     const buffer = await this.readStoredFile(absoluteStoragePath);
+
+    await this.auditService.record({
+      entityType: 'DMS_DOCUMENT',
+      entityId: document.id,
+      action: 'DMS_DOCUMENT_DOWNLOADED',
+      performedBy: user.id,
+      afterData: DmsMapper.toAuditData(document),
+      context,
+    });
 
     return {
       buffer,
@@ -579,23 +593,7 @@ export class DmsService {
   }
 
   private canSeeDocument(document: DmsDocumentRecord, user: AuthUser) {
-    if (document.createdById === user.id) {
-      return true;
-    }
-
-    if (this.hasAnyRole(user, ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN'])) {
-      return true;
-    }
-
-    if (
-      this.hasAnyRole(user, ['KABID', 'ANALIS_MADYA', 'ANALIS_MUDA']) &&
-      user.unitKerjaId &&
-      document.unitKerjaId === user.unitKerjaId
-    ) {
-      return true;
-    }
-
-    return false;
+    return canAccessDmsDocument(document, user);
   }
 
   private ensureCanCreate(user: AuthUser) {

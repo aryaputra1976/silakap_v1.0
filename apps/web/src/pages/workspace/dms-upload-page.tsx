@@ -28,6 +28,7 @@ export function DmsUploadPage() {
     caseId: searchParams.get('caseId') ?? '',
   }));
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -125,7 +126,13 @@ export function DmsUploadPage() {
             title="File Dokumen"
             description="File dapat diunggah sekarang atau nanti dari halaman detail."
           >
-            <DmsUploadDropzone disabled={saving} file={file} onSelect={setFile} />
+            <DmsUploadDropzone
+              disabled={saving}
+              error={fileError}
+              file={file}
+              onError={setFileError}
+              onSelect={setFile}
+            />
           </SectionCard>
 
           <SectionCard>

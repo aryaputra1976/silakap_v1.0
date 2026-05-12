@@ -6,6 +6,7 @@ import {
 } from '@prisma/client';
 import { AuthUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { applyDmsDocumentScope } from './constants/dms-permission.constant';
 
 export interface NormalizedDmsDashboardFilters {
   year?: number;
@@ -291,30 +292,6 @@ export class DmsDashboardRepository {
       where.unitKerjaId = filters.unitKerjaId;
     }
 
-    this.applyScope(where, user);
-
-    return where;
-  }
-
-  private applyScope(where: Prisma.DmsDocumentWhereInput, user: AuthUser) {
-    if (
-      this.hasAnyRole(user, ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN'])
-    ) {
-      return;
-    }
-
-    if (
-      this.hasAnyRole(user, ['KABID', 'ANALIS_MADYA', 'ANALIS_MUDA']) &&
-      user.unitKerjaId
-    ) {
-      where.unitKerjaId = user.unitKerjaId;
-      return;
-    }
-
-    where.createdById = user.id;
-  }
-
-  private hasAnyRole(user: AuthUser, roles: string[]) {
-    return user.roles.some((role) => roles.includes(role));
+    return applyDmsDocumentScope(where, user);
   }
 }

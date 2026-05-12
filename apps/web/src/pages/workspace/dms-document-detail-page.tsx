@@ -45,6 +45,7 @@ export function DmsDocumentDetailPage() {
   const [document, setDocument] = useState<DmsDocument | null>(null);
   const [form, setForm] = useState<DmsMetadataFormValue>(initialDmsMetadataForm);
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -155,6 +156,7 @@ async function uploadFile() {
     setDocument(updated);
     setForm(toFormValue(updated));
     setFile(null);
+    setFileError('');
     await loadAuditTimeline(updated.id);
   } catch (caught) {
     setError(
@@ -512,7 +514,9 @@ async function deleteDocument() {
             >
               <DmsUploadDropzone
                 disabled={working}
+                error={fileError}
                 file={file}
+                onError={setFileError}
                 onSelect={setFile}
               />
             </SectionCard>
