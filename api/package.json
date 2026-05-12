@@ -11,7 +11,9 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:cleanup-smoke": "tsx scripts/cleanup-smoke-data.ts"
+    "db:seed-pilot": "tsx prisma/seed-pilot-siap.ts",
+    "db:cleanup-smoke": "tsx scripts/cleanup-smoke-data.ts",
+    "smoke:phase11": "tsx scripts/smoke-phase11-siap.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
