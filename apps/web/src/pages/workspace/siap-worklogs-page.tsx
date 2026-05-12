@@ -1,100 +1,55 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  Download,
-  Edit3,
-  FileText,
-  Paperclip,
-  Plus,
-  RefreshCcw,
-  Save,
-  Send,
-  Trash2,
-  Upload,
-  X,
-} from 'lucide-react';
+import { Plus, RefreshCcw } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { apiClient, ApiError } from '@/lib/api/client';
+import { dmsApi, type DmsDocument } from '@/lib/api/dms';
 import type {
-  CreateSiapWorklogPayload,
   PaginatedResult,
   SiapWorklog,
   SiapWorklogAttachment,
-  SiapWorklogStatus,
 } from '@/lib/api/types';
 import {
   ActionButton,
-  DataTable,
   ErrorAlert,
-  Field,
-  FilterBar,
-  formatDate,
-  formatDateTime,
-  formatFileSize,
-  inputClass,
   LoadingState,
   PageHeader,
   SectionCard,
-  StatCard,
   StatusBadge,
-  Toolbar,
 } from '@/components/workspace/ui';
-
-const worklogStatuses: SiapWorklogStatus[] = [
-  'DRAFT',
-  'SUBMITTED',
-  'REVISION_REQUIRED',
-  'APPROVED',
-  'REJECTED',
-];
-
-const defaultCategories = [
-  'VERIFIKASI_BERKAS',
-  'VALIDASI_DATA',
-  'ARSIP_DIGITAL',
-  'LAYANAN_ASN',
-  'RAPAT_KOORDINASI',
-  'LAPORAN',
-  'LAINNYA',
-];
-
-type WorklogFormState = {
-  workDate: string;
-  category: string;
-  title: string;
-  description: string;
-  output: string;
-  volume: string;
-  obstacle: string;
-  caseId: string;
-  taskId: string;
-};
-
-const initialForm: WorklogFormState = {
-  workDate: toInputDate(new Date()),
-  category: 'VERIFIKASI_BERKAS',
-  title: '',
-  description: '',
-  output: '',
-  volume: '',
-  obstacle: '',
-  caseId: '',
-  taskId: '',
-};
+import { SiapWorklogAttachmentPanel } from '@/components/workspace/siap-worklog/siap-worklog-attachment-panel';
+import { SiapWorklogFilterBar } from '@/components/workspace/siap-worklog/siap-worklog-filter-bar';
+import {
+  initialWorklogForm,
+  SiapWorklogForm,
+  toWorklogFormValue,
+  toWorklogPayload,
+  type WorklogFormState,
+} from '@/components/workspace/siap-worklog/siap-worklog-form';
+import {
+  SiapWorklogStats,
+  type SiapWorklogSummary,
+} from '@/components/workspace/siap-worklog/siap-worklog-stats';
+import { SiapWorklogTable } from '@/components/workspace/siap-worklog/siap-worklog-table';
 
 export function SiapWorklogsPage() {
+  const navigate = useNavigate();
+
   const [data, setData] = useState<PaginatedResult<SiapWorklog> | null>(null);
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
-  const [form, setForm] = useState<WorklogFormState>(initialForm);
+  const [form, setForm] = useState<WorklogFormState>(initialWorklogForm);
   const [editing, setEditing] = useState<SiapWorklog | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState('');
   const [error, setError] = useState('');
+
   const [attachmentTarget, setAttachmentTarget] =
     useState<SiapWorklog | null>(null);
   const [attachments, setAttachments] = useState<SiapWorklogAttachment[]>([]);
+  const [dmsDocuments, setDmsDocuments] = useState<DmsDocument[]>([]);
+  const [loadingDmsDocuments, setLoadingDmsDocuments] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [attachmentLabel, setAttachmentLabel] = useState('');
   const [attachmentDescription, setAttachmentDescription] = useState('');
@@ -131,52 +86,42 @@ export function SiapWorklogsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  const summary = useMemo(() => {
-    const items = data?.items ?? [];
+  const rows = data?.items ?? [];
 
+  const summary = useMemo<SiapWorklogSummary>(() => {
     return {
       total: data?.total ?? 0,
-      draft: items.filter((item) => item.status === 'DRAFT').length,
-      submitted: items.filter((item) => item.status === 'SUBMITTED').length,
-      revision: items.filter((item) => item.status === 'REVISION_REQUIRED')
-        .length,
-      approved: items.filter((item) => item.status === 'APPROVED').length,
+      draft: rows.filter((item) => item.status === 'DRAFT').length,
+      submitted: rows.filter((item) => item.status === 'SUBMITTED').length,
+      revision: rows.filter((item) => item.status === 'REVISION_REQUIRED').length,
+      approved: rows.filter((item) => item.status === 'APPROVED').length,
     };
-  }, [data]);
+  }, [data?.total, rows]);
 
   function openCreateForm() {
     setEditing(null);
-    setForm(initialForm);
+    setForm(initialWorklogForm);
     setShowForm(true);
   }
 
   function openEditForm(item: SiapWorklog) {
     setEditing(item);
-    setForm({
-      workDate: toInputDate(item.workDate),
-      category: item.category,
-      title: item.title,
-      description: item.description,
-      output: item.output ?? '',
-      volume: item.volume === null ? '' : String(item.volume),
-      obstacle: item.obstacle ?? '',
-      caseId: item.caseId ?? '',
-      taskId: item.taskId ?? '',
-    });
+    setForm(toWorklogFormValue(item));
     setShowForm(true);
   }
 
   function closeForm() {
     setShowForm(false);
     setEditing(null);
-    setForm(initialForm);
+    setForm(initialWorklogForm);
   }
 
-  function updateForm(field: keyof WorklogFormState, value: string) {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  function closeAttachmentPanel() {
+    setAttachmentTarget(null);
+    setAttachments([]);
+    setDmsDocuments([]);
+    setAttachmentLabel('');
+    setAttachmentDescription('');
   }
 
   async function saveWorklog(event: FormEvent<HTMLFormElement>) {
@@ -185,7 +130,7 @@ export function SiapWorklogsPage() {
     setError('');
 
     try {
-      const payload = toPayload(form);
+      const payload = toWorklogPayload(form);
 
       if (editing) {
         await apiClient.patch<SiapWorklog>(
@@ -231,7 +176,13 @@ export function SiapWorklogsPage() {
     setAttachmentTarget(item);
     setAttachmentLabel('');
     setAttachmentDescription('');
-    await loadAttachments(item.id);
+    setAttachments([]);
+    setDmsDocuments([]);
+
+    await Promise.all([
+      loadAttachments(item.id),
+      loadDmsDocuments(item.id),
+    ]);
   }
 
   async function loadAttachments(worklogId: string) {
@@ -249,6 +200,30 @@ export function SiapWorklogsPage() {
           ? caught.message
           : 'Gagal memuat bukti dukung',
       );
+    }
+  }
+
+  async function loadDmsDocuments(worklogId: string) {
+    setLoadingDmsDocuments(true);
+    setError('');
+
+    try {
+      const result = await dmsApi.listDocuments({
+        worklogId,
+        page: 1,
+        limit: 25,
+      });
+
+      setDmsDocuments(result.items);
+    } catch (caught) {
+      setDmsDocuments([]);
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal memuat dokumen DMS terkait buku kerja',
+      );
+    } finally {
+      setLoadingDmsDocuments(false);
     }
   }
 
@@ -316,7 +291,21 @@ export function SiapWorklogsPage() {
     );
   }
 
-  const rows = data?.items ?? [];
+  function openDmsUpload() {
+    if (!attachmentTarget) {
+      navigate('/dms/upload');
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('worklogId', attachmentTarget.id);
+
+    if (attachmentTarget.caseId) {
+      params.set('caseId', attachmentTarget.caseId);
+    }
+
+    navigate(`/dms/upload?${params.toString()}`);
+  }
 
   return (
     <div className="space-y-5">
@@ -329,7 +318,11 @@ export function SiapWorklogsPage() {
             <ActionButton icon={Plus} onClick={openCreateForm}>
               Tambah Buku Kerja
             </ActionButton>
-            <ActionButton icon={RefreshCcw} onClick={() => void load()} variant="secondary">
+            <ActionButton
+              icon={RefreshCcw}
+              onClick={() => void load()}
+              variant="secondary"
+            >
               Refresh
             </ActionButton>
           </>
@@ -338,304 +331,46 @@ export function SiapWorklogsPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <section className="grid gap-3 md:grid-cols-4">
-        <StatCard
-          icon={FileText}
-          label="Draft"
-          value={summary.draft}
-          tone="warning"
-        />
-        <StatCard
-          icon={Send}
-          label="Submitted"
-          value={summary.submitted}
-          tone="info"
-        />
-        <StatCard
-          icon={Edit3}
-          label="Perlu Revisi"
-          value={summary.revision}
-          tone="danger"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Approved"
-          value={summary.approved}
-          tone="success"
-        />
-      </section>
+      <SiapWorklogStats summary={summary} />
 
       {showForm ? (
-        <SectionCard
-          title={editing ? 'Edit Buku Kerja' : 'Tambah Buku Kerja'}
-          description="Isi data pekerjaan harian. Buku kerja masih dapat diedit selama DRAFT atau REVISION_REQUIRED."
-          actions={
-            <ActionButton icon={X} onClick={closeForm} variant="secondary">
-              Tutup
-            </ActionButton>
-          }
-        >
-          <form className="grid gap-4" onSubmit={saveWorklog}>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Tanggal Kerja">
-                <input
-                  className={inputClass}
-                  required
-                  type="date"
-                  value={form.workDate}
-                  onChange={(event) => updateForm('workDate', event.target.value)}
-                />
-              </Field>
-
-              <Field label="Kategori">
-                <select
-                  className={inputClass}
-                  required
-                  value={form.category}
-                  onChange={(event) => updateForm('category', event.target.value)}
-                >
-                  {defaultCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Volume / Jumlah">
-                <input
-                  className={inputClass}
-                  min={0}
-                  type="number"
-                  value={form.volume}
-                  onChange={(event) => updateForm('volume', event.target.value)}
-                  placeholder="Contoh: 12"
-                />
-              </Field>
-            </div>
-
-            <Field label="Judul Kegiatan">
-              <input
-                className={inputClass}
-                required
-                value={form.title}
-                onChange={(event) => updateForm('title', event.target.value)}
-                placeholder="Contoh: Verifikasi berkas pensiun BUP"
-              />
-            </Field>
-
-            <Field label="Uraian Pekerjaan">
-              <textarea
-                className={textareaClass}
-                required
-                value={form.description}
-                onChange={(event) =>
-                  updateForm('description', event.target.value)
-                }
-                placeholder="Jelaskan pekerjaan yang dilakukan hari ini."
-              />
-            </Field>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Output / Hasil">
-                <textarea
-                  className={textareaClass}
-                  value={form.output}
-                  onChange={(event) => updateForm('output', event.target.value)}
-                  placeholder="Contoh: 12 berkas diperiksa."
-                />
-              </Field>
-
-              <Field label="Kendala">
-                <textarea
-                  className={textareaClass}
-                  value={form.obstacle}
-                  onChange={(event) =>
-                    updateForm('obstacle', event.target.value)
-                  }
-                  placeholder="Isi jika ada kendala."
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Case ID Opsional">
-                <input
-                  className={inputClass}
-                  value={form.caseId}
-                  onChange={(event) => updateForm('caseId', event.target.value)}
-                  placeholder="Isi jika terkait case SIAP"
-                />
-              </Field>
-
-              <Field label="Task ID Opsional">
-                <input
-                  className={inputClass}
-                  value={form.taskId}
-                  onChange={(event) => updateForm('taskId', event.target.value)}
-                  placeholder="Isi jika terkait task SIAP"
-                />
-              </Field>
-            </div>
-
-            <div className="flex justify-end">
-              <ActionButton disabled={saving} icon={Save} type="submit">
-                {saving ? 'Menyimpan...' : 'Simpan Buku Kerja'}
-              </ActionButton>
-            </div>
-          </form>
-        </SectionCard>
+        <SiapWorklogForm
+          editing={editing}
+          form={form}
+          saving={saving}
+          onChange={setForm}
+          onClose={closeForm}
+          onSubmit={saveWorklog}
+        />
       ) : null}
 
-      <Toolbar>
-        <FilterBar>
-          <input
-            className={inputClass}
-            placeholder="Cari judul/output/kendala"
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                void load();
-              }
-            }}
-          />
-
-          <select
-            className={inputClass}
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-          >
-            <option value="">Semua status</option>
-            {worklogStatuses.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <ActionButton icon={RefreshCcw} onClick={() => void load()} variant="secondary">
-            Terapkan Filter
-          </ActionButton>
-        </FilterBar>
-      </Toolbar>
+      <SiapWorklogFilterBar
+        q={q}
+        status={status}
+        onApply={() => void load()}
+        onQChange={setQ}
+        onStatusChange={setStatus}
+      />
 
       {attachmentTarget ? (
-        <SectionCard
-          title="Bukti Dukung Buku Kerja"
-          description={attachmentTarget.title}
-          actions={
-            <ActionButton
-              icon={X}
-              onClick={() => {
-                setAttachmentTarget(null);
-                setAttachments([]);
-              }}
-              variant="secondary"
-            >
-              Tutup
-            </ActionButton>
-          }
-        >
-          <div className="grid gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Label Bukti">
-                <input
-                  className={inputClass}
-                  value={attachmentLabel}
-                  onChange={(event) => setAttachmentLabel(event.target.value)}
-                  placeholder="Contoh: Rekap verifikasi berkas"
-                />
-              </Field>
-
-              <Field label="Deskripsi">
-                <input
-                  className={inputClass}
-                  value={attachmentDescription}
-                  onChange={(event) =>
-                    setAttachmentDescription(event.target.value)
-                  }
-                  placeholder="Keterangan singkat bukti dukung"
-                />
-              </Field>
-            </div>
-
-            <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50">
-              <Upload className="size-4" />
-              {uploading ? 'Mengunggah...' : 'Upload Bukti PDF/JPG/PNG'}
-              <input
-                className="sr-only"
-                disabled={uploading}
-                type="file"
-                accept="application/pdf,image/jpeg,image/png"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void uploadAttachment(file);
-                  }
-                  event.currentTarget.value = '';
-                }}
-              />
-            </label>
-
-            <DataTable
-              items={attachments}
-              rowKey={(item) => item.id}
-              empty="Belum ada bukti dukung"
-              columns={[
-                {
-                  key: 'name',
-                  header: 'Bukti',
-                  render: (item) => (
-                    <div>
-                      <div className="font-semibold text-zinc-950">
-                        {item.label ??
-                          item.document.originalFileName ??
-                          item.document.fileName}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.document.mimeType ?? '-'} ·{' '}
-                        {formatFileSize(item.document.fileSize)}
-                      </div>
-                      {item.description ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.description}
-                        </p>
-                      ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'date',
-                  header: 'Tanggal',
-                  render: (item) => formatDateTime(item.createdAt),
-                },
-                {
-                  key: 'actions',
-                  header: 'Aksi',
-                  render: (item) => (
-                    <div className="flex flex-wrap gap-2">
-                      <ActionButton
-                        icon={Download}
-                        onClick={() => void downloadAttachment(item)}
-                        variant="secondary"
-                      >
-                        Download
-                      </ActionButton>
-                      <ActionButton
-                        icon={Trash2}
-                        onClick={() => void deleteAttachment(item.id)}
-                        variant="danger"
-                      >
-                        Hapus
-                      </ActionButton>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </div>
-        </SectionCard>
+        <SiapWorklogAttachmentPanel
+          attachments={attachments}
+          description={attachmentDescription}
+          dmsDocuments={dmsDocuments}
+          label={attachmentLabel}
+          loadingDmsDocuments={loadingDmsDocuments}
+          target={attachmentTarget}
+          uploading={uploading}
+          onClose={closeAttachmentPanel}
+          onDelete={(attachmentId) => void deleteAttachment(attachmentId)}
+          onDescriptionChange={setAttachmentDescription}
+          onDownload={(item) => void downloadAttachment(item)}
+          onLabelChange={setAttachmentLabel}
+          onOpenDmsDocument={(id) => navigate(`/dms/documents/${id}`)}
+          onOpenDmsUpload={openDmsUpload}
+          onRefreshDms={() => void loadDmsDocuments(attachmentTarget.id)}
+          onUpload={(file) => void uploadAttachment(file)}
+        />
       ) : null}
 
       <SectionCard
@@ -645,174 +380,15 @@ export function SiapWorklogsPage() {
         {loading ? (
           <LoadingState label="Memuat buku kerja" />
         ) : (
-          <DataTable
-            items={rows}
-            rowKey={(item) => item.id}
-            empty="Belum ada buku kerja"
-            columns={[
-              {
-                key: 'workDate',
-                header: 'Tanggal',
-                render: (item) => (
-                  <div>
-                    <div className="font-semibold text-zinc-900">
-                      {formatDate(item.workDate)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.category}
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: 'title',
-                header: 'Kegiatan',
-                render: (item) => (
-                  <div className="max-w-xl">
-                    <div className="font-semibold text-zinc-950">
-                      {item.title}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                      {item.description}
-                    </p>
-                    {item.output ? (
-                      <p className="mt-1 text-xs font-medium text-zinc-700">
-                        Output: {item.output}
-                      </p>
-                    ) : null}
-                  </div>
-                ),
-              },
-              {
-                key: 'volume',
-                header: 'Volume',
-                render: (item) => item.volume ?? '-',
-              },
-              {
-                key: 'status',
-                header: 'Status',
-                render: (item) => (
-                  <StatusBadge
-                    value={item.status}
-                    tone={worklogStatusTone(item.status)}
-                  />
-                ),
-              },
-              {
-                key: 'review',
-                header: 'Review',
-                render: (item) => (
-                  <div className="text-sm">
-                    <div>{item.reviewer?.name ?? '-'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDateTime(item.reviewedAt)}
-                    </div>
-                    {item.reviewNote ? (
-                      <div className="mt-1 max-w-xs text-xs text-rose-700">
-                        {item.reviewNote}
-                      </div>
-                    ) : null}
-                  </div>
-                ),
-              },
-              {
-                key: 'actions',
-                header: 'Aksi',
-                render: (item) => (
-                  <div className="flex flex-wrap gap-2">
-                    <ActionButton
-                      icon={Paperclip}
-                      onClick={() => void openAttachments(item)}
-                      variant="secondary"
-                    >
-                      Bukti
-                    </ActionButton>
-
-                    {canEdit(item) ? (
-                      <ActionButton
-                        icon={Edit3}
-                        onClick={() => openEditForm(item)}
-                        variant="secondary"
-                      >
-                        Edit
-                      </ActionButton>
-                    ) : null}
-
-                    {canSubmit(item) ? (
-                      <ActionButton
-                        disabled={workingId === item.id}
-                        icon={Send}
-                        onClick={() => void submitWorklog(item.id)}
-                      >
-                        Submit
-                      </ActionButton>
-                    ) : null}
-
-                    {!canEdit(item) && !canSubmit(item) ? (
-                      <StatusBadge value="LOCKED" tone="neutral" />
-                    ) : null}
-                  </div>
-                ),
-              },
-            ]}
+          <SiapWorklogTable
+            rows={rows}
+            workingId={workingId}
+            onEdit={openEditForm}
+            onOpenAttachments={(item) => void openAttachments(item)}
+            onSubmit={(id) => void submitWorklog(id)}
           />
         )}
       </SectionCard>
     </div>
   );
 }
-
-function canEdit(item: SiapWorklog) {
-  return item.status === 'DRAFT' || item.status === 'REVISION_REQUIRED';
-}
-
-function canSubmit(item: SiapWorklog) {
-  return item.status === 'DRAFT' || item.status === 'REVISION_REQUIRED';
-}
-
-function toPayload(form: WorklogFormState): CreateSiapWorklogPayload {
-  return {
-    workDate: form.workDate,
-    category: form.category,
-    title: form.title.trim(),
-    description: form.description.trim(),
-    output: normalizeOptional(form.output),
-    volume: form.volume ? Number(form.volume) : undefined,
-    obstacle: normalizeOptional(form.obstacle),
-    caseId: normalizeOptional(form.caseId),
-    taskId: normalizeOptional(form.taskId),
-  };
-}
-
-function normalizeOptional(value: string) {
-  const normalized = value.trim();
-  return normalized ? normalized : undefined;
-}
-
-function toInputDate(value: string | Date) {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toISOString().slice(0, 10);
-}
-
-function worklogStatusTone(status: SiapWorklogStatus) {
-  if (status === 'APPROVED') {
-    return 'success' as const;
-  }
-
-  if (status === 'SUBMITTED') {
-    return 'info' as const;
-  }
-
-  if (status === 'REVISION_REQUIRED' || status === 'REJECTED') {
-    return 'danger' as const;
-  }
-
-  return 'warning' as const;
-}
-
-const textareaClass = `${inputClass} min-h-28 py-2`;
