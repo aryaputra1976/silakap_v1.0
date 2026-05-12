@@ -379,11 +379,12 @@ model SiapWorklog {
   updatedBy String?   @map("updated_by") @db.VarChar(36)
   deletedAt DateTime? @map("deleted_at")
 
-  user      User       @relation("WorklogUser", fields: [userId], references: [id], onDelete: Cascade)
-  unitKerja UnitKerja? @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
-  case      SiapCase?  @relation(fields: [caseId], references: [id], onDelete: SetNull)
-  task      SiapTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  reviewer  User?      @relation("WorklogReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  user        User                      @relation("WorklogUser", fields: [userId], references: [id], onDelete: Cascade)
+  unitKerja   UnitKerja?                @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
+  case        SiapCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  task        SiapTask?                 @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewer    User?                     @relation("WorklogReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  attachments SiapWorklogAttachment[]
 
   @@index([userId])
   @@index([unitKerjaId])
@@ -489,24 +490,25 @@ model SlaTracking {
 }
 
 model Document {
-  id               String  @id @default(uuid()) @db.VarChar(36)
-  caseId           String? @map("case_id") @db.VarChar(36)
-  documentType     String  @map("document_type") @db.VarChar(100)
-  fileName         String  @map("file_name") @db.VarChar(255)
-  originalFileName String? @map("original_file_name") @db.VarChar(255)
-  storagePath      String  @map("storage_path") @db.VarChar(500)
-  mimeType         String? @map("mime_type") @db.VarChar(120)
-  fileSize         Int?    @map("file_size")
-  checksum         String? @db.VarChar(128)
-  version          Int     @default(1)
-  uploadedBy       String? @map("uploaded_by") @db.VarChar(36)
+  id               String   @id @default(uuid()) @db.VarChar(36)
+  caseId           String?  @map("case_id") @db.VarChar(36)
+  documentType     String   @map("document_type") @db.VarChar(100)
+  fileName         String   @map("file_name") @db.VarChar(255)
+  originalFileName String?  @map("original_file_name") @db.VarChar(255)
+  storagePath      String   @map("storage_path") @db.VarChar(500)
+  mimeType         String?  @map("mime_type") @db.VarChar(120)
+  fileSize         Int?     @map("file_size")
+  checksum         String?  @db.VarChar(128)
+  version          Int      @default(1)
+  uploadedBy       String?  @map("uploaded_by") @db.VarChar(36)
   uploadedAt       DateTime @default(now()) @map("uploaded_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  case SiapCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  case               SiapCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  worklogAttachments SiapWorklogAttachment[]
 
   @@index([caseId])
   @@index([documentType])
@@ -639,4 +641,24 @@ model SipensiunCase {
   @@index([jenisPensiun])
   @@index([tmtPensiun])
   @@map("sipensiun_cases")
+}
+
+model SiapWorklogAttachment {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  worklogId   String   @map("worklog_id") @db.VarChar(36)
+  documentId  String   @map("document_id") @db.VarChar(36)
+
+  label       String?  @db.VarChar(150)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.VarChar(36)
+
+  worklog  SiapWorklog @relation(fields: [worklogId], references: [id], onDelete: Cascade)
+  document Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([worklogId, documentId])
+  @@index([worklogId])
+  @@index([documentId])
+  @@index([createdAt])
+  @@map("siap_worklog_attachments")
 }

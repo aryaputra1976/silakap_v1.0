@@ -10,5 +10,6 @@ import { SiarsipService } from './siarsip.service';
   imports: [AuditModule, AuthModule, PrismaModule],
   controllers: [SiarsipController],
   providers: [SiarsipRepository, SiarsipService],
+  exports: [SiarsipService],
 })
 export class SiarsipModule {}

@@ -1,12 +1,16 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  Download,
   Edit3,
   FileText,
+  Paperclip,
   Plus,
   RefreshCcw,
   Save,
   Send,
+  Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -14,6 +18,7 @@ import type {
   CreateSiapWorklogPayload,
   PaginatedResult,
   SiapWorklog,
+  SiapWorklogAttachment,
   SiapWorklogStatus,
 } from '@/lib/api/types';
 import {
@@ -24,6 +29,7 @@ import {
   FilterBar,
   formatDate,
   formatDateTime,
+  formatFileSize,
   inputClass,
   LoadingState,
   PageHeader,
@@ -86,6 +92,12 @@ export function SiapWorklogsPage() {
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState('');
   const [error, setError] = useState('');
+  const [attachmentTarget, setAttachmentTarget] =
+    useState<SiapWorklog | null>(null);
+  const [attachments, setAttachments] = useState<SiapWorklogAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [attachmentLabel, setAttachmentLabel] = useState('');
+  const [attachmentDescription, setAttachmentDescription] = useState('');
 
   async function load() {
     setLoading(true);
@@ -213,6 +225,95 @@ export function SiapWorklogsPage() {
     } finally {
       setWorkingId('');
     }
+  }
+
+  async function openAttachments(item: SiapWorklog) {
+    setAttachmentTarget(item);
+    setAttachmentLabel('');
+    setAttachmentDescription('');
+    await loadAttachments(item.id);
+  }
+
+  async function loadAttachments(worklogId: string) {
+    setError('');
+
+    try {
+      const result = await apiClient.get<SiapWorklogAttachment[]>(
+        `/siap/worklogs/${worklogId}/attachments`,
+      );
+
+      setAttachments(result);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal memuat bukti dukung',
+      );
+    }
+  }
+
+  async function uploadAttachment(file: File) {
+    if (!attachmentTarget) {
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('label', attachmentLabel || file.name);
+      formData.append('description', attachmentDescription);
+
+      await apiClient.upload<SiapWorklogAttachment>(
+        `/siap/worklogs/${attachmentTarget.id}/attachments`,
+        formData,
+      );
+
+      setAttachmentLabel('');
+      setAttachmentDescription('');
+      await loadAttachments(attachmentTarget.id);
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal upload bukti dukung',
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteAttachment(attachmentId: string) {
+    if (!attachmentTarget) {
+      return;
+    }
+
+    setError('');
+
+    try {
+      await apiClient.delete(
+        `/siap/worklogs/${attachmentTarget.id}/attachments/${attachmentId}`,
+      );
+
+      await loadAttachments(attachmentTarget.id);
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal menghapus bukti dukung',
+      );
+    }
+  }
+
+  async function downloadAttachment(item: SiapWorklogAttachment) {
+    await apiClient.download(
+      `/siarsip/documents/${item.documentId}/download`,
+      item.document.originalFileName ?? item.document.fileName,
+    );
   }
 
   const rows = data?.items ?? [];
@@ -419,6 +520,124 @@ export function SiapWorklogsPage() {
         </FilterBar>
       </Toolbar>
 
+      {attachmentTarget ? (
+        <SectionCard
+          title="Bukti Dukung Buku Kerja"
+          description={attachmentTarget.title}
+          actions={
+            <ActionButton
+              icon={X}
+              onClick={() => {
+                setAttachmentTarget(null);
+                setAttachments([]);
+              }}
+              variant="secondary"
+            >
+              Tutup
+            </ActionButton>
+          }
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Label Bukti">
+                <input
+                  className={inputClass}
+                  value={attachmentLabel}
+                  onChange={(event) => setAttachmentLabel(event.target.value)}
+                  placeholder="Contoh: Rekap verifikasi berkas"
+                />
+              </Field>
+
+              <Field label="Deskripsi">
+                <input
+                  className={inputClass}
+                  value={attachmentDescription}
+                  onChange={(event) =>
+                    setAttachmentDescription(event.target.value)
+                  }
+                  placeholder="Keterangan singkat bukti dukung"
+                />
+              </Field>
+            </div>
+
+            <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50">
+              <Upload className="size-4" />
+              {uploading ? 'Mengunggah...' : 'Upload Bukti PDF/JPG/PNG'}
+              <input
+                className="sr-only"
+                disabled={uploading}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void uploadAttachment(file);
+                  }
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+
+            <DataTable
+              items={attachments}
+              rowKey={(item) => item.id}
+              empty="Belum ada bukti dukung"
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Bukti',
+                  render: (item) => (
+                    <div>
+                      <div className="font-semibold text-zinc-950">
+                        {item.label ??
+                          item.document.originalFileName ??
+                          item.document.fileName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {item.document.mimeType ?? '-'} ·{' '}
+                        {formatFileSize(item.document.fileSize)}
+                      </div>
+                      {item.description ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'date',
+                  header: 'Tanggal',
+                  render: (item) => formatDateTime(item.createdAt),
+                },
+                {
+                  key: 'actions',
+                  header: 'Aksi',
+                  render: (item) => (
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton
+                        icon={Download}
+                        onClick={() => void downloadAttachment(item)}
+                        variant="secondary"
+                      >
+                        Download
+                      </ActionButton>
+                      <ActionButton
+                        icon={Trash2}
+                        onClick={() => void deleteAttachment(item.id)}
+                        variant="danger"
+                      >
+                        Hapus
+                      </ActionButton>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        </SectionCard>
+      ) : null}
+
       <SectionCard
         title="Daftar Buku Kerja"
         description="Submit buku kerja setelah data aktivitas dan output sudah benar."
@@ -501,6 +720,14 @@ export function SiapWorklogsPage() {
                 header: 'Aksi',
                 render: (item) => (
                   <div className="flex flex-wrap gap-2">
+                    <ActionButton
+                      icon={Paperclip}
+                      onClick={() => void openAttachments(item)}
+                      variant="secondary"
+                    >
+                      Bukti
+                    </ActionButton>
+
                     {canEdit(item) ? (
                       <ActionButton
                         icon={Edit3}

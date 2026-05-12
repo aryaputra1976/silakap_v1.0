@@ -2,17 +2,21 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   ClipboardCheck,
+  Download,
   Edit3,
+  Paperclip,
   RefreshCcw,
   RotateCcw,
   Search,
   Users,
+  X,
 } from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api/client';
 import type {
   PaginatedResult,
   ReviewSiapWorklogPayload,
   SiapWorklog,
+  SiapWorklogAttachment,
   SiapWorklogStatus,
 } from '@/lib/api/types';
 import {
@@ -23,6 +27,7 @@ import {
   FilterBar,
   formatDate,
   formatDateTime,
+  formatFileSize,
   inputClass,
   LoadingState,
   PageHeader,
@@ -52,6 +57,9 @@ export function SiapWorklogTeamPage() {
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState('');
   const [error, setError] = useState('');
+  const [attachmentTarget, setAttachmentTarget] =
+    useState<SiapWorklog | null>(null);
+  const [attachments, setAttachments] = useState<SiapWorklogAttachment[]>([]);
 
   async function load() {
     setLoading(true);
@@ -148,6 +156,36 @@ export function SiapWorklogTeamPage() {
     }
   }
 
+  async function openAttachments(item: SiapWorklog) {
+    setAttachmentTarget(item);
+    await loadAttachments(item.id);
+  }
+
+  async function loadAttachments(worklogId: string) {
+    setError('');
+
+    try {
+      const result = await apiClient.get<SiapWorklogAttachment[]>(
+        `/siap/worklogs/${worklogId}/attachments`,
+      );
+
+      setAttachments(result);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal memuat bukti dukung',
+      );
+    }
+  }
+
+  async function downloadAttachment(item: SiapWorklogAttachment) {
+    await apiClient.download(
+      `/siarsip/documents/${item.documentId}/download`,
+      item.document.originalFileName ?? item.document.fileName,
+    );
+  }
+
   const rows = data?.items ?? [];
 
   return (
@@ -224,6 +262,73 @@ export function SiapWorklogTeamPage() {
           </ActionButton>
         </FilterBar>
       </Toolbar>
+
+      {attachmentTarget ? (
+        <SectionCard
+          title="Bukti Dukung Buku Kerja"
+          description={`${attachmentTarget.user.name} · ${attachmentTarget.title}`}
+          actions={
+            <ActionButton
+              icon={X}
+              onClick={() => {
+                setAttachmentTarget(null);
+                setAttachments([]);
+              }}
+              variant="secondary"
+            >
+              Tutup
+            </ActionButton>
+          }
+        >
+          <DataTable
+            items={attachments}
+            rowKey={(item) => item.id}
+            empty="Belum ada bukti dukung"
+            columns={[
+              {
+                key: 'name',
+                header: 'Bukti',
+                render: (item) => (
+                  <div>
+                    <div className="font-semibold text-zinc-950">
+                      {item.label ??
+                        item.document.originalFileName ??
+                        item.document.fileName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.document.mimeType ?? '-'} ·{' '}
+                      {formatFileSize(item.document.fileSize)}
+                    </div>
+                    {item.description ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: 'date',
+                header: 'Tanggal',
+                render: (item) => formatDateTime(item.createdAt),
+              },
+              {
+                key: 'actions',
+                header: 'Aksi',
+                render: (item) => (
+                  <ActionButton
+                    icon={Download}
+                    onClick={() => void downloadAttachment(item)}
+                    variant="secondary"
+                  >
+                    Download
+                  </ActionButton>
+                ),
+              },
+            ]}
+          />
+        </SectionCard>
+      ) : null}
 
       {reviewTarget ? (
         <SectionCard
@@ -397,6 +502,14 @@ export function SiapWorklogTeamPage() {
                 header: 'Aksi',
                 render: (item) => (
                   <div className="flex flex-wrap gap-2">
+                    <ActionButton
+                      icon={Paperclip}
+                      onClick={() => void openAttachments(item)}
+                      variant="secondary"
+                    >
+                      Bukti
+                    </ActionButton>
+
                     {item.status === 'SUBMITTED' ? (
                       <>
                         <ActionButton

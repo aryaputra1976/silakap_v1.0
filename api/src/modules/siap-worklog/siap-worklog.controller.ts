@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -8,8 +9,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -20,8 +24,10 @@ import { ok } from '../shared/respond';
 import { getAuditContext } from '../shared/request-context';
 import { CreateWorklogDto } from './dto/create-worklog.dto';
 import { ReviewWorklogDto } from './dto/review-worklog.dto';
+import { UploadWorklogAttachmentDto } from './dto/upload-worklog-attachment.dto';
 import { UpdateWorklogDto } from './dto/update-worklog.dto';
 import { WorklogListQueryDto } from './dto/worklog-list-query.dto';
+import { UploadedWorklogAttachmentFile } from './siap-worklog-attachment.types';
 import { SiapWorklogService } from './siap-worklog.service';
 
 const SIAP_WORKLOG_VIEW_ROLES = [
@@ -71,6 +77,52 @@ export class SiapWorklogController {
   ) {
     const result = await this.worklogService.findTeam(query, user);
     return ok(result);
+  }
+
+  @Get(':id/attachments')
+  async findAttachments(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.worklogService.findAttachments(id, user);
+    return ok(result);
+  }
+
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAttachment(
+    @Param('id') id: string,
+    @Body() dto: UploadWorklogAttachmentDto,
+    @UploadedFile() file: UploadedWorklogAttachmentFile | undefined,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    const result = await this.worklogService.uploadAttachment(
+      id,
+      dto,
+      file,
+      user,
+      getAuditContext(request),
+    );
+
+    return ok(result, 'Bukti dukung berhasil diunggah');
+  }
+
+  @Delete(':id/attachments/:attachmentId')
+  async deleteAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    const result = await this.worklogService.deleteAttachment(
+      id,
+      attachmentId,
+      user,
+      getAuditContext(request),
+    );
+
+    return ok(result, 'Bukti dukung berhasil dihapus');
   }
 
   @Get(':id')

@@ -153,6 +153,74 @@ export class SiarsipService {
     return this.toDocumentResponse(created);
   }
 
+  async uploadStandaloneDocument(
+    ownerId: string,
+    documentTypeValue: string,
+    file: UploadedDocumentFile | undefined,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File wajib diunggah');
+    }
+
+    const documentType = this.normalizeDocumentType(documentTypeValue);
+    const extension = this.getAllowedExtension(file.mimetype);
+
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      throw new BadRequestException('Ukuran file maksimal 2 MB');
+    }
+
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    const timestamp = Date.now();
+    const random = randomBytes(4).toString('hex');
+    const storedFileName = `${documentType}-${timestamp}-${random}.${extension}`;
+    const relativeStoragePath = [
+      'uploads',
+      'worklogs',
+      ownerId,
+      storedFileName,
+    ].join('/');
+    const absoluteStoragePath =
+      this.resolveSafeStoragePath(relativeStoragePath);
+
+    await mkdir(resolve(this.getUploadRoot(), 'worklogs', ownerId), {
+      recursive: true,
+    });
+    await writeFile(absoluteStoragePath, file.buffer);
+
+    const created = await this.siarsipRepository.createDocument({
+      caseId: null,
+      documentType,
+      fileName: storedFileName,
+      originalFileName: basename(file.originalname),
+      storagePath: relativeStoragePath,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      checksum,
+      uploadedBy: user.id,
+    });
+
+    await this.auditService.record({
+      entityType: 'DOCUMENT',
+      entityId: created.id,
+      action: 'STANDALONE_DOCUMENT_UPLOADED',
+      performedBy: user.id,
+      afterData: {
+        ownerId,
+        documentType,
+        fileName: storedFileName,
+        originalFileName: basename(file.originalname),
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        checksum,
+      },
+      context,
+    });
+
+    return this.toDocumentResponse(created);
+  }
+
   async downloadDocument(id: string): Promise<DownloadDocumentPayload> {
     const document = await this.siarsipRepository.findDocumentById(id.trim());
 

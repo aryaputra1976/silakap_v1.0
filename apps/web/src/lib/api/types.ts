@@ -162,6 +162,17 @@ export type DocumentRecord = {
   case?: SiapCaseSummary | null;
 };
 
+export type SiapWorklogAttachment = {
+  id: string;
+  worklogId: string;
+  documentId: string;
+  label: string | null;
+  description: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  document: DocumentRecord;
+};
+
 export type DocumentChecklist = {
   caseId: string;
   serviceType: string;
@@ -421,6 +432,7 @@ export type SiapWorklog = {
   case: SiapWorklogCaseSummary | null;
   task: SiapWorklogTaskSummary | null;
   reviewer: NotificationUserSummary | null;
+  attachments?: SiapWorklogAttachment[];
 };
 
 export type SiapWorklogDashboardStaff = {

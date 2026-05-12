@@ -9,14 +9,17 @@ import { SiapWorklogStatus } from '@prisma/client';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { EventBusService } from '../events/event-bus.service';
+import { SiarsipService } from '../siarsip/siarsip.service';
 import { CreateWorklogDto } from './dto/create-worklog.dto';
 import { ReviewWorklogDto } from './dto/review-worklog.dto';
+import { UploadWorklogAttachmentDto } from './dto/upload-worklog-attachment.dto';
 import { UpdateWorklogDto } from './dto/update-worklog.dto';
 import { WorklogListQueryDto } from './dto/worklog-list-query.dto';
 import {
   SiapWorklogRecord,
   SiapWorklogRepository,
 } from './siap-worklog.repository';
+import { UploadedWorklogAttachmentFile } from './siap-worklog-attachment.types';
 import { NormalizedWorklogFilters } from './siap-worklog.types';
 
 const STAFF_ROLES = [
@@ -48,6 +51,8 @@ export class SiapWorklogService {
     private readonly eventBusService: EventBusService,
     @Inject(AuditService)
     private readonly auditService: AuditService,
+    @Inject(SiarsipService)
+    private readonly siarsipService: SiarsipService,
   ) {}
 
   async create(dto: CreateWorklogDto, user: AuthUser, context?: AuditContext) {
@@ -340,6 +345,121 @@ export class SiapWorklogService {
     return this.toResponse(updated);
   }
 
+  async uploadAttachment(
+    worklogId: string,
+    dto: UploadWorklogAttachmentDto,
+    file: UploadedWorklogAttachmentFile | undefined,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    const worklog = await this.getWorklogForUser(worklogId, user);
+
+    if (!this.canUploadAttachment(worklog, user)) {
+      throw new ForbiddenException(
+        'Anda tidak berwenang mengunggah bukti dukung buku kerja ini',
+      );
+    }
+
+    const document = worklog.caseId
+      ? await this.siarsipService.uploadDocument(
+          worklog.caseId,
+          {
+            documentType: 'SIAP_WORKLOG_BUKTI',
+            description: this.normalizeOptionalText(dto.description),
+          },
+          file,
+          user,
+          context,
+        )
+      : await this.siarsipService.uploadStandaloneDocument(
+          worklog.id,
+          'SIAP_WORKLOG_BUKTI',
+          file,
+          user,
+          context,
+        );
+
+    const attachment = await this.worklogRepository.createAttachment({
+      worklogId: worklog.id,
+      documentId: document.id,
+      label: this.normalizeNullableText(dto.label),
+      description: this.normalizeNullableText(dto.description),
+      createdBy: user.id,
+    });
+
+    await this.auditService.record({
+      entityType: 'SIAP_WORKLOG_ATTACHMENT',
+      entityId: attachment.id,
+      action: 'WORKLOG_ATTACHMENT_UPLOADED',
+      performedBy: user.id,
+      afterData: {
+        worklogId: worklog.id,
+        documentId: document.id,
+        label: attachment.label,
+        fileName: document.fileName,
+        originalFileName: document.originalFileName,
+        mimeType: document.mimeType,
+        fileSize: document.fileSize,
+      },
+      context,
+    });
+
+    return this.toAttachmentResponse(attachment);
+  }
+
+  async findAttachments(worklogId: string, user: AuthUser) {
+    const worklog = await this.getWorklogForUser(worklogId, user);
+    const attachments = await this.worklogRepository.findAttachmentsByWorklogId(
+      worklog.id,
+    );
+
+    return attachments.map((item) => this.toAttachmentResponse(item));
+  }
+
+  async deleteAttachment(
+    worklogId: string,
+    attachmentId: string,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    const worklog = await this.getWorklogForUser(worklogId, user);
+
+    if (!this.canUploadAttachment(worklog, user)) {
+      throw new ForbiddenException(
+        'Anda tidak berwenang menghapus bukti dukung buku kerja ini',
+      );
+    }
+
+    const attachment = await this.worklogRepository.findAttachmentById(
+      attachmentId.trim(),
+    );
+
+    if (!attachment || attachment.worklogId !== worklog.id) {
+      throw new NotFoundException('Bukti dukung tidak ditemukan');
+    }
+
+    await this.worklogRepository.deleteAttachment(attachment.id);
+
+    await this.auditService.record({
+      entityType: 'SIAP_WORKLOG_ATTACHMENT',
+      entityId: attachment.id,
+      action: 'WORKLOG_ATTACHMENT_DELETED',
+      performedBy: user.id,
+      beforeData: {
+        worklogId: worklog.id,
+        documentId: attachment.documentId,
+        label: attachment.label,
+        document: attachment.document,
+      },
+      context,
+    });
+
+    return {
+      deleted: true,
+      id: attachment.id,
+    };
+  }
+
   private async getWorklogForUser(id: string, user: AuthUser) {
     const worklog = await this.worklogRepository.findById(id.trim());
 
@@ -440,6 +560,24 @@ export class SiapWorklogService {
     throw new ForbiddenException(
       'Anda tidak berwenang mereview buku kerja unit ini',
     );
+  }
+
+  private canUploadAttachment(worklog: SiapWorklogRecord, user: AuthUser) {
+    if (worklog.userId === user.id) {
+      const uploadableStatuses: SiapWorklogStatus[] = [
+        SiapWorklogStatus.DRAFT,
+        SiapWorklogStatus.REVISION_REQUIRED,
+        SiapWorklogStatus.SUBMITTED,
+      ];
+
+      return uploadableStatuses.includes(worklog.status);
+    }
+
+    if (this.hasAnyRole(user, ['SUPER_ADMIN', 'ADMIN_BKPSDM'])) {
+      return true;
+    }
+
+    return false;
   }
 
   private normalizeFilters(
@@ -578,6 +716,46 @@ export class SiapWorklogService {
       case: record.case,
       task: record.task,
       reviewer: record.reviewer,
+      attachments: record.attachments.map((attachment) =>
+        this.toAttachmentResponse(attachment),
+      ),
+    };
+  }
+
+  private toAttachmentResponse(attachment: {
+    id: string;
+    worklogId: string;
+    documentId: string;
+    label: string | null;
+    description: string | null;
+    createdAt: Date;
+    createdBy: string | null;
+    document: {
+      id: string;
+      caseId: string | null;
+      documentType: string;
+      fileName: string;
+      originalFileName: string | null;
+      storagePath: string;
+      mimeType: string | null;
+      fileSize: number | null;
+      checksum: string | null;
+      version: number;
+      uploadedBy: string | null;
+      uploadedAt: Date;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+  }) {
+    return {
+      id: attachment.id,
+      worklogId: attachment.worklogId,
+      documentId: attachment.documentId,
+      label: attachment.label,
+      description: attachment.description,
+      createdAt: attachment.createdAt,
+      createdBy: attachment.createdBy,
+      document: attachment.document,
     };
   }
 }

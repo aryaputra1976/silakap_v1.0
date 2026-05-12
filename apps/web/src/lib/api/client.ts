@@ -111,13 +111,29 @@ export const apiClient = {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
+  delete<T>(path: string) {
+    return request<T>(path, {
+      method: 'DELETE',
+    });
+  },
   upload<T>(path: string, formData: FormData) {
     return request<T>(path, {
       method: 'POST',
       body: formData,
     });
   },
-  download(path: string) {
-    return request<Blob>(path);
+  async download(path: string, fileName?: string) {
+    const blob = await request<Blob>(path);
+
+    if (fileName) {
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }
+
+    return blob;
   },
 };

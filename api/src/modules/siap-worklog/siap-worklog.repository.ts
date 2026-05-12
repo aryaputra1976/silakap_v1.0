@@ -52,6 +52,31 @@ const worklogInclude = {
       name: true,
     },
   },
+  attachments: {
+    include: {
+      document: {
+        select: {
+          id: true,
+          caseId: true,
+          documentType: true,
+          fileName: true,
+          originalFileName: true,
+          storagePath: true,
+          mimeType: true,
+          fileSize: true,
+          checksum: true,
+          version: true,
+          uploadedBy: true,
+          uploadedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  },  
 } satisfies Prisma.SiapWorklogInclude;
 
 export type SiapWorklogRecord = Prisma.SiapWorklogGetPayload<{
@@ -135,6 +160,105 @@ export class SiapWorklogRepository {
     return count > 0;
   }
 
+  async createAttachment(
+    data: Prisma.SiapWorklogAttachmentUncheckedCreateInput,
+  ) {
+    return this.prisma.siapWorklogAttachment.create({
+      data,
+      include: {
+        document: {
+          select: {
+            id: true,
+            caseId: true,
+            documentType: true,
+            fileName: true,
+            originalFileName: true,
+            storagePath: true,
+            mimeType: true,
+            fileSize: true,
+            checksum: true,
+            version: true,
+            uploadedBy: true,
+            uploadedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findAttachmentById(id: string) {
+    return this.prisma.siapWorklogAttachment.findUnique({
+      where: { id },
+      include: {
+        worklog: {
+          select: {
+            id: true,
+            userId: true,
+            unitKerjaId: true,
+            status: true,
+          },
+        },
+        document: {
+          select: {
+            id: true,
+            caseId: true,
+            documentType: true,
+            fileName: true,
+            originalFileName: true,
+            storagePath: true,
+            mimeType: true,
+            fileSize: true,
+            checksum: true,
+            version: true,
+            uploadedBy: true,
+            uploadedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findAttachmentsByWorklogId(worklogId: string) {
+    return this.prisma.siapWorklogAttachment.findMany({
+      where: {
+        worklogId,
+      },
+      include: {
+        document: {
+          select: {
+            id: true,
+            caseId: true,
+            documentType: true,
+            fileName: true,
+            originalFileName: true,
+            storagePath: true,
+            mimeType: true,
+            fileSize: true,
+            checksum: true,
+            version: true,
+            uploadedBy: true,
+            uploadedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async deleteAttachment(id: string) {
+    return this.prisma.siapWorklogAttachment.delete({
+      where: { id },
+    });
+  }
+    
   private buildWhere(
     filters: NormalizedWorklogFilters,
   ): Prisma.SiapWorklogWhereInput {
