@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Archive,
   BarChart3,
+  CheckCircle2,
   FileText,
   Plus,
   RefreshCcw,
@@ -11,25 +12,28 @@ import { useNavigate } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
   dmsApi,
-  type DmsDocument,
-  type DmsDocumentListResponse,
+  type DmsDashboardLatestDocument,
+  type DmsDashboardSummary,
+  type DmsDocumentStatus,
 } from '@/lib/api/dms';
 import {
   ActionButton,
+  DataTable,
   ErrorAlert,
+  formatDateTime,
   LoadingState,
   PageHeader,
   SectionCard,
   StatCard,
   StatusBadge,
 } from '@/components/workspace/ui';
-import { DmsDocumentTable } from '@/components/workspace/dms/dms-document-table';
-import { DmsStatCards, type DmsStatSummary } from '@/components/workspace/dms/dms-stat-cards';
+import { DmsCategoryBadge } from '@/components/workspace/dms/dms-category-badge';
+import { DmsStatusBadge } from '@/components/workspace/dms/dms-status-badge';
 
 export function DmsDashboardPage() {
   const navigate = useNavigate();
 
-  const [data, setData] = useState<DmsDocumentListResponse | null>(null);
+  const [summary, setSummary] = useState<DmsDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -38,12 +42,8 @@ export function DmsDashboardPage() {
     setError('');
 
     try {
-      const result = await dmsApi.listDocuments({
-        page: 1,
-        limit: 10,
-      });
-
-      setData(result);
+      const result = await dmsApi.getDashboardSummary();
+      setSummary(result);
     } catch (caught) {
       setError(
         caught instanceof ApiError
@@ -59,31 +59,27 @@ export function DmsDashboardPage() {
     void loadDashboard();
   }, []);
 
-  const documents = data?.items ?? [];
+  const statusMap = useMemo(() => {
+    const map = new Map<DmsDocumentStatus, number>();
 
-  const summary = useMemo(() => buildSummary(documents, data?.total ?? 0), [
-    documents,
-    data?.total,
-  ]);
+    for (const item of summary?.byStatus ?? []) {
+      map.set(item.status, item.total);
+    }
 
-  const readyForVerification = documents.filter(
-    (item) => item.status === 'SUBMITTED',
-  ).length;
+    return map;
+  }, [summary]);
 
-  const withoutFile = documents.filter((item) => !item.fileName).length;
+  const latestDocuments = summary?.latestDocuments ?? [];
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Dashboard DMS"
-        description="Ringkasan dokumen bukti dukung, laporan, dan arsip digital yang masuk ke Document Management System SILAKAP."
+        description="Ringkasan dokumen bukti dukung, laporan, dan arsip digital pada Document Management System SILAKAP."
         meta={<StatusBadge value="DMS BUKTI DUKUNG" tone="dark" />}
         actions={
           <>
-            <ActionButton
-              icon={Plus}
-              onClick={() => navigate('/dms/upload')}
-            >
+            <ActionButton icon={Plus} onClick={() => navigate('/dms/upload')}>
               Upload Dokumen
             </ActionButton>
             <ActionButton
@@ -100,69 +96,186 @@ export function DmsDashboardPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <DmsStatCards summary={summary} />
+      {loading && !summary ? (
+        <LoadingState label="Memuat dashboard DMS" />
+      ) : (
+        <>
+          <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <StatCard
+              icon={FileText}
+              label="Total Dokumen"
+              value={summary?.total ?? 0}
+              tone="info"
+            />
+            <StatCard
+              icon={FileText}
+              label="Draft"
+              value={statusMap.get('DRAFT') ?? 0}
+              tone="warning"
+            />
+            <StatCard
+              icon={UploadCloud}
+              label="Uploaded"
+              value={statusMap.get('UPLOADED') ?? 0}
+              tone="info"
+            />
+            <StatCard
+              icon={BarChart3}
+              label="Submitted"
+              value={summary?.waitingVerification ?? 0}
+              description="Menunggu verifikasi"
+              tone="info"
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="Verified / Archived"
+              value={summary?.verifiedOrArchived ?? 0}
+              tone="success"
+            />
+            <StatCard
+              icon={Archive}
+              label="Tanpa File"
+              value={summary?.withoutFile ?? 0}
+              tone={(summary?.withoutFile ?? 0) > 0 ? 'warning' : 'success'}
+            />
+          </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <StatCard
-          icon={UploadCloud}
-          label="Menunggu Verifikasi"
-          value={readyForVerification}
-          description="Dokumen SUBMITTED yang perlu ditinjau oleh pejabat/verifikator berwenang."
-          tone="info"
-        />
-        <StatCard
-          icon={FileText}
-          label="Belum Ada File"
-          value={withoutFile}
-          description="Metadata sudah dibuat tetapi file pendukung belum diunggah."
-          tone={withoutFile > 0 ? 'warning' : 'success'}
-        />
-        <StatCard
-          icon={Archive}
-          label="Siap Arsip"
-          value={summary.verified + summary.archived}
-          description="Dokumen terverifikasi dan/atau sudah masuk arsip final."
-          tone="success"
-        />
-      </section>
+          <section className="grid gap-3 md:grid-cols-3">
+            <StatCard
+              icon={UploadCloud}
+              label="Menunggu Verifikasi"
+              value={summary?.waitingVerification ?? 0}
+              description="Dokumen SUBMITTED yang perlu ditinjau."
+              tone="info"
+            />
+            <StatCard
+              icon={FileText}
+              label="Belum Ada File"
+              value={summary?.withoutFile ?? 0}
+              description="Metadata sudah dibuat, file belum diunggah."
+              tone={(summary?.withoutFile ?? 0) > 0 ? 'warning' : 'success'}
+            />
+            <StatCard
+              icon={Archive}
+              label="Ditolak"
+              value={summary?.rejected ?? 0}
+              description="Dokumen yang perlu diperbaiki."
+              tone={(summary?.rejected ?? 0) > 0 ? 'danger' : 'neutral'}
+            />
+          </section>
 
-      <SectionCard
-        title="Dokumen Terbaru"
-        description="Sepuluh dokumen terbaru yang dapat diakses oleh pengguna saat ini."
-        actions={
-          <ActionButton
-            icon={BarChart3}
-            onClick={() => navigate('/dms/documents')}
-            variant="secondary"
+          <SectionCard
+            title="Dokumen Terbaru"
+            description="Sepuluh dokumen terbaru yang dapat diakses oleh pengguna saat ini."
+            actions={
+              <ActionButton
+                icon={BarChart3}
+                onClick={() => navigate('/dms/documents')}
+                variant="secondary"
+              >
+                Lihat Semua
+              </ActionButton>
+            }
           >
-            Lihat Semua
-          </ActionButton>
-        }
-      >
-        {loading ? (
-          <LoadingState label="Memuat dokumen terbaru" />
-        ) : (
-          <DmsDocumentTable
-            documents={documents}
-            onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
-          />
-        )}
-      </SectionCard>
+            {loading ? (
+              <LoadingState label="Memuat dokumen terbaru" />
+            ) : (
+              <LatestDocumentsTable
+                documents={latestDocuments}
+                onOpen={(id) => navigate(`/dms/documents/${id}`)}
+              />
+            )}
+          </SectionCard>
+        </>
+      )}
     </div>
   );
 }
 
-function buildSummary(
-  documents: DmsDocument[],
-  total: number,
-): DmsStatSummary {
-  return {
-    total,
-    draft: documents.filter((item) => item.status === 'DRAFT').length,
-    uploaded: documents.filter((item) => item.status === 'UPLOADED').length,
-    submitted: documents.filter((item) => item.status === 'SUBMITTED').length,
-    verified: documents.filter((item) => item.status === 'VERIFIED').length,
-    rejected: documents.filter((item) => item.status === 'REJECTED').length,
-    archived: documents.filter((item) => item.status === 'ARCHIVED').length,
-  };
+function LatestDocumentsTable({
+  documents,
+  onOpen,
+}: {
+  documents: DmsDashboardLatestDocument[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <DataTable
+      items={documents}
+      rowKey={(item) => item.id}
+      empty="Belum ada dokumen terbaru"
+      columns={[
+        {
+          key: 'title',
+          header: 'Dokumen',
+          render: (item) => (
+            <div className="max-w-md">
+              <div className="font-semibold text-zinc-950">{item.title}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {item.originalFileName ?? item.fileName ?? 'Belum ada file'}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <DmsCategoryBadge category={item.category} />
+                <DmsStatusBadge status={item.status} />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: 'unit',
+          header: 'Unit Kerja',
+          render: (item) => (
+            <div>
+              <div className="font-medium text-zinc-900">
+                {item.unitKerja?.nama ?? '-'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {item.unitKerja?.kode ?? ''}
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: 'period',
+          header: 'Periode',
+          render: (item) => formatPeriod(item),
+        },
+        {
+          key: 'created',
+          header: 'Dibuat',
+          render: (item) => (
+            <div>
+              <div className="font-medium text-zinc-900">
+                {item.createdBy?.name ?? '-'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {formatDateTime(item.createdAt)}
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: 'actions',
+          header: 'Aksi',
+          render: (item) => (
+            <ActionButton onClick={() => onOpen(item.id)} variant="secondary">
+              Buka
+            </ActionButton>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+function formatPeriod(item: DmsDashboardLatestDocument) {
+  if (!item.periodYear && !item.periodMonth) {
+    return '-';
+  }
+
+  if (item.periodMonth && item.periodYear) {
+    return `${item.periodMonth}/${item.periodYear}`;
+  }
+
+  return String(item.periodYear ?? '-');
 }

@@ -198,6 +198,55 @@ export interface DeleteDmsDocumentResponse {
   id: string;
 }
 
+export interface DmsDashboardQuery {
+  year?: string;
+  month?: string;
+  quarter?: string;
+  unitKerjaId?: string;
+  category?: DmsDocumentCategory | '';
+  status?: DmsDocumentStatus | '';
+}
+
+export interface DmsDashboardStatusSummary {
+  status: DmsDocumentStatus;
+  total: number;
+}
+
+export interface DmsDashboardCategorySummary {
+  category: DmsDocumentCategory;
+  total: number;
+}
+
+export interface DmsDashboardLatestDocument {
+  id: string;
+  title: string;
+  category: DmsDocumentCategory;
+  status: DmsDocumentStatus;
+  originalFileName: string | null;
+  fileName: string | null;
+  periodYear: number | null;
+  periodMonth: number | null;
+  unitKerja: DmsUnitKerja | null;
+  createdBy: {
+    id: string;
+    username: string;
+    name: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DmsDashboardSummary {
+  total: number;
+  byStatus: DmsDashboardStatusSummary[];
+  byCategory: DmsDashboardCategorySummary[];
+  waitingVerification: number;
+  withoutFile: number;
+  verifiedOrArchived: number;
+  rejected: number;
+  latestDocuments: DmsDashboardLatestDocument[];
+}
+
 function cleanQuery(query: DmsDocumentListQuery): Record<string, string | number | undefined> {
   return {
     q: query.q,
@@ -213,6 +262,50 @@ function cleanQuery(query: DmsDocumentListQuery): Record<string, string | number
     page: query.page,
     limit: query.limit,
   };
+}
+
+function cleanDashboardQuery(
+  query: DmsDashboardQuery,
+): Record<string, string | number | undefined> {
+  return {
+    year: query.year,
+    month: query.month,
+    quarter: query.quarter,
+    unitKerjaId: query.unitKerjaId,
+    category: query.category || undefined,
+    status: query.status || undefined,
+  };
+}
+
+function toReportExportQuery(query: DmsDashboardQuery = {}) {
+  const params = new URLSearchParams();
+
+  if (query.year) {
+    params.set('year', query.year);
+  }
+
+  if (query.month) {
+    params.set('month', query.month);
+  }
+
+  if (query.quarter) {
+    params.set('quarter', query.quarter);
+  }
+
+  if (query.unitKerjaId) {
+    params.set('unitKerjaId', query.unitKerjaId);
+  }
+
+  if (query.category) {
+    params.set('category', query.category);
+  }
+
+  if (query.status) {
+    params.set('status', query.status);
+  }
+
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : '';
 }
 
 export const dmsApi = {
@@ -269,6 +362,23 @@ export const dmsApi = {
   deleteDocument(id: string) {
     return apiClient.delete<DeleteDmsDocumentResponse>(`/dms/documents/${id}`);
   },
+
+  getDashboardSummary(query: DmsDashboardQuery = {}) {
+    return apiClient.get<DmsDashboardSummary>(
+      '/dms/dashboard/summary',
+      cleanDashboardQuery(query),
+    );
+  },
+
+  exportReportsCsv(query: DmsDashboardQuery = {}) {
+    const suffix = toReportExportQuery(query);
+    const year = query.year ? `-${query.year}` : '';
+    const month = query.month ? `-bulan-${query.month}` : '';
+    const quarter = query.quarter ? `-triwulan-${query.quarter}` : '';
+    const fileName = `laporan-dms${year}${month}${quarter}.csv`;
+
+    return apiClient.download(`/dms/reports/export${suffix}`, fileName);
+  },  
 };
 
 export function dmsCategoryLabel(category: DmsDocumentCategory | string) {
