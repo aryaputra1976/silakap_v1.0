@@ -12,6 +12,10 @@ import { basename, extname, isAbsolute, relative, resolve } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { canAccessDmsDocument } from './constants/dms-permission.constant';
+import {
+  isDmsDeletableStatus,
+  isDmsEditableStatus,
+} from './constants/dms-status.constant';
 import { CreateDmsDocumentDto } from './dto/create-dms-document.dto';
 import { DmsDocumentListQueryDto } from './dto/dms-document-list-query.dto';
 import { DmsRejectDto } from './dto/dms-reject.dto';
@@ -406,15 +410,10 @@ export class DmsService {
       );
     }
 
-    const nonDeletableStatuses: DmsDocumentStatus[] = [
-    DmsDocumentStatus.VERIFIED,
-    DmsDocumentStatus.ARCHIVED,
-    ];
-
-    if (nonDeletableStatuses.includes(document.status)) {
-    throw new BadRequestException(
+    if (!isDmsDeletableStatus(document.status)) {
+      throw new BadRequestException(
         'Dokumen VERIFIED atau ARCHIVED tidak dapat dihapus',
-    );
+      );
     }
 
     const deleted = await this.dmsRepository.softDelete(document.id, user.id);
@@ -610,13 +609,7 @@ export class DmsService {
       throw new ForbiddenException('Dokumen hanya dapat diedit oleh pembuat');
     }
 
-    const editableStatuses: DmsDocumentStatus[] = [
-      DmsDocumentStatus.DRAFT,
-      DmsDocumentStatus.UPLOADED,
-      DmsDocumentStatus.REJECTED,
-    ];
-
-    if (!editableStatuses.includes(document.status)) {
+    if (!isDmsEditableStatus(document.status)) {
       throw new BadRequestException(
         'Dokumen hanya dapat diedit saat DRAFT, UPLOADED, atau REJECTED',
       );
