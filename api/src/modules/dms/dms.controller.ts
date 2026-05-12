@@ -9,12 +9,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -80,6 +81,23 @@ export class DmsController {
   async findById(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const result = await this.dmsService.findById(id, user);
     return ok(result);
+  }
+
+  @Get(':id/download')
+  async download(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Res() response: Response,
+  ) {
+    const result = await this.dmsService.download(id, user);
+
+    response.setHeader('Content-Type', result.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(result.fileName)}"`,
+    );
+
+    response.send(result.buffer);
   }
 
   @Post()

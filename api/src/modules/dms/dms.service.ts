@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { DmsDocumentCategory, DmsDocumentStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, isAbsolute, relative, resolve } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
@@ -30,6 +30,12 @@ type UploadedDmsFile = {
   size: number;
   buffer: Buffer;
 };
+
+export interface DownloadDmsDocumentPayload {
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+}
 
 const DMS_CREATE_ROLES = [
   'SUPER_ADMIN',
@@ -118,6 +124,23 @@ export class DmsService {
   async findById(id: string, user: AuthUser) {
     const document = await this.getDocumentForUser(id, user);
     return DmsMapper.toResponse(document);
+  }
+
+  async download(id: string, user: AuthUser): Promise<DownloadDmsDocumentPayload> {
+    const document = await this.getDocumentForUser(id, user);
+
+    if (!document.fileName || !document.storagePath) {
+      throw new NotFoundException('File dokumen DMS belum tersedia');
+    }
+
+    const absoluteStoragePath = this.resolveSafeStoragePath(document.storagePath);
+    const buffer = await this.readStoredFile(absoluteStoragePath);
+
+    return {
+      buffer,
+      mimeType: document.mimeType ?? 'application/octet-stream',
+      fileName: document.originalFileName ?? document.fileName,
+    };
   }
 
   async update(
@@ -744,4 +767,12 @@ export class DmsService {
 
     return absolutePath;
   }
+
+  private async readStoredFile(absoluteStoragePath: string) {
+    try {
+      return await readFile(absoluteStoragePath);
+    } catch {
+      throw new NotFoundException('File dokumen DMS tidak ditemukan di storage');
+    }
+  }  
 }

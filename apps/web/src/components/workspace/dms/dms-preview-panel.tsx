@@ -1,5 +1,6 @@
-import { FileText } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import {
+  ActionButton,
   FileMeta,
   formatDateTime,
   formatFileSize,
@@ -7,11 +8,31 @@ import {
 } from '@/components/workspace/ui';
 import type { DmsDocument } from '@/lib/api/dms';
 
-export function DmsPreviewPanel({ document }: { document: DmsDocument }) {
+export function DmsPreviewPanel({
+  document,
+  downloading,
+  onDownload,
+}: {
+  document: DmsDocument;
+  downloading?: boolean;
+  onDownload?: () => void;
+}) {
   return (
     <SectionCard
       title="Preview & Metadata File"
       description="Informasi teknis file yang tersimpan di DMS."
+      actions={
+        document.fileName && onDownload ? (
+          <ActionButton
+            disabled={downloading}
+            icon={Download}
+            onClick={onDownload}
+            variant="secondary"
+          >
+            {downloading ? 'Mengunduh...' : 'Download'}
+          </ActionButton>
+        ) : null
+      }
     >
       {document.fileName ? (
         <div className="space-y-5">

@@ -10,6 +10,7 @@ import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
   dmsApi,
+  type DmsAuditTimelineItem,
   type DmsDocument,
   type DmsDocumentCategory,
 } from '@/lib/api/dms';
@@ -48,7 +49,30 @@ export function DmsDocumentDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [auditItems, setAuditItems] = useState<DmsAuditTimelineItem[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
   const [error, setError] = useState('');
+
+  async function loadAuditTimeline(targetDocumentId: string) {
+    setAuditLoading(true);
+    setAuditError('');
+
+    try {
+      const result = await dmsApi.getDocumentAuditTimeline(targetDocumentId);
+      setAuditItems(result);
+    } catch (caught) {
+      setAuditItems([]);
+      setAuditError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Gagal memuat audit timeline DMS',
+      );
+    } finally {
+      setAuditLoading(false);
+    }
+  }
 
   async function loadDocument() {
     if (!documentId) {
@@ -64,6 +88,7 @@ export function DmsDocumentDetailPage() {
       const result = await dmsApi.getDocument(documentId);
       setDocument(result);
       setForm(toFormValue(result));
+      await loadAuditTimeline(result.id);
     } catch (caught) {
       setError(
         caught instanceof ApiError
@@ -93,6 +118,7 @@ export function DmsDocumentDetailPage() {
       setDocument(updated);
       setForm(toFormValue(updated));
       setEditMode(false);
+      await loadAuditTimeline(updated.id);
     } catch (caught) {
       setError(
         caught instanceof ApiError
@@ -104,159 +130,245 @@ export function DmsDocumentDetailPage() {
     }
   }
 
-  async function uploadFile() {
-    if (!document || !file) {
-      return;
-    }
-
-    setWorking(true);
-    setError('');
-
-    try {
-      const updated = await dmsApi.uploadDocument(document.id, file, {
-        description: form.description,
-      });
-
-      setDocument(updated);
-      setForm(toFormValue(updated));
-      setFile(null);
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal mengunggah file dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+async function uploadFile() {
+  if (!document || !file) {
+    return;
   }
 
-  async function submitDocument() {
-    if (!document) {
-      return;
-    }
-
-    setWorking(true);
-    setError('');
-
-    try {
-      const updated = await dmsApi.submitDocument(document.id);
-      setDocument(updated);
-      setForm(toFormValue(updated));
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal submit dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+  if (
+    document.fileName &&
+    !confirmAction(
+      'Dokumen ini sudah memiliki file. Upload file baru akan mengganti file aktif dan menaikkan versi dokumen. Lanjutkan?',
+    )
+  ) {
+    return;
   }
 
-  async function verifyDocument() {
-    if (!document) {
-      return;
-    }
+  setWorking(true);
+  setError('');
 
-    setWorking(true);
-    setError('');
+  try {
+    const updated = await dmsApi.uploadDocument(document.id, file, {
+      description: form.description,
+    });
 
-    try {
-      const updated = await dmsApi.verifyDocument(document.id, {
-        note: reviewNote || undefined,
-      });
+    setDocument(updated);
+    setForm(toFormValue(updated));
+    setFile(null);
+    await loadAuditTimeline(updated.id);
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal mengunggah file dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
 
-      setDocument(updated);
-      setForm(toFormValue(updated));
-      setReviewNote('');
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal memverifikasi dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+async function submitDocument() {
+  if (!document) {
+    return;
   }
 
-  async function rejectDocument() {
-    if (!document) {
-      return;
-    }
-
-    if (reviewNote.trim().length < 3) {
-      setError('Catatan penolakan wajib diisi minimal 3 karakter');
-      return;
-    }
-
-    setWorking(true);
-    setError('');
-
-    try {
-      const updated = await dmsApi.rejectDocument(document.id, {
-        note: reviewNote,
-      });
-
-      setDocument(updated);
-      setForm(toFormValue(updated));
-      setReviewNote('');
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal menolak dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+  if (
+    !confirmAction(
+      'Submit dokumen untuk verifikasi? Setelah disubmit, dokumen tidak dapat diedit sampai diverifikasi atau ditolak.',
+    )
+  ) {
+    return;
   }
 
-  async function archiveDocument() {
-    if (!document) {
-      return;
-    }
+  setWorking(true);
+  setError('');
 
-    setWorking(true);
-    setError('');
+  try {
+    const updated = await dmsApi.submitDocument(document.id);
+    setDocument(updated);
+    setForm(toFormValue(updated));
+    await loadAuditTimeline(updated.id);
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal submit dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
 
-    try {
-      const updated = await dmsApi.archiveDocument(document.id);
-      setDocument(updated);
-      setForm(toFormValue(updated));
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal mengarsipkan dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+async function verifyDocument() {
+  if (!document) {
+    return;
   }
 
-  async function deleteDocument() {
-    if (!document) {
-      return;
-    }
-
-    setWorking(true);
-    setError('');
-
-    try {
-      await dmsApi.deleteDocument(document.id);
-      navigate('/dms/documents');
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal menghapus dokumen',
-      );
-    } finally {
-      setWorking(false);
-    }
+  if (
+    !confirmAction(
+      'Verifikasi dokumen ini sebagai bukti dukung yang sah?',
+    )
+  ) {
+    return;
   }
+
+  setWorking(true);
+  setError('');
+
+  try {
+    const updated = await dmsApi.verifyDocument(document.id, {
+      note: reviewNote || undefined,
+    });
+
+    setDocument(updated);
+    setForm(toFormValue(updated));
+    setReviewNote('');
+    await loadAuditTimeline(updated.id);
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal memverifikasi dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
+
+async function rejectDocument() {
+  if (!document) {
+    return;
+  }
+
+  if (reviewNote.trim().length < 3) {
+    setError('Catatan penolakan wajib diisi minimal 3 karakter');
+    return;
+  }
+
+  if (
+    !confirmAction(
+      'Tolak dokumen ini? Dokumen akan dikembalikan untuk diperbaiki oleh pembuat.',
+    )
+  ) {
+    return;
+  }
+
+  setWorking(true);
+  setError('');
+
+  try {
+    const updated = await dmsApi.rejectDocument(document.id, {
+      note: reviewNote,
+    });
+
+    setDocument(updated);
+    setForm(toFormValue(updated));
+    setReviewNote('');
+    await loadAuditTimeline(updated.id);
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal menolak dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
+
+async function archiveDocument() {
+  if (!document) {
+    return;
+  }
+
+  if (
+    !confirmAction(
+      'Arsipkan dokumen ini sebagai dokumen final? Setelah diarsipkan, dokumen tidak dapat diedit atau dihapus.',
+    )
+  ) {
+    return;
+  }
+
+  setWorking(true);
+  setError('');
+
+  try {
+    const updated = await dmsApi.archiveDocument(document.id);
+    setDocument(updated);
+    setForm(toFormValue(updated));
+    await loadAuditTimeline(updated.id);
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal mengarsipkan dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
+
+async function deleteDocument() {
+  if (!document) {
+    return;
+  }
+
+  const firstConfirm = confirmAction(
+    'Hapus dokumen ini? Data dokumen akan dihapus dari daftar DMS.',
+  );
+
+  if (!firstConfirm) {
+    return;
+  }
+
+  const secondConfirm = confirmAction(
+    'Konfirmasi sekali lagi: dokumen yang dihapus tidak akan tampil lagi di DMS. Lanjutkan hapus?',
+  );
+
+  if (!secondConfirm) {
+    return;
+  }
+
+  setWorking(true);
+  setError('');
+
+  try {
+    await dmsApi.deleteDocument(document.id);
+    navigate('/dms/documents');
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : 'Gagal menghapus dokumen',
+    );
+  } finally {
+    setWorking(false);
+  }
+}
+
+    async function downloadDocument() {
+      if (!document) {
+        return;
+      }
+
+      setDownloading(true);
+      setError('');
+
+      try {
+        await dmsApi.downloadDocument(
+          document.id,
+          document.originalFileName ?? document.fileName ?? `${document.id}.bin`,
+        );
+      } catch (caught) {
+        setError(
+          caught instanceof ApiError
+            ? caught.message
+            : 'Gagal mengunduh dokumen',
+        );
+      } finally {
+        setDownloading(false);
+      }
+    }
 
   if (loading) {
     return <LoadingState label="Memuat detail dokumen DMS" />;
@@ -378,7 +490,11 @@ export function DmsDocumentDetailPage() {
             )}
           </SectionCard>
 
-          <DmsPreviewPanel document={document} />
+          <DmsPreviewPanel
+            document={document}
+            downloading={downloading}
+            onDownload={() => void downloadDocument()}
+          />
 
           {canEditMetadata ? (
             <SectionCard
@@ -406,7 +522,12 @@ export function DmsDocumentDetailPage() {
             title="Riwayat Dokumen"
             description="Jejak aktivitas utama berdasarkan status dokumen."
           >
-            <DmsAuditTimeline document={document} />
+            <DmsAuditTimeline
+              error={auditError}
+              items={auditItems}
+              loading={auditLoading}
+              onRefresh={() => void loadAuditTimeline(document.id)}
+            />
           </SectionCard>
         </div>
 
@@ -499,4 +620,8 @@ function toFormValue(document: DmsDocument): DmsMetadataFormValue {
     caseId: document.caseId ?? '',
     worklogId: document.worklogId ?? '',
   };
+}
+
+function confirmAction(message: string) {
+  return window.confirm(message);
 }

@@ -247,6 +247,26 @@ export interface DmsDashboardSummary {
   latestDocuments: DmsDashboardLatestDocument[];
 }
 
+export interface DmsAuditTimelineActor {
+  id: string;
+  username: string;
+  name: string;
+}
+
+export interface DmsAuditTimelineItem {
+  id: string;
+  action: string;
+  title: string;
+  description: string | null;
+  actor: DmsAuditTimelineActor | null;
+  performedBy: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  beforeData: unknown;
+  afterData: unknown;
+  createdAt: string;
+}
+
 function cleanQuery(query: DmsDocumentListQuery): Record<string, string | number | undefined> {
   return {
     q: query.q,
@@ -320,6 +340,16 @@ export const dmsApi = {
     return apiClient.get<DmsDocument>(`/dms/documents/${id}`);
   },
 
+  getDocumentAuditTimeline(id: string) {
+    return apiClient.get<DmsAuditTimelineItem[]>(
+      `/dms/documents/${id}/audit`,
+    );
+  },
+
+  downloadDocument(id: string, fileName: string) {
+    return apiClient.download(`/dms/documents/${id}/download`, fileName);
+  },
+    
   createDocument(payload: CreateDmsDocumentPayload) {
     return apiClient.post<DmsDocument>('/dms/documents', payload);
   },
