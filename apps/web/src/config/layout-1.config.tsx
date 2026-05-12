@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   Database,
   FileText,
+  FolderArchive,
   Gauge,
   GitBranch,
   Settings,
@@ -61,6 +62,17 @@ export const MENU_SIDEBAR: MenuConfig = [
       { title: 'ASN', path: '/sidata/asn' },
       { title: 'Unit Organisasi', disabled: true },
       { title: 'Jabatan & Golongan', disabled: true },
+    ],
+  },
+  {
+    title: 'DMS Bukti Dukung',
+    icon: FolderArchive,
+    children: [
+      { title: 'Dashboard DMS', path: '/dms' },
+      { title: 'Dokumen', path: '/dms/documents' },
+      { title: 'Upload Dokumen', path: '/dms/upload' },
+      { title: 'Verifikasi Dokumen', path: '/dms/verification' },
+      { title: 'Laporan DMS', path: '/dms/reports' },
     ],
   },
   {

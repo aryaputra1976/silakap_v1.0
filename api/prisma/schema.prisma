@@ -80,6 +80,30 @@ enum JenisPensiun {
   YATIM_PIATU
 }
 
+enum DmsDocumentCategory {
+  SKP
+  LAPORAN_BULANAN
+  LAPORAN_TRIWULAN
+  LAPORAN_TAHUNAN
+  REKON_DATA
+  DATA_ASN
+  SURAT_DINAS
+  NOTA_DINAS
+  BUKTI_DUKUNG
+  DOKUMEN_KEBIJAKAN
+  ARSIP_KEPEGAWAIAN
+  LAINNYA
+}
+
+enum DmsDocumentStatus {
+  DRAFT
+  UPLOADED
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  ARCHIVED
+}
+
 model User {
   id           String        @id @default(uuid()) @db.VarChar(36)
   username     String        @unique @map("user") @db.VarChar(50)
@@ -106,12 +130,15 @@ model User {
   assignedTasks SiapTask[] @relation("TaskAssignedTo")
   createdTasks  SiapTask[] @relation("TaskAssignedBy")
 
-  workflowLogs WorkflowLog[]
-  timelineLogs TimelineEntry[]
-  auditLogs    AuditLog[]
-  notifications Notification[]
-  siapWorklogs         SiapWorklog[] @relation("WorklogUser")
-  reviewedSiapWorklogs SiapWorklog[] @relation("WorklogReviewer")
+  workflowLogs          WorkflowLog[]
+  timelineLogs          TimelineEntry[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  siapWorklogs          SiapWorklog[]   @relation("WorklogUser")
+  reviewedSiapWorklogs  SiapWorklog[]   @relation("WorklogReviewer")
+  createdDmsDocuments   DmsDocument[]   @relation("DmsDocumentCreatedBy")
+  submittedDmsDocuments DmsDocument[]   @relation("DmsDocumentSubmittedBy")
+  verifiedDmsDocuments  DmsDocument[]   @relation("DmsDocumentVerifiedBy")
 
   @@index([username])
   @@index([email])
@@ -229,9 +256,10 @@ model UnitKerja {
   parent   UnitKerja?  @relation("UnitKerjaHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children UnitKerja[] @relation("UnitKerjaHierarchy")
 
-  users User[]
-  asn   Asn[]
+  users        User[]
+  asn          Asn[]
   siapWorklogs SiapWorklog[]
+  dmsDocuments DmsDocument[]
 
   @@index([kode])
   @@index([parentId])
@@ -240,12 +268,12 @@ model UnitKerja {
 }
 
 model Asn {
-  id     String  @id @default(uuid()) @db.VarChar(36)
-  nip    String  @unique @db.VarChar(30)
-  nik    String? @unique @db.VarChar(30)
-  nama   String  @db.VarChar(200)
-  email  String? @db.VarChar(150)
-  phone  String? @db.VarChar(30)
+  id    String  @id @default(uuid()) @db.VarChar(36)
+  nip   String  @unique @db.VarChar(30)
+  nik   String? @unique @db.VarChar(30)
+  nama  String  @db.VarChar(200)
+  email String? @db.VarChar(150)
+  phone String? @db.VarChar(30)
 
   unitKerjaId String?    @map("unit_kerja_id") @db.VarChar(36)
   unitKerja   UnitKerja? @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
@@ -264,8 +292,9 @@ model Asn {
   updatedBy String?   @map("updated_by") @db.VarChar(36)
   deletedAt DateTime? @map("deleted_at")
 
-  cases SiapCase[]
+  cases          SiapCase[]
   sipensiunCases SipensiunCase[]
+  dmsDocuments   DmsDocument[]
 
   @@index([nip])
   @@index([nama])
@@ -296,15 +325,16 @@ model SiapCase {
   updatedBy String?   @map("updated_by") @db.VarChar(36)
   deletedAt DateTime? @map("deleted_at")
 
-  asn          Asn?            @relation(fields: [asnId], references: [id], onDelete: SetNull)
-  tasks        SiapTask[]
-  documents    Document[]
-  workflowLogs WorkflowLog[]
-  slaTracking  SlaTracking[]
-  timelines    TimelineEntry[]
+  asn           Asn?            @relation(fields: [asnId], references: [id], onDelete: SetNull)
+  tasks         SiapTask[]
+  documents     Document[]
+  workflowLogs  WorkflowLog[]
+  slaTracking   SlaTracking[]
+  timelines     TimelineEntry[]
   sipensiunCase SipensiunCase?
   notifications Notification[]
-  worklogs SiapWorklog[]
+  worklogs      SiapWorklog[]
+  dmsDocuments  DmsDocument[]
 
   @@index([caseNumber])
   @@index([serviceType])
@@ -337,9 +367,9 @@ model SiapTask {
   updatedBy String?   @map("updated_by") @db.VarChar(36)
   deletedAt DateTime? @map("deleted_at")
 
-  case        SiapCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  assignee    User?    @relation("TaskAssignedTo", fields: [assignedTo], references: [id], onDelete: SetNull)
-  assigner    User?    @relation("TaskAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+  case        SiapCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  assignee    User?           @relation("TaskAssignedTo", fields: [assignedTo], references: [id], onDelete: SetNull)
+  assigner    User?           @relation("TaskAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
   slaTracking SlaTracking[]
   timelines   TimelineEntry[]
   worklogs    SiapWorklog[]
@@ -353,11 +383,11 @@ model SiapTask {
 }
 
 model SiapWorklog {
-  id          String            @id @default(uuid()) @db.VarChar(36)
-  userId      String            @map("user_id") @db.VarChar(36)
-  unitKerjaId String?           @map("unit_kerja_id") @db.VarChar(36)
-  caseId      String?           @map("case_id") @db.VarChar(36)
-  taskId      String?           @map("task_id") @db.VarChar(36)
+  id          String  @id @default(uuid()) @db.VarChar(36)
+  userId      String  @map("user_id") @db.VarChar(36)
+  unitKerjaId String? @map("unit_kerja_id") @db.VarChar(36)
+  caseId      String? @map("case_id") @db.VarChar(36)
+  taskId      String? @map("task_id") @db.VarChar(36)
 
   workDate    DateTime          @map("work_date")
   category    String            @db.VarChar(80)
@@ -379,12 +409,13 @@ model SiapWorklog {
   updatedBy String?   @map("updated_by") @db.VarChar(36)
   deletedAt DateTime? @map("deleted_at")
 
-  user        User                      @relation("WorklogUser", fields: [userId], references: [id], onDelete: Cascade)
-  unitKerja   UnitKerja?                @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
-  case        SiapCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
-  task        SiapTask?                 @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  reviewer    User?                     @relation("WorklogReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  attachments SiapWorklogAttachment[]
+  user         User                    @relation("WorklogUser", fields: [userId], references: [id], onDelete: Cascade)
+  unitKerja    UnitKerja?              @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
+  case         SiapCase?               @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  task         SiapTask?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewer     User?                   @relation("WorklogReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  attachments  SiapWorklogAttachment[]
+  dmsDocuments DmsDocument[]
 
   @@index([userId])
   @@index([unitKerjaId])
@@ -418,7 +449,7 @@ model WorkflowDefinition {
 }
 
 model WorkflowTransition {
-  id         String  @id @default(uuid()) @db.VarChar(36)
+  id         String @id @default(uuid()) @db.VarChar(36)
   workflowId String @map("workflow_id") @db.VarChar(36)
 
   fromState   String @map("from_state") @db.VarChar(80)
@@ -426,9 +457,9 @@ model WorkflowTransition {
   actionCode  String @map("action_code") @db.VarChar(80)
   allowedRole String @map("allowed_role") @db.VarChar(80)
 
-  slaDays  Int?    @map("sla_days")
-  sortOrder Int    @default(0) @map("sort_order")
-  isActive Boolean @default(true) @map("is_active")
+  slaDays   Int?    @map("sla_days")
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -444,13 +475,13 @@ model WorkflowTransition {
 }
 
 model WorkflowLog {
-  id          String  @id @default(uuid()) @db.VarChar(36)
-  caseId      String  @map("case_id") @db.VarChar(36)
-  fromState   String? @map("from_state") @db.VarChar(80)
-  toState     String  @map("to_state") @db.VarChar(80)
-  action      String  @db.VarChar(80)
-  note        String? @db.Text
-  performedBy String? @map("performed_by") @db.VarChar(36)
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  caseId      String   @map("case_id") @db.VarChar(36)
+  fromState   String?  @map("from_state") @db.VarChar(80)
+  toState     String   @map("to_state") @db.VarChar(80)
+  action      String   @db.VarChar(80)
+  note        String?  @db.Text
+  performedBy String?  @map("performed_by") @db.VarChar(36)
   performedAt DateTime @default(now()) @map("performed_at")
   ipAddress   String?  @map("ip_address") @db.VarChar(100)
   userAgent   String?  @map("user_agent") @db.Text
@@ -478,7 +509,7 @@ model SlaTracking {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  case SiapCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case SiapCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
   task SiapTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([caseId])
@@ -507,7 +538,7 @@ model Document {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  case               SiapCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  case               SiapCase?               @relation(fields: [caseId], references: [id], onDelete: SetNull)
   worklogAttachments SiapWorklogAttachment[]
 
   @@index([caseId])
@@ -517,16 +548,16 @@ model Document {
 }
 
 model TimelineEntry {
-  id          String  @id @default(uuid()) @db.VarChar(36)
-  caseId      String  @map("case_id") @db.VarChar(36)
-  taskId      String? @map("task_id") @db.VarChar(36)
-  eventType   String  @map("event_type") @db.VarChar(100)
-  title       String  @db.VarChar(200)
-  description String? @db.Text
-  performedBy String? @map("performed_by") @db.VarChar(36)
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  caseId      String   @map("case_id") @db.VarChar(36)
+  taskId      String?  @map("task_id") @db.VarChar(36)
+  eventType   String   @map("event_type") @db.VarChar(100)
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  performedBy String?  @map("performed_by") @db.VarChar(36)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  case SiapCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case SiapCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
   task SiapTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
   user User?     @relation(fields: [performedBy], references: [id], onDelete: SetNull)
 
@@ -539,15 +570,15 @@ model TimelineEntry {
 }
 
 model AuditLog {
-  id          String  @id @default(uuid()) @db.VarChar(36)
-  entityType  String  @map("entity_type") @db.VarChar(100)
-  entityId    String  @map("entity_id") @db.VarChar(100)
-  action      String  @db.VarChar(100)
-  performedBy String? @map("performed_by") @db.VarChar(36)
-  beforeData  Json?   @map("before_data")
-  afterData   Json?   @map("after_data")
-  ipAddress   String? @map("ip_address") @db.VarChar(100)
-  userAgent   String? @map("user_agent") @db.Text
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  entityType  String   @map("entity_type") @db.VarChar(100)
+  entityId    String   @map("entity_id") @db.VarChar(100)
+  action      String   @db.VarChar(100)
+  performedBy String?  @map("performed_by") @db.VarChar(36)
+  beforeData  Json?    @map("before_data")
+  afterData   Json?    @map("after_data")
+  ipAddress   String?  @map("ip_address") @db.VarChar(100)
+  userAgent   String?  @map("user_agent") @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   user User? @relation(fields: [performedBy], references: [id], onDelete: SetNull)
@@ -614,16 +645,16 @@ model SipensiunCase {
   tmtPensiun   DateTime?    @map("tmt_pensiun")
   catatan      String?      @db.Text
 
-  nomorKarpeg          String?   @map("nomor_karpeg") @db.VarChar(80)
-  alamatSekarang       String?   @map("alamat_sekarang") @db.Text
-  alamatSesudahPensiun String?   @map("alamat_sesudah_pensiun") @db.Text
-  noHp                 String?   @map("no_hp") @db.VarChar(40)
+  nomorKarpeg          String? @map("nomor_karpeg") @db.VarChar(80)
+  alamatSekarang       String? @map("alamat_sekarang") @db.Text
+  alamatSesudahPensiun String? @map("alamat_sesudah_pensiun") @db.Text
+  noHp                 String? @map("no_hp") @db.VarChar(40)
 
-  namaPemohon         String? @map("nama_pemohon") @db.VarChar(150)
-  nikPemohon          String? @map("nik_pemohon") @db.VarChar(40)
-  hubunganPemohon     String? @map("hubungan_pemohon") @db.VarChar(80)
-  alamatPemohon       String? @map("alamat_pemohon") @db.Text
-  noHpPemohon         String? @map("no_hp_pemohon") @db.VarChar(40)
+  namaPemohon     String? @map("nama_pemohon") @db.VarChar(150)
+  nikPemohon      String? @map("nik_pemohon") @db.VarChar(40)
+  hubunganPemohon String? @map("hubungan_pemohon") @db.VarChar(80)
+  alamatPemohon   String? @map("alamat_pemohon") @db.Text
+  noHpPemohon     String? @map("no_hp_pemohon") @db.VarChar(40)
 
   namaPenerimaManfaat String?   @map("nama_penerima_manfaat") @db.VarChar(150)
   tanggalMeninggal    DateTime? @map("tanggal_meninggal")
@@ -644,9 +675,9 @@ model SipensiunCase {
 }
 
 model SiapWorklogAttachment {
-  id          String   @id @default(uuid()) @db.VarChar(36)
-  worklogId   String   @map("worklog_id") @db.VarChar(36)
-  documentId  String   @map("document_id") @db.VarChar(36)
+  id         String @id @default(uuid()) @db.VarChar(36)
+  worklogId  String @map("worklog_id") @db.VarChar(36)
+  documentId String @map("document_id") @db.VarChar(36)
 
   label       String?  @db.VarChar(150)
   description String?  @db.Text
@@ -661,4 +692,72 @@ model SiapWorklogAttachment {
   @@index([documentId])
   @@index([createdAt])
   @@map("siap_worklog_attachments")
+}
+
+model DmsDocument {
+  id          String              @id @default(uuid()) @db.VarChar(36)
+  title       String              @db.VarChar(200)
+  description String?             @db.Text
+  category    DmsDocumentCategory @default(BUKTI_DUKUNG)
+  status      DmsDocumentStatus   @default(DRAFT)
+
+  periodYear    Int? @map("period_year")
+  periodMonth   Int? @map("period_month")
+  periodQuarter Int? @map("period_quarter")
+
+  unitKerjaId String? @map("unit_kerja_id") @db.VarChar(36)
+  asnId       String? @map("asn_id") @db.VarChar(36)
+  caseId      String? @map("case_id") @db.VarChar(36)
+  worklogId   String? @map("worklog_id") @db.VarChar(36)
+
+  fileName         String? @map("file_name") @db.VarChar(255)
+  originalFileName String? @map("original_file_name") @db.VarChar(255)
+  storagePath      String? @map("storage_path") @db.VarChar(500)
+  mimeType         String? @map("mime_type") @db.VarChar(120)
+  fileSize         Int?    @map("file_size")
+  checksum         String? @db.VarChar(128)
+  version          Int     @default(1)
+
+  submittedAt   DateTime? @map("submitted_at")
+  submittedById String?   @map("submitted_by_id") @db.VarChar(36)
+
+  verifiedAt   DateTime? @map("verified_at")
+  verifiedById String?   @map("verified_by_id") @db.VarChar(36)
+
+  rejectedAt    DateTime? @map("rejected_at")
+  rejectionNote String?   @map("rejection_note") @db.Text
+
+  archivedAt DateTime? @map("archived_at")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdById String?   @map("created_by_id") @db.VarChar(36)
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedById String?   @map("updated_by_id") @db.VarChar(36)
+  deletedAt   DateTime? @map("deleted_at")
+
+  unitKerja UnitKerja?   @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
+  asn       Asn?         @relation(fields: [asnId], references: [id], onDelete: SetNull)
+  case      SiapCase?    @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  worklog   SiapWorklog? @relation(fields: [worklogId], references: [id], onDelete: SetNull)
+
+  createdBy   User? @relation("DmsDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  submittedBy User? @relation("DmsDocumentSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  verifiedBy  User? @relation("DmsDocumentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([title])
+  @@index([category])
+  @@index([status])
+  @@index([periodYear])
+  @@index([periodMonth])
+  @@index([periodQuarter])
+  @@index([unitKerjaId])
+  @@index([asnId])
+  @@index([caseId])
+  @@index([worklogId])
+  @@index([createdById])
+  @@index([submittedById])
+  @@index([verifiedById])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("dms_documents")
 }

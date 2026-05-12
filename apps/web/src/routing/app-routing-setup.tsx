@@ -12,6 +12,12 @@ import { SipensiunListPage } from '@/pages/workspace/sipensiun-list-page';
 import { ProtectedRoute } from './protected-route';
 import { SiapWorklogDashboardPage } from '@/pages/workspace/siap-worklog-dashboard-page';
 import { SiapWorklogExecutivePage } from '@/pages/workspace/siap-worklog-executive-page';
+import { DmsDashboardPage } from '@/pages/workspace/dms-dashboard-page';
+import { DmsDocumentsPage } from '@/pages/workspace/dms-documents-page';
+import { DmsDocumentDetailPage } from '@/pages/workspace/dms-document-detail-page';
+import { DmsUploadPage } from '@/pages/workspace/dms-upload-page';
+import { DmsVerificationPage } from '@/pages/workspace/dms-verification-page';
+import { DmsReportsPage } from '@/pages/workspace/dms-reports-page';
 
 export function AppRoutingSetup() {
   return (
@@ -21,14 +27,25 @@ export function AppRoutingSetup() {
         <Route element={<Layout1 />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+
           <Route path="/sidata/asn" element={<SidataAsnPage />} />
+
+          <Route path="/dms" element={<DmsDashboardPage />} />
+          <Route path="/dms/documents" element={<DmsDocumentsPage />} />
+          <Route path="/dms/documents/:id" element={<DmsDocumentDetailPage />} />
+          <Route path="/dms/upload" element={<DmsUploadPage />} />
+          <Route path="/dms/verification" element={<DmsVerificationPage />} />
+          <Route path="/dms/reports" element={<DmsReportsPage />} />
+
           <Route path="/sipensiun" element={<SipensiunListPage />} />
           <Route path="/sipensiun/:id" element={<SipensiunDetailPage />} />
+
           <Route path="/siap/tasks" element={<SiapTasksPage />} />
           <Route path="/siap/worklogs" element={<SiapWorklogsPage />} />
           <Route path="/siap/worklogs/team" element={<SiapWorklogTeamPage />} />
           <Route path="/siap/worklogs/dashboard" element={<SiapWorklogDashboardPage />} />
           <Route path="/siap/worklogs/executive" element={<SiapWorklogExecutivePage />} />
+
           <Route path="/siarsip" element={<SiarsipPage />} />
         </Route>
       </Route>
