@@ -11,7 +11,6 @@ import { SidataModule } from './sidata/sidata.module';
 import { SipensiunModule } from './sipensiun/sipensiun.module';
 import { SlaModule } from './sla/sla.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { SecurityHeadersMiddleware } from './shared/security-headers.middleware';
 
 @Module({
   imports: [
@@ -33,6 +32,6 @@ import { SecurityHeadersMiddleware } from './shared/security-headers.middleware'
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+    
   }
 }

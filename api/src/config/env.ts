@@ -1,10 +1,15 @@
 export type AppConfig = {
+  appName: string;
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   databaseUrl: string;
   jwtSecret: string;
   webOrigins: string[];
   requestBodyLimit: string;
+  uploadRoot: string;
+  uploadMaxSizeMb: number;
+  securityHeadersEnabled: boolean;
+  trustProxy: boolean;
 };
 
 const allowedNodeEnv = new Set(['development', 'test', 'production']);
@@ -19,7 +24,10 @@ export function validateEnv(): AppConfig {
   const isProduction = nodeEnv === 'production';
   const databaseUrl = required('DATABASE_URL');
   const jwtSecret = required('JWT_SECRET');
-  const webOrigin = process.env.WEB_ORIGIN || (isProduction ? '' : 'http://localhost:5173,http://127.0.0.1:5173');
+  const webOrigin =
+    process.env.WEB_ORIGIN ||
+    (isProduction ? '' : 'http://localhost:5173,http://127.0.0.1:5173');
+
   const webOrigins = webOrigin
     .split(',')
     .map((origin) => origin.trim())
@@ -32,19 +40,41 @@ export function validateEnv(): AppConfig {
 
     if (
       jwtSecret.length < 32 ||
-      ['dev-secret', 'dev-only-secret'].includes(jwtSecret)
+      ['dev-secret', 'dev-only-secret', 'secret', 'changeme'].includes(jwtSecret)
     ) {
-      throw new Error('JWT_SECRET production minimal 32 karakter dan bukan secret dev');
+      throw new Error(
+        'JWT_SECRET production minimal 32 karakter dan bukan secret dev',
+      );
+    }
+
+    if (databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')) {
+      throw new Error(
+        'DATABASE_URL production tidak boleh mengarah ke localhost',
+      );
     }
   }
 
   return {
+    appName: process.env.APP_NAME || 'silakap-hostinger-api',
     nodeEnv: nodeEnv as AppConfig['nodeEnv'],
     port: numberInRange(process.env.PORT, 3000, 1, 65535, 'PORT'),
     databaseUrl,
     jwtSecret,
     webOrigins,
     requestBodyLimit: process.env.REQUEST_BODY_LIMIT || '1mb',
+    uploadRoot: process.env.UPLOAD_ROOT || 'uploads',
+    uploadMaxSizeMb: numberInRange(
+      process.env.UPLOAD_MAX_SIZE_MB,
+      2,
+      1,
+      20,
+      'UPLOAD_MAX_SIZE_MB',
+    ),
+    securityHeadersEnabled: boolFromEnv(
+      process.env.SECURITY_HEADERS_ENABLED,
+      true,
+    ),
+    trustProxy: boolFromEnv(process.env.TRUST_PROXY, isProduction),
   };
 }
 
@@ -57,12 +87,29 @@ export function getJwtSecret() {
 
   if (
     process.env.NODE_ENV === 'production' &&
-    (value.length < 32 || ['dev-secret', 'dev-only-secret'].includes(value))
+    (value.length < 32 ||
+      ['dev-secret', 'dev-only-secret', 'secret', 'changeme'].includes(value))
   ) {
     throw new Error('JWT_SECRET production tidak valid');
   }
 
   return value;
+}
+
+export function getUploadRoot() {
+  return process.env.UPLOAD_ROOT || 'uploads';
+}
+
+export function getUploadMaxSizeBytes() {
+  const maxMb = numberInRange(
+    process.env.UPLOAD_MAX_SIZE_MB,
+    2,
+    1,
+    20,
+    'UPLOAD_MAX_SIZE_MB',
+  );
+
+  return maxMb * 1024 * 1024;
 }
 
 function required(name: string) {
@@ -95,4 +142,20 @@ function numberInRange(
   }
 
   return normalized;
+}
+
+function boolFromEnv(value: string | undefined, defaultValue: boolean) {
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+
+  if (['true', '1', 'yes', 'on'].includes(value.toLowerCase())) {
+    return true;
+  }
+
+  if (['false', '0', 'no', 'off'].includes(value.toLowerCase())) {
+    return false;
+  }
+
+  throw new Error(`Nilai boolean tidak valid: ${value}`);
 }

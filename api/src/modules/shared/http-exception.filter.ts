@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { getRequestId } from './request-id.middleware';
 
 @Catch()
 export class GlobalHttpExceptionFilter implements ExceptionFilter {
@@ -20,14 +21,22 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : null;
-    const message = this.resolveMessage(exceptionResponse, exception);
+
+    const message = this.resolveMessage(exceptionResponse, exception, status);
+    const requestId = getRequestId(request);
+    const timestamp = new Date().toISOString();
 
     if (status >= 500) {
       this.logger.error(
-        `${request.method} ${request.url} failed: ${message}`,
+        `[${requestId ?? 'no-request-id'}] ${request.method} ${request.url} failed: ${message}`,
         exception instanceof Error ? exception.stack : undefined,
+      );
+    } else if (status >= 400) {
+      this.logger.warn(
+        `[${requestId ?? 'no-request-id'}] ${request.method} ${request.url} rejected: ${message}`,
       );
     }
 
@@ -38,12 +47,21 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         statusCode: status,
         path: request.url,
         method: request.method,
-        timestamp: new Date().toISOString(),
+        timestamp,
+        requestId,
       },
     });
   }
 
-  private resolveMessage(response: unknown, exception: unknown) {
+  private resolveMessage(
+    response: unknown,
+    exception: unknown,
+    status: number,
+  ) {
+    if (status >= 500 && process.env.NODE_ENV === 'production') {
+      return 'Terjadi kesalahan pada server';
+    }
+
     if (typeof response === 'string') {
       return response;
     }

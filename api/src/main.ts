@@ -6,18 +6,44 @@ import { json, urlencoded } from 'express';
 import { validateEnv } from './config/env';
 import { AppModule } from './modules/app.module';
 import { GlobalHttpExceptionFilter } from './modules/shared/http-exception.filter';
+import { requestIdMiddleware } from './modules/shared/request-id.middleware';
+import { securityHeadersMiddleware } from './modules/shared/security-headers.middleware';
 
 const appConfig = validateEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  if (appConfig.trustProxy) {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
+  if (appConfig.securityHeadersEnabled) {
+    app.use(securityHeadersMiddleware);
+  }
+
+  app.use(requestIdMiddleware);
+
   app.enableCors({
-    origin: appConfig.webOrigins,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (appConfig.webOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('CORS origin tidak diizinkan'), false);
+    },
     credentials: true,
   });
+
   app.use(json({ limit: appConfig.requestBodyLimit }));
   app.use(urlencoded({ extended: true, limit: appConfig.requestBodyLimit }));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -25,9 +51,15 @@ async function bootstrap() {
       forbidNonWhitelisted: appConfig.nodeEnv === 'production',
     }),
   );
+
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
   await app.listen(appConfig.port);
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `${appConfig.appName} running on http://localhost:${appConfig.port}`,
+  );
 }
 
 bootstrap();
