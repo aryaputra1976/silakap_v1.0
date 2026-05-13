@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCcw } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -8,21 +7,12 @@ import {
   type DmsDocumentListQuery,
   type DmsDocumentListResponse,
 } from '@/lib/api/dms';
-
-import {
-  ActionButton,
-  ErrorAlert,
-  LoadingState,
-  PageHeader,
-  SectionCard,
-  StatusBadge,
-} from '@/components/workspace/ui';
-import { DmsDocumentTable } from '@/components/workspace/dms/dms-document-table';
-import {
-  DmsFilterBar,
-  type DmsFilterValue,
-} from '@/components/workspace/dms/dms-filter-bar';
-import { DmsStatCards, type DmsStatSummary } from '@/components/workspace/dms/dms-stat-cards';
+import { ErrorAlert } from '@/components/workspace/ui';
+import { type DmsFilterValue } from '@/components/workspace/dms/dms-filter-bar';
+import { type DmsStatSummary } from '@/components/workspace/dms/dms-stat-cards';
+import { DmsDocumentsHeader } from '@/components/workspace/dms/list/dms-documents-header';
+import { DmsDocumentsSummary } from '@/components/workspace/dms/list/dms-documents-summary';
+import { DmsDocumentsSection } from '@/components/workspace/dms/list/dms-documents-section';
 
 const defaultFilter: DmsFilterValue = {
   q: '',
@@ -115,57 +105,28 @@ export function DmsDocumentsPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Dokumen DMS"
-        description="Kelola dokumen bukti dukung, laporan, arsip kepegawaian, dan dokumen kerja yang terhubung dengan SIAP, SIDATA, dan layanan kepegawaian."
-        meta={<StatusBadge value={`${data?.total ?? 0} DOKUMEN`} tone="info" />}
-        actions={
-          <>
-            <ActionButton
-              icon={Plus}
-              onClick={() => navigate('/dms/upload')}
-            >
-              Upload Dokumen
-            </ActionButton>
-            <ActionButton
-              disabled={loading}
-              icon={RefreshCcw}
-              onClick={() => void loadDocuments()}
-              variant="secondary"
-            >
-              Refresh
-            </ActionButton>
-          </>
-        }
+      <DmsDocumentsHeader
+        totalDocuments={data?.total ?? 0}
+        loading={loading}
+        onUpload={() => navigate('/dms/upload')}
+        onRefresh={() => void loadDocuments()}
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <DmsStatCards summary={summary} />
+      <DmsDocumentsSummary summary={summary} />
 
-      <DmsFilterBar
-        value={filter}
+      <DmsDocumentsSection
+        documents={documents}
+        filter={filter}
         loading={loading}
-        onChange={setFilter}
-        onApply={applyFilter}
-        onReset={resetFilter}
+        downloadingId={downloadingId}
+        onFilterChange={setFilter}
+        onApplyFilter={applyFilter}
+        onResetFilter={resetFilter}
+        onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
+        onDownloadDocument={(document) => void downloadDocument(document)}
       />
-
-      <SectionCard
-        title="Daftar Dokumen"
-        description="Dokumen yang tampil mengikuti hak akses pengguna dan filter yang diterapkan."
-      >
-        {loading ? (
-          <LoadingState label="Memuat dokumen DMS" />
-        ) : (
-          <DmsDocumentTable
-            documents={documents}
-            downloadingId={downloadingId}
-            onDownloadDocument={(document) => void downloadDocument(document)}
-            onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
-          />
-        )}
-      </SectionCard>
     </div>
   );
 }

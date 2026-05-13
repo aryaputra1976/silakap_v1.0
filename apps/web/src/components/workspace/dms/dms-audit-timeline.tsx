@@ -3,7 +3,6 @@ import {
   ActionButton,
   EmptyState,
   LoadingState,
-  StatusBadge,
   Timeline,
 } from '@/components/workspace/ui';
 import type { DmsAuditTimelineItem } from '@/lib/api/dms';
@@ -62,22 +61,3 @@ export function DmsAuditTimeline({
   );
 }
 
-export function DmsAuditActionBadge({ action }: { action: string }) {
-  return <StatusBadge value={action.replace(/_/g, ' ')} tone={tone(action)} />;
-}
-
-function tone(action: string) {
-  if (action.includes('VERIFIED') || action.includes('ARCHIVED')) {
-    return 'success' as const;
-  }
-
-  if (action.includes('REJECTED') || action.includes('DELETED')) {
-    return 'danger' as const;
-  }
-
-  if (action.includes('SUBMITTED') || action.includes('UPLOADED')) {
-    return 'info' as const;
-  }
-
-  return 'neutral' as const;
-}

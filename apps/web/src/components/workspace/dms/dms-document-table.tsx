@@ -6,6 +6,8 @@ import {
   formatFileSize,
 } from '@/components/workspace/ui';
 import type { DmsDocument } from '@/lib/api/dms';
+import { formatPeriod } from './shared/dms-formatters';
+import { canDownloadDocument } from './shared/dms-action-utils';
 import { DmsCategoryBadge } from './dms-category-badge';
 import { DmsStatusBadge } from './dms-status-badge';
 
@@ -134,7 +136,7 @@ export function DmsDocumentTable({
                 Buka
               </ActionButton>
 
-              {onDownloadDocument && item.fileName ? (
+              {onDownloadDocument && canDownloadDocument(item) ? (
                 <ActionButton
                   disabled={downloadingId === item.id}
                   icon={Download}
@@ -152,14 +154,3 @@ export function DmsDocumentTable({
   );
 }
 
-function formatPeriod(item: DmsDocument) {
-  if (!item.periodYear && !item.periodMonth) {
-    return '-';
-  }
-
-  if (item.periodMonth && item.periodYear) {
-    return `${item.periodMonth}/${item.periodYear}`;
-  }
-
-  return String(item.periodYear ?? '-');
-}

@@ -1,6 +1,14 @@
 import { Archive, CheckCircle2, Send, Trash2, XCircle } from 'lucide-react';
 import { ActionButton, SectionCard, StatusBadge } from '@/components/workspace/ui';
 import type { DmsDocument, DmsDocumentStatus } from '@/lib/api/dms';
+import { getDmsStatusTone } from './shared/dms-status-utils';
+import {
+  canArchiveDocument,
+  canDeleteDocument,
+  canRejectDocument,
+  canSubmitDocument,
+  canVerifyDocument,
+} from './shared/dms-action-utils';
 
 export function DmsActionPanel({
   document,
@@ -27,19 +35,19 @@ export function DmsActionPanel({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-zinc-700">Status saat ini:</span>
-          <StatusBadge value={document.status} tone={statusTone(document.status)} />
+          <StatusBadge value={document.status} tone={getDmsStatusTone(document.status)} />
         </div>
 
         <WorkflowHint status={document.status} />
 
         <div className="flex flex-wrap gap-2">
-          {canSubmit(document.status) && onSubmit ? (
+          {canSubmitDocument(document.status) && onSubmit ? (
             <ActionButton disabled={working} icon={Send} onClick={onSubmit}>
               Submit Verifikasi
             </ActionButton>
           ) : null}
 
-          {canVerify(document.status) && onVerify ? (
+          {canVerifyDocument(document.status) && onVerify ? (
             <ActionButton
               disabled={working}
               icon={CheckCircle2}
@@ -50,7 +58,7 @@ export function DmsActionPanel({
             </ActionButton>
           ) : null}
 
-          {canVerify(document.status) && onReject ? (
+          {canRejectDocument(document.status) && onReject ? (
             <ActionButton
               disabled={working}
               icon={XCircle}
@@ -61,7 +69,7 @@ export function DmsActionPanel({
             </ActionButton>
           ) : null}
 
-          {document.status === 'VERIFIED' && onArchive ? (
+          {canArchiveDocument(document.status) && onArchive ? (
             <ActionButton
               disabled={working}
               icon={Archive}
@@ -72,7 +80,7 @@ export function DmsActionPanel({
             </ActionButton>
           ) : null}
 
-          {canDelete(document.status) && onDelete ? (
+          {canDeleteDocument(document.status) && onDelete ? (
             <ActionButton
               disabled={working}
               icon={Trash2}
@@ -141,36 +149,4 @@ function WorkflowHint({ status }: { status: DmsDocumentStatus }) {
       Dokumen sudah masuk arsip final.
     </p>
   );
-}
-
-function canSubmit(status: DmsDocumentStatus) {
-  return status === 'UPLOADED' || status === 'REJECTED';
-}
-
-function canVerify(status: DmsDocumentStatus) {
-  return status === 'SUBMITTED';
-}
-
-function canDelete(status: DmsDocumentStatus) {
-  return status !== 'VERIFIED' && status !== 'ARCHIVED';
-}
-
-function statusTone(status: DmsDocumentStatus) {
-  if (status === 'VERIFIED' || status === 'ARCHIVED') {
-    return 'success' as const;
-  }
-
-  if (status === 'SUBMITTED') {
-    return 'info' as const;
-  }
-
-  if (status === 'REJECTED') {
-    return 'danger' as const;
-  }
-
-  if (status === 'UPLOADED') {
-    return 'warning' as const;
-  }
-
-  return 'neutral' as const;
 }

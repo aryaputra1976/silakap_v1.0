@@ -56,12 +56,28 @@ export const MENU_SIDEBAR: MenuConfig = [
     ],
   },
   {
-    title: 'SIDATA',
+    title: 'SIDATA ASN',
     icon: Database,
     children: [
-      { title: 'ASN', path: '/sidata/asn' },
-      { title: 'Unit Organisasi', disabled: true },
-      { title: 'Jabatan & Golongan', disabled: true },
+      { title: 'Dashboard', path: '/sidata/dashboard' },
+      { title: 'Profil ASN', path: '/sidata/asn' },
+      { title: 'Validasi Data', path: '/sidata/validasi' },
+      { title: 'Pemutakhiran Data', path: '/sidata/pemutakhiran' },
+      {
+        title: 'Import & Sinkronisasi',
+        children: [
+          { title: 'Import SIASN', path: '/sidata/import/siasn' },
+          { title: 'Import Excel', path: '/sidata/import/excel' },
+          { title: 'Import Referensi', path: '/sidata/import/referensi' },
+          { title: 'Mapping Referensi', path: '/sidata/import/mapping-referensi' },
+          { title: 'Riwayat Import', path: '/sidata/import/riwayat' },
+          { title: 'Log Sinkronisasi', path: '/sidata/import/log-sinkronisasi' },
+        ],
+      },
+      { title: 'Rekonsiliasi Data', path: '/sidata/rekonsiliasi' },
+      { title: 'Referensi Data', path: '/sidata/referensi' },
+      { title: 'Dokumen ASN', path: '/sidata/dokumen' },
+      { title: 'Laporan', path: '/sidata/laporan' },
     ],
   },
   {
