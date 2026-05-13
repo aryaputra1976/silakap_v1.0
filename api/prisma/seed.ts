@@ -241,6 +241,33 @@ async function main() {
       tmtPensiun: new Date('2035-05-01'),
     },
   });
+
+  // Seed canonical jenis jabatan classifiers
+  const jenisJabatanData = [
+    {
+      kode: 'STRUKTURAL',
+      nama: 'Jabatan Struktural',
+      deskripsi: 'Jabatan yang menunjukkan tugas, tanggung jawab, wewenang dan hak seorang PNS dalam rangka memimpin suatu satuan organisasi.',
+    },
+    {
+      kode: 'FUNGSIONAL',
+      nama: 'Jabatan Fungsional',
+      deskripsi: 'Jabatan yang mempunyai ruang lingkup, tugas, tanggung jawab dan wewenang untuk melakukan kegiatan yang berkaitan dengan pelayanan fungsional.',
+    },
+    {
+      kode: 'PELAKSANA',
+      nama: 'Jabatan Pelaksana',
+      deskripsi: 'Jabatan yang mempunyai ruang lingkup, tugas, tanggung jawab dan wewenang untuk melakukan kegiatan pelayanan publik serta administrasi pemerintahan.',
+    },
+  ];
+
+  for (const data of jenisJabatanData) {
+    await prisma.refJenisJabatan.upsert({
+      where: { kode: data.kode },
+      update: { nama: data.nama, deskripsi: data.deskripsi, isActive: true },
+      create: { kode: data.kode, nama: data.nama, deskripsi: data.deskripsi, isActive: true },
+    });
+  }
 }
 
 main()

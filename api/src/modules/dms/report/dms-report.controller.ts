@@ -8,13 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { AuthUser } from '../auth/auth.types';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { DMS_VIEW_ROLES } from './constants/dms-permission.constant';
-import { DmsReportQueryDto } from './dto/dms-report-query.dto';
+import { AuthUser } from '../../auth/auth.types';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { DMS_VIEW_ROLES } from '../constants/dms-permission.constant';
+import { DmsReportQueryDto } from '../dto/dms-report-query.dto';
 import { DmsReportService } from './dms-report.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)

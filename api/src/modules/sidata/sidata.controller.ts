@@ -1,10 +1,12 @@
 import { Controller, Get, Inject, Param, Query, UseGuards } from '@nestjs/common';
+import { AuthUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { SidataService } from './sidata.service';
-import { SidataAsnQuery } from './sidata.types';
+import { SidataAsnQueryDto } from './sidata.types';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
@@ -28,14 +30,20 @@ export class SidataController {
   }
 
   @Get('asn')
-  async findAsn(@Query() query: SidataAsnQuery) {
-    const result = await this.sidataService.findAsnList(query);
+  async findAsn(
+    @Query() query: SidataAsnQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.sidataService.findAsnList(query, user);
     return ok(result);
   }
 
   @Get('asn/:id')
-  async findAsnById(@Param('id') id: string) {
-    const asn = await this.sidataService.findAsnById(id);
+  async findAsnById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const asn = await this.sidataService.findAsnById(id, user);
     return ok(asn);
   }
 }

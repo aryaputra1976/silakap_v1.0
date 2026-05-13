@@ -1,4 +1,4 @@
-import { DmsDocumentRecord } from './dms.repository';
+import { DmsDocumentRecord } from '../dms.repository';
 
 export class DmsMapper {
   static toResponse(record: DmsDocumentRecord) {

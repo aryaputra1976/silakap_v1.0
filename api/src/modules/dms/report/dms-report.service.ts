@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { DmsDocumentCategory, DmsDocumentStatus } from '@prisma/client';
-import { AuthUser } from '../auth/auth.types';
-import { DmsReportQueryDto } from './dto/dms-report-query.dto';
+import { AuthUser } from '../../auth/auth.types';
+import { DmsReportQueryDto } from '../dto/dms-report-query.dto';
 import {
   DmsReportRepository,
   DmsReportRow,

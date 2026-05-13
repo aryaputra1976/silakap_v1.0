@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AuthUser } from '../auth/auth.types';
 import {
   AsnRecord,
   SidataRepository,
@@ -6,9 +7,50 @@ import {
 } from './sidata.repository';
 import {
   NormalizedAsnFilters,
-  SidataAsnQuery,
+  SIDATA_ALL_ACCESS_ROLES,
+  SidataAccessScope,
+  SidataAsnQueryDto,
   UnitTreeNode,
 } from './sidata.types';
+
+type UnitResponse = {
+  id: string;
+  kode: string;
+  nama: string;
+  parentId: string | null;
+  level: number;
+  isActive: boolean;
+};
+
+type AsnUnitKerja = {
+  id: string;
+  kode: string;
+  nama: string;
+};
+
+type AsnResponse = {
+  id: string;
+  nip: string;
+  nik: string | null;
+  nama: string;
+  email: string | null;
+  phone: string | null;
+  unitKerjaId: string | null;
+  unitKerja: AsnUnitKerja | null;
+  jabatanNama: string | null;
+  golonganNama: string | null;
+  jenisAsn: string | null;
+  statusAsn: string | null;
+  tanggalLahir: string | null;
+  tmtPensiun: string | null;
+};
+
+type PaginatedAsnResponse = {
+  items: AsnResponse[];
+  page: number;
+  limit: number;
+  total: number;
+};
 
 @Injectable()
 export class SidataService {
@@ -17,18 +59,21 @@ export class SidataService {
     private readonly sidataRepository: SidataRepository,
   ) {}
 
-  async findUnits() {
+  async findUnits(): Promise<UnitResponse[]> {
     const units = await this.sidataRepository.findUnits();
     return units.map((unit) => this.toUnitResponse(unit));
   }
 
-  async findUnitTree() {
+  async findUnitTree(): Promise<UnitTreeNode[]> {
     const tree = await this.sidataRepository.findUnitTree();
     return tree.map((unit) => this.toUnitTreeResponse(unit));
   }
 
-  async findAsnList(query: SidataAsnQuery) {
-    const filters = this.normalizeAsnFilters(query);
+  async findAsnList(
+    query: SidataAsnQueryDto,
+    user: AuthUser,
+  ): Promise<PaginatedAsnResponse> {
+    const filters = this.normalizeAsnFilters(query, user);
     const result = await this.sidataRepository.findAsnList(filters);
 
     return {
@@ -39,27 +84,52 @@ export class SidataService {
     };
   }
 
-  async findAsnById(id: string) {
+  async findAsnById(id: string, user: AuthUser): Promise<AsnResponse> {
     const asn = await this.sidataRepository.findAsnById(id.trim());
 
     if (!asn) {
       throw new NotFoundException('Data ASN tidak ditemukan');
     }
 
+    const scope = this.getAccessScope(user);
+
+    if (scope === 'UNIT' && asn.unitKerjaId !== user.unitKerjaId) {
+      throw new NotFoundException('Data ASN tidak ditemukan');
+    }
+
     return this.toAsnResponse(asn);
   }
 
-  private normalizeAsnFilters(query: SidataAsnQuery): NormalizedAsnFilters {
+  private getAccessScope(user: AuthUser): SidataAccessScope {
+    const allAccessRoles: readonly string[] = SIDATA_ALL_ACCESS_ROLES;
+    if (user.roles.some((r) => allAccessRoles.includes(r))) {
+      return 'ALL';
+    }
+    return 'UNIT';
+  }
+
+  private normalizeAsnFilters(
+    query: SidataAsnQueryDto,
+    user: AuthUser,
+  ): NormalizedAsnFilters {
+    const scope = this.getAccessScope(user);
+
+    const unitKerjaId =
+      scope === 'UNIT'
+        ? (user.unitKerjaId ?? undefined)
+        : this.normalizeOptionalText(query.unitKerjaId);
+
     return {
       q: this.normalizeOptionalText(query.q),
-      unitKerjaId: this.normalizeOptionalText(query.unitKerjaId),
+      unitKerjaId,
       statusAsn: this.normalizeOptionalText(query.statusAsn),
+      jenisAsn: this.normalizeOptionalText(query.jenisAsn),
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
-      limit: this.normalizePositiveNumber(query.limit, 10, 1, 100),
+      limit: this.normalizePositiveNumber(query.limit, 20, 1, 100),
     };
   }
 
-  private normalizeOptionalText(value: string | undefined) {
+  private normalizeOptionalText(value: string | undefined): string | undefined {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
   }
@@ -69,7 +139,7 @@ export class SidataService {
     defaultValue: number,
     min: number,
     max: number,
-  ) {
+  ): number {
     const parsed = Number(value);
 
     if (!Number.isFinite(parsed)) {
@@ -79,7 +149,7 @@ export class SidataService {
     return Math.min(Math.max(Math.trunc(parsed), min), max);
   }
 
-  private toUnitResponse(unit: UnitKerjaRecord) {
+  private toUnitResponse(unit: UnitKerjaRecord): UnitResponse {
     return {
       id: unit.id,
       kode: unit.kode,
@@ -102,7 +172,7 @@ export class SidataService {
     };
   }
 
-  private toAsnResponse(asn: AsnRecord) {
+  private toAsnResponse(asn: AsnRecord): AsnResponse {
     return {
       id: asn.id,
       nip: asn.nip,
@@ -116,8 +186,8 @@ export class SidataService {
       golonganNama: asn.golonganNama,
       jenisAsn: asn.jenisAsn,
       statusAsn: asn.statusAsn,
-      tanggalLahir: asn.tanggalLahir,
-      tmtPensiun: asn.tmtPensiun,
+      tanggalLahir: asn.tanggalLahir?.toISOString() ?? null,
+      tmtPensiun: asn.tmtPensiun?.toISOString() ?? null,
     };
   }
 }

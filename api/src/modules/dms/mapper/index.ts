@@ -1,1 +1,1 @@
-export { DmsMapper } from '../dms.mapper';
+export { DmsMapper } from './dms.mapper';

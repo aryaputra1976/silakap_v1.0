@@ -22,7 +22,7 @@ import { DmsRejectDto } from './dto/dms-reject.dto';
 import { DmsUploadDto } from './dto/dms-upload.dto';
 import { DmsVerifyDto } from './dto/dms-verify.dto';
 import { UpdateDmsDocumentDto } from './dto/update-dms-document.dto';
-import { DmsMapper } from './dms.mapper';
+import { DmsMapper } from './mapper';
 import {
   DmsDocumentRecord,
   DmsRepository,

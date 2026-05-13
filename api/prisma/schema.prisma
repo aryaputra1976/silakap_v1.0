@@ -761,3 +761,389 @@ model DmsDocument {
   @@index([deletedAt])
   @@map("dms_documents")
 }
+
+// ─── SIDATA Reference Tables ──────────────────────────────────────────────────
+
+model RefJenisJabatan {
+  id        String  @id @default(uuid()) @db.VarChar(36)
+  kode      String  @unique @db.VarChar(50)
+  nama      String  @db.VarChar(150)
+  deskripsi String? @db.Text
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  jabatan RefJabatan[]
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_jenis_jabatan")
+}
+
+model RefJabatan {
+  id             String  @id @default(uuid()) @db.VarChar(36)
+  jenisJabatanId String  @map("jenis_jabatan_id") @db.VarChar(36)
+  kode           String? @db.VarChar(100)
+  nama           String  @db.VarChar(300)
+  namaNormalized String? @map("nama_normalized") @db.VarChar(300)
+
+  siasnId   String? @map("siasn_id") @db.VarChar(100)
+  siasnKode String? @map("siasn_kode") @db.VarChar(100)
+  siasnNama String? @map("siasn_nama") @db.VarChar(300)
+
+  rumpun       String? @db.VarChar(200)
+  jenjang      String? @db.VarChar(100)
+  kelasJabatan Int?    @map("kelas_jabatan")
+  source       String? @db.VarChar(100)
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  jenisJabatan RefJenisJabatan @relation(fields: [jenisJabatanId], references: [id])
+
+  @@index([jenisJabatanId])
+  @@index([kode])
+  @@index([nama])
+  @@index([namaNormalized])
+  @@index([siasnId])
+  @@index([siasnKode])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("ref_jabatan")
+}
+
+// ─── SIDATA Import Staging ────────────────────────────────────────────────────
+
+model SidataReferenceImportBatch {
+  id         String  @id @default(uuid()) @db.VarChar(36)
+  source     String  @db.VarChar(100)
+  importType String  @map("import_type") @db.VarChar(100)
+  fileName   String? @map("file_name") @db.VarChar(255)
+  status     String  @db.VarChar(50)
+
+  totalRows     Int @default(0) @map("total_rows")
+  validRows     Int @default(0) @map("valid_rows")
+  invalidRows   Int @default(0) @map("invalid_rows")
+  duplicateRows Int @default(0) @map("duplicate_rows")
+  warningRows   Int @default(0) @map("warning_rows")
+
+  importedById String?   @map("imported_by_id") @db.VarChar(36)
+  startedAt    DateTime? @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  errorMessage String?   @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stagingRows SidataReferenceImportStaging[]
+
+  @@index([source])
+  @@index([importType])
+  @@index([status])
+  @@index([importedById])
+  @@index([createdAt])
+  @@map("sidata_reference_import_batches")
+}
+
+model SidataReferenceImportStaging {
+  id        String @id @default(uuid()) @db.VarChar(36)
+  batchId   String @map("batch_id") @db.VarChar(36)
+  rowNumber Int    @map("row_number")
+
+  referenceType     String  @map("reference_type") @db.VarChar(100)
+  sourceCode        String? @map("source_code") @db.VarChar(100)
+  sourceName        String  @map("source_name") @db.VarChar(300)
+  sourceDescription String? @map("source_description") @db.Text
+
+  targetTable String? @map("target_table") @db.VarChar(100)
+  targetId    String? @map("target_id") @db.VarChar(36)
+
+  mappingStatus    String @default("UNMAPPED") @map("mapping_status") @db.VarChar(50)
+  validationStatus String @default("VALID") @map("validation_status") @db.VarChar(50)
+  validationErrors Json?  @map("validation_errors")
+  rawData          Json   @map("raw_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  batch SidataReferenceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([referenceType])
+  @@index([sourceCode])
+  @@index([sourceName])
+  @@index([targetTable])
+  @@index([targetId])
+  @@index([mappingStatus])
+  @@index([validationStatus])
+  @@index([createdAt])
+  @@map("sidata_reference_import_staging")
+}
+
+// ─── SIDATA Reference Mapping ─────────────────────────────────────────────────
+
+model SidataReferenceMapping {
+  id         String  @id @default(uuid()) @db.VarChar(36)
+  sourceType String  @map("source_type") @db.VarChar(100)
+  sourceCode String? @map("source_code") @db.VarChar(100)
+  sourceName String  @map("source_name") @db.VarChar(300)
+
+  targetTable String @map("target_table") @db.VarChar(100)
+  targetId    String @map("target_id") @db.VarChar(36)
+
+  mappingStatus   String  @default("MAPPED") @map("mapping_status") @db.VarChar(50)
+  confidenceScore Float?  @map("confidence_score")
+  note            String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([sourceType])
+  @@index([sourceCode])
+  @@index([sourceName])
+  @@index([targetTable])
+  @@index([targetId])
+  @@index([mappingStatus])
+  @@map("sidata_reference_mappings")
+}
+
+// ─── SIDATA Generic Reference Tables ──────────────────────────────────────────
+
+model RefGolongan {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(50)
+  nama      String    @db.VarChar(150)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_golongan")
+}
+
+model RefPangkat {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(50)
+  nama      String    @db.VarChar(150)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_pangkat")
+}
+
+model RefPendidikan {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(50)
+  nama      String    @db.VarChar(150)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_pendidikan")
+}
+
+model RefAgama {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(50)
+  nama      String    @db.VarChar(100)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_agama")
+}
+
+model RefJenisKelamin {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(10)
+  nama      String    @db.VarChar(50)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_jenis_kelamin")
+}
+
+model RefStatusKawin {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(10)
+  nama      String    @db.VarChar(100)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_status_kawin")
+}
+
+model RefKedudukanHukum {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(50)
+  nama      String    @db.VarChar(200)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_kedudukan_hukum")
+}
+
+model RefJenisAsn {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  kode      String?   @db.VarChar(20)
+  nama      String    @db.VarChar(100)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([kode])
+  @@index([isActive])
+  @@map("ref_jenis_asn")
+}
+
+// ─── SIDATA ASN Import Staging ────────────────────────────────────────────────
+
+model SidataAsnImportBatch {
+  id            String    @id @db.VarChar(36)
+  source        String    @db.VarChar(50)
+  importType    String    @map("import_type") @db.VarChar(100)
+  fileName      String?   @map("file_name") @db.VarChar(255)
+  status        String    @db.VarChar(50)
+  totalRows     Int       @default(0) @map("total_rows")
+  validRows     Int       @default(0) @map("valid_rows")
+  invalidRows   Int       @default(0) @map("invalid_rows")
+  duplicateRows Int       @default(0) @map("duplicate_rows")
+  warningRows   Int       @default(0) @map("warning_rows")
+  importedById  String?   @map("imported_by_id") @db.VarChar(36)
+  startedAt     DateTime? @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+  errorMessage  String?   @map("error_message") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  stagingRows SidataAsnImportStaging[]
+
+  @@index([source])
+  @@index([importType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sidata_asn_import_batch")
+}
+
+model SidataAsnImportStaging {
+  id        String @id @db.VarChar(36)
+  batchId   String @map("batch_id") @db.VarChar(36)
+  rowNumber Int    @map("row_number")
+
+  // Core identity
+  nip     String? @db.VarChar(30)
+  nipLama String? @map("nip_lama") @db.VarChar(30)
+  nama    String? @db.VarChar(300)
+
+  // Jabatan
+  namaJabatan    String?   @map("nama_jabatan") @db.VarChar(300)
+  jenisJabatan   String?   @map("jenis_jabatan") @db.VarChar(100)
+  kdJabatan      String?   @map("kd_jabatan") @db.VarChar(50)
+  kdJabatanSiasn String?   @map("kd_jabatan_siasn") @db.VarChar(50)
+  tmtJabatan     DateTime? @map("tmt_jabatan")
+
+  // Golongan / Pangkat
+  namaGolongan      String?   @map("nama_golongan") @db.VarChar(100)
+  namaRuang         String?   @map("nama_ruang") @db.VarChar(100)
+  kdGolongan        String?   @map("kd_golongan") @db.VarChar(20)
+  kdGolonganSiasn   String?   @map("kd_golongan_siasn") @db.VarChar(20)
+  tmtGolongan       DateTime? @map("tmt_golongan")
+  masaKerjaGolongan String?   @map("masa_kerja_golongan") @db.VarChar(20)
+  masaKerjaSeluruh  String?   @map("masa_kerja_seluruh") @db.VarChar(20)
+
+  // Unit Organisasi
+  namaUnorEselon1 String? @map("nama_unor_eselon1") @db.VarChar(300)
+  namaUnorEselon2 String? @map("nama_unor_eselon2") @db.VarChar(300)
+  namaUnorEselon3 String? @map("nama_unor_eselon3") @db.VarChar(300)
+  namaUnorEselon4 String? @map("nama_unor_eselon4") @db.VarChar(300)
+  kdUnor          String? @map("kd_unor") @db.VarChar(50)
+
+  // Data Pribadi
+  tempatLahir        String?   @map("tempat_lahir") @db.VarChar(100)
+  tanggalLahir       DateTime? @map("tanggal_lahir")
+  jenisKelamin       String?   @map("jenis_kelamin") @db.VarChar(20)
+  agama              String?   @db.VarChar(50)
+  statusKawin        String?   @map("status_kawin") @db.VarChar(50)
+  pendidikanTerakhir String?   @map("pendidikan_terakhir") @db.VarChar(100)
+  namaSekolah        String?   @map("nama_sekolah") @db.VarChar(300)
+
+  // Status Kepegawaian
+  tmtPns            DateTime? @map("tmt_pns")
+  tmtPensiun        DateTime? @map("tmt_pensiun")
+  statusKepegawaian String?   @map("status_kepegawaian") @db.VarChar(100)
+  jenisAsn          String?   @map("jenis_asn") @db.VarChar(50)
+  kedudukanHukum    String?   @map("kedudukan_hukum") @db.VarChar(100)
+
+  // SK
+  noSk      String?   @map("no_sk") @db.VarChar(100)
+  tanggalSk DateTime? @map("tanggal_sk")
+
+  // Validation & Mapping
+  validationStatus String  @default("VALID") @map("validation_status") @db.VarChar(50)
+  validationErrors Json?   @map("validation_errors")
+  mappingStatus    String  @default("UNMAPPED") @map("mapping_status") @db.VarChar(50)
+  matchedAsnId     String? @map("matched_asn_id") @db.VarChar(36)
+
+  rawData    Json  @map("raw_data")
+  mappedData Json? @map("mapped_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  batch SidataAsnImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([nip])
+  @@index([nama])
+  @@index([validationStatus])
+  @@index([mappingStatus])
+  @@index([createdAt])
+  @@map("sidata_asn_import_staging")
+}
+
+model SidataImportAuditLog {
+  id        String   @id @db.VarChar(36)
+  batchId   String   @map("batch_id") @db.VarChar(36)
+  batchType String   @map("batch_type") @db.VarChar(50)
+  action    String   @db.VarChar(100)
+  actorId   String?  @map("actor_id") @db.VarChar(36)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([batchId])
+  @@index([batchType])
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("sidata_import_audit_log")
+}

@@ -3,8 +3,8 @@ import {
   DmsDocumentCategory,
   DmsDocumentStatus,
 } from '@prisma/client';
-import { AuthUser } from '../auth/auth.types';
-import { DmsDashboardQueryDto } from './dto/dms-dashboard-query.dto';
+import { AuthUser } from '../../auth/auth.types';
+import { DmsDashboardQueryDto } from '../dto/dms-dashboard-query.dto';
 import {
   DmsDashboardCategorySummary,
   DmsDashboardRepository,

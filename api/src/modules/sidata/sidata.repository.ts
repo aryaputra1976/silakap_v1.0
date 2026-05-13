@@ -119,6 +119,10 @@ export class SidataRepository {
       where.statusAsn = filters.statusAsn;
     }
 
+    if (filters.jenisAsn) {
+      where.jenisAsn = filters.jenisAsn;
+    }
+
     if (filters.q) {
       where.OR = [
         { nip: { contains: filters.q } },

@@ -4,9 +4,9 @@ import {
   DmsDocumentStatus,
   Prisma,
 } from '@prisma/client';
-import { AuthUser } from '../auth/auth.types';
-import { PrismaService } from '../prisma/prisma.service';
-import { applyDmsDocumentScope } from './constants/dms-permission.constant';
+import { AuthUser } from '../../auth/auth.types';
+import { PrismaService } from '../../prisma/prisma.service';
+import { applyDmsDocumentScope } from '../constants/dms-permission.constant';
 
 export interface NormalizedDmsReportFilters {
   year?: number;
