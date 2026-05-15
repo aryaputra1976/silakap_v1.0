@@ -463,6 +463,7 @@ export type ExtractReferencesResult = {
     pendidikanTingkat: number;
     pendidikan: number;
     jenisJabatan: number;
+    jabatan: number;
   };
   totalExtracted: number;
 };
@@ -501,6 +502,11 @@ export type SidataImportIssueQueryDto = {
   limit?: string;
   status?: string;
   q?: string;
+};
+
+export type ResolveAsnUnitKerjaMappingDto = {
+  unitKerjaId?: string;
+  note?: string;
 };
 
 export type SidataAsnReconciliationQueryDto = {

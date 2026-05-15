@@ -14,12 +14,12 @@ import {
 type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'dark';
 
 const toneClass: Record<Tone, string> = {
-  neutral: 'border-zinc-200 bg-zinc-50 text-zinc-700',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800',
+  neutral: 'border-[#d6e2d1] bg-[#f4f8ef] text-[#51614c]',
+  success: 'border-[#9ed9c4] bg-[#e6f6ee] text-[#087052]',
+  warning: 'border-[#ecd28b] bg-[#fff6d7] text-[#7d5a00]',
   danger: 'border-rose-200 bg-rose-50 text-rose-700',
-  info: 'border-sky-200 bg-sky-50 text-sky-700',
-  dark: 'border-zinc-800 bg-zinc-900 text-white',
+  info: 'border-[#9fd6dc] bg-[#e7f6f5] text-[#096672]',
+  dark: 'border-[#103f3b] bg-[#103f3b] text-white',
 };
 
 function cn(...values: Array<string | false | null | undefined>) {
@@ -83,11 +83,11 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-border/80 pb-5 md:flex-row md:items-end md:justify-between">
+    <div className="flex flex-col gap-4 border-b border-[#d8e5d3] pb-5 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
         {meta ? <div className="mb-2 flex flex-wrap gap-2">{meta}</div> : null}
-        <h1 className="truncate text-2xl font-semibold tracking-normal text-zinc-950">{title}</h1>
-        {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        <h1 className="truncate text-2xl font-semibold tracking-normal text-[#102f2b]">{title}</h1>
+        {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687967]">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -108,12 +108,12 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-lg border border-border bg-white shadow-sm shadow-zinc-200/40', className)}>
+    <section className={cn('rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40', className)}>
       {(title || description || actions) ? (
-        <div className="flex flex-col gap-3 border-b border-border/80 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-b border-[#d8e5d3] bg-[#f5faf1] px-5 py-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            {title ? <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-900">{title}</h2> : null}
-            {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+            {title ? <h2 className="text-sm font-semibold uppercase tracking-normal text-[#173c36]">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-[#6d7e68]">{description}</p> : null}
           </div>
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
         </div>
@@ -137,11 +137,11 @@ export function StatCard({
   tone?: Tone;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-5 shadow-sm shadow-zinc-200/40">
+    <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-5 shadow-sm shadow-[#bfd0bb]/40">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</div>
-          <div className="mt-2 text-2xl font-semibold text-zinc-950">{value}</div>
+          <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">{label}</div>
+          <div className="mt-2 text-2xl font-semibold text-[#173c36]">{value}</div>
         </div>
         {Icon ? (
           <div className={cn('flex size-10 items-center justify-center rounded-lg border', toneClass[tone])}>
@@ -149,7 +149,7 @@ export function StatCard({
           </div>
         ) : null}
       </div>
-      {description ? <p className="mt-3 text-sm leading-5 text-muted-foreground">{description}</p> : null}
+      {description ? <p className="mt-3 text-sm leading-5 text-[#6d7e68]">{description}</p> : null}
     </div>
   );
 }
@@ -186,8 +186,8 @@ export function SlaBadge({ dueDate, status }: { dueDate?: string | null; status?
 
 export function LoadingState({ label = 'Memuat data' }: { label?: string }) {
   return (
-    <div className="flex min-h-48 items-center justify-center gap-3 rounded-lg border border-border bg-white text-sm text-muted-foreground shadow-sm">
-      <Loader2 className="size-5 animate-spin text-zinc-500" />
+    <div className="flex min-h-48 items-center justify-center gap-3 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] text-sm text-[#6d7e68] shadow-sm">
+      <Loader2 className="size-5 animate-spin text-[#0f766e]" />
       {label}
     </div>
   );
@@ -203,14 +203,14 @@ export function EmptyState({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/70 p-8 text-center">
+    <div className="rounded-lg border border-dashed border-[#b7c9b1] bg-[#f4f8ef] p-8 text-center">
       {Icon ? (
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500">
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] text-[#587052]">
           <Icon className="size-5" />
         </div>
       ) : null}
-      <div className="font-semibold text-zinc-900">{title}</div>
-      {description ? <div className="mt-1 text-sm text-muted-foreground">{description}</div> : null}
+      <div className="font-semibold text-[#173c36]">{title}</div>
+      {description ? <div className="mt-1 text-sm text-[#6d7e68]">{description}</div> : null}
     </div>
   );
 }
@@ -245,10 +245,10 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm shadow-zinc-200/40">
+    <div className="overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[780px] text-left text-sm">
-          <thead className="border-b border-border bg-zinc-50 text-xs font-semibold uppercase tracking-normal text-zinc-500">
+          <thead className="border-b border-[#d8e5d3] bg-[#eef7ec] text-xs font-semibold uppercase tracking-normal text-[#60735b]">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={cn('px-4 py-3', column.className)}>
@@ -257,11 +257,11 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-[#e0eadb]">
             {items.map((item, index) => (
-              <tr key={rowKey ? rowKey(item, index) : index} className="bg-white transition-colors hover:bg-zinc-50/80">
+              <tr key={rowKey ? rowKey(item, index) : index} className="bg-[#fbfdf8] transition-colors hover:bg-[#f1f7ed]">
                 {columns.map((column) => (
-                  <td key={column.key} className={cn('px-4 py-3.5 align-top text-zinc-700', column.className)}>
+                  <td key={column.key} className={cn('px-4 py-3.5 align-top text-[#4e5f49]', column.className)}>
                     {column.render(item)}
                   </td>
                 ))}
@@ -290,16 +290,16 @@ export function ActionButton({
   onClick?: () => void;
 }) {
   const variantClass = {
-    primary: 'border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800',
-    secondary: 'border-border bg-white text-zinc-800 hover:bg-zinc-50',
+    primary: 'border-[#0f766e] bg-[#0f766e] text-white hover:bg-[#0b5f58]',
+    secondary: 'border-[#c9d9c4] bg-[#fbfdf8] text-[#173c36] hover:bg-[#eef7ec]',
     danger: 'border-rose-600 bg-rose-600 text-white hover:bg-rose-700',
-    ghost: 'border-transparent bg-transparent text-zinc-700 hover:bg-zinc-100',
+    ghost: 'border-transparent bg-transparent text-[#496247] hover:bg-[#eef7ec]',
   };
 
   return (
     <button
       className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-300 disabled:cursor-not-allowed disabled:opacity-55',
+        'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55',
         variantClass[variant],
       )}
       disabled={disabled}
@@ -507,12 +507,12 @@ export function formatFileSize(value: number | null | undefined) {
 }
 
 export const inputClass =
-  'h-10 rounded-md border border-input bg-white px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500';
+  'h-10 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-3 text-sm text-[#173c36] outline-none transition-colors placeholder:text-[#8a9a84] focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:bg-[#edf3e9] disabled:text-[#74806f]';
 
 export const buttonClass =
-  'inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-900 bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300 disabled:cursor-not-allowed disabled:opacity-55';
+  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#0f766e] bg-[#0f766e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0b5f58] focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55';
 
 export const secondaryButtonClass =
-  'inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-55';
+  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-4 text-sm font-semibold text-[#173c36] transition-colors hover:bg-[#eef7ec] focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55';
 
 export const uploadIcon = FileUp;

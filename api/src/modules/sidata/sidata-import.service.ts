@@ -1959,6 +1959,63 @@ export class SidataImportService implements OnModuleInit {
     });
   }
 
+  async resolveAsnUnitKerjaMapping(params: {
+    batchId: string;
+    rowId: string;
+    unitKerjaId?: string;
+    note?: string;
+    actorId?: string | null;
+  }) {
+    const batchId = params.batchId.trim();
+    const rowId = params.rowId.trim();
+    const unitKerjaId = params.unitKerjaId?.trim();
+
+    if (!unitKerjaId) {
+      throw new BadRequestException('Unit kerja target wajib dipilih');
+    }
+
+    const batch = await this.sidataImportRepository.findAsnImportBatchById(batchId);
+    if (!batch) {
+      throw new NotFoundException('Batch import ASN tidak ditemukan');
+    }
+    if (batch.status === SIDATA_IMPORT_STATUS.COMMITTED) {
+      throw new BadRequestException('Batch ASN yang sudah committed tidak dapat diedit');
+    }
+
+    try {
+      const row = await this.sidataImportRepository.resolveAsnUnitKerjaMapping({
+        batchId,
+        rowId,
+        unitKerjaId,
+      });
+
+      await this.sidataImportRepository.createImportAuditLog({
+        action: SIDATA_IMPORT_AUDIT_ACTION.REMAP_ASN,
+        batchId,
+        batchType: 'ASN',
+        actorId: params.actorId ?? null,
+        metadata: {
+          action: 'RESOLVE_UNIT_KERJA_MAPPING',
+          rowId,
+          rowNumber: row.rowNumber,
+          unitKerjaId,
+          note: params.note ?? null,
+        },
+      });
+
+      return row;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === 'ASN_IMPORT_ROW_NOT_FOUND') {
+        throw new NotFoundException('Baris import ASN tidak ditemukan');
+      }
+      if (message === 'UNIT_KERJA_NOT_FOUND') {
+        throw new NotFoundException('Unit kerja target tidak ditemukan');
+      }
+      throw error;
+    }
+  }
+
   async remapSiasnAsnBatch(
     batchId: string,
     options: { skipStatusGuard?: boolean } = {},

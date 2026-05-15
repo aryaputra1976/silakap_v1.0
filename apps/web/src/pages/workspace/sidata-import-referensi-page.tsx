@@ -507,7 +507,7 @@ export function SidataImportReferensiPage() {
             return (
               <div
                 key={item.value}
-                className="flex min-h-[250px] flex-col justify-between rounded-lg border border-border bg-zinc-50/60 p-4"
+                className="flex min-h-[250px] flex-col justify-between rounded-lg border border-[#d8e5d3] bg-[#f6faf2] p-4 shadow-sm shadow-[#bfd0bb]/30"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
@@ -517,12 +517,12 @@ export function SidataImportReferensiPage() {
                         {item.description}
                       </p>
                     </div>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#ecd28b] bg-[#fff6d7] text-[#0f766e]">
                       <Layers3 className="size-5" />
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-dashed border-zinc-300 bg-white p-4">
+                  <div className="mt-4 rounded-lg border border-dashed border-[#b7c9b1] bg-[#fbfdf8] p-4">
                     {file ? (
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
@@ -543,7 +543,7 @@ export function SidataImportReferensiPage() {
                       </div>
                     )}
 
-                    <label className="mt-4 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50">
+                    <label className="mt-4 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-4 text-sm font-semibold text-[#173c36] transition-colors hover:bg-[#eef7ec]">
                       <Upload className="size-4" />
                       Pilih File
                       <input
@@ -586,9 +586,9 @@ export function SidataImportReferensiPage() {
         description="Upload data profil JF dari BKN (Database_Profil_JF_2024_BKN.xlsx) untuk mengisi detail jabatan fungsional seperti dasar hukum, tugas, tunjangan, dan persyaratan."
       >
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div className="rounded-lg border border-border bg-zinc-50 p-4">
+          <div className="rounded-lg border border-[#d8e5d3] bg-[#f6faf2] p-4">
             <div className="flex items-start gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#ecd28b] bg-[#fff6d7] text-[#0f766e]">
                 <BookOpen className="size-5" />
               </div>
               <div>
@@ -602,9 +602,9 @@ export function SidataImportReferensiPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/60 p-4">
+          <div className="rounded-lg border border-dashed border-[#b7c9b1] bg-[#f6faf2] p-4">
             {jfProfileFile ? (
-              <div className="rounded-lg border border-border bg-white p-4">
+              <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
                   <FileSpreadsheet className="size-4 text-emerald-600" />
                   <span className="truncate">{jfProfileFile.name}</span>
@@ -614,7 +614,7 @@ export function SidataImportReferensiPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-white p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4 text-sm text-[#6d7e68]">
                 <div className="flex items-center gap-2 font-semibold text-zinc-700">
                   <FileUp className="size-4" />
                   Belum ada file dipilih
@@ -624,7 +624,7 @@ export function SidataImportReferensiPage() {
             )}
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50">
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-4 text-sm font-semibold text-[#173c36] transition-colors hover:bg-[#eef7ec]">
                 <Upload className="size-4" />
                 Pilih File
                 <input
@@ -681,9 +681,9 @@ export function SidataImportReferensiPage() {
               </select>
             </label>
 
-            <div className="rounded-lg border border-border bg-zinc-50 p-4">
+            <div className="rounded-lg border border-[#d8e5d3] bg-[#f6faf2] p-4">
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#ecd28b] bg-[#fff6d7] text-[#0f766e]">
                   <Database className="size-5" />
                 </div>
                 <div>
@@ -699,9 +699,9 @@ export function SidataImportReferensiPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/60 p-4">
+          <div className="rounded-lg border border-dashed border-[#b7c9b1] bg-[#f6faf2] p-4">
             {referenceFile ? (
-              <div className="rounded-lg border border-border bg-white p-4">
+              <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
                   <FileSpreadsheet className="size-4 text-emerald-600" />
                   <span className="truncate">{referenceFile.name}</span>
@@ -711,7 +711,7 @@ export function SidataImportReferensiPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-white p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4 text-sm text-[#6d7e68]">
                 <div className="flex items-center gap-2 font-semibold text-zinc-700">
                   <FileUp className="size-4" />
                   Belum ada file dipilih
@@ -721,7 +721,7 @@ export function SidataImportReferensiPage() {
             )}
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50">
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-4 text-sm font-semibold text-[#173c36] transition-colors hover:bg-[#eef7ec]">
                 <Upload className="size-4" />
                 Pilih File
                 <input
@@ -907,7 +907,7 @@ export function SidataImportReferensiPage() {
           <ErrorAlert message={summaryError} />
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-zinc-50 p-4">
+            <div className="rounded-lg border border-[#d8e5d3] bg-[#f6faf2] p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">

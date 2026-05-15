@@ -28,6 +28,7 @@ import {
   SidataBufferedFile,
   SidataGenericReferenceUploadDto,
   SidataImportIssueQueryDto,
+  ResolveAsnUnitKerjaMappingDto,
   SidataStagingQueryDto,
   SidataUploadReferenceJabatanDto,
 } from './sidata-import.types';
@@ -318,6 +319,24 @@ export class SidataImportController {
   }
 
   // ─── Phase 11A: Import Audit Log ─────────────────────────────────────────────
+
+  @Post('asn-batches/:id/issues/:rowId/resolve-unit-kerja')
+  @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'REVIEWER_MAPPING')
+  async resolveAsnUnitKerjaMapping(
+    @Param('id') id: string,
+    @Param('rowId') rowId: string,
+    @Body() body: ResolveAsnUnitKerjaMappingDto,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    const result = await this.sidataImportService.resolveAsnUnitKerjaMapping({
+      batchId: id,
+      rowId,
+      unitKerjaId: body.unitKerjaId,
+      note: body.note,
+      actorId: user?.id,
+    });
+    return ok(result);
+  }
 
   @Get('audit-logs')
   async listAuditLogs(@Query() query: SidataAuditLogQueryDto) {

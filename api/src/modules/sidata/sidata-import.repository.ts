@@ -133,6 +133,8 @@ export type RefJabatanRecord = Prisma.RefJabatanGetPayload<{
 type AsnReferenceMaps = {
   unitKerjaByKode: Map<string, string>;
   unitKerjaByNama: Map<string, string>;
+  unitKerjaCandidatesByNama: Map<string, Array<{ id: string; parentId: string | null }>>;
+  unitKerjaParentNameById: Map<string, string>;
   jenisJabatanByKode: Map<string, string>;
   jabatanBySiasnKode: Map<string, { id: string; jenisJabatanId: string }>;
   jabatanByKode: Map<string, { id: string; jenisJabatanId: string }>;
@@ -146,6 +148,13 @@ type AsnReferenceMaps = {
   agamaByNama: Map<string, string>;
   statusKawinByNama: Map<string, string>;
   pendidikanByNama: Map<string, string>;
+};
+
+type ExtractedAsnJabatanPair = {
+  kode: string | null;
+  nama: string;
+  jenisKode: string;
+  jenisNama: string | null;
 };
 
 // ─── Phase 5: ASN Import Selects & Types ─────────────────────────────────────
@@ -1917,12 +1926,17 @@ export class SidataImportRepository {
   private toAsnImportIssueRow(
     row: SidataAsnImportStagingRecord,
   ): SidataAsnImportIssueRow {
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+    const unitNameCandidates = this.getUnitKerjaNameCandidates(row, raw);
+
     return {
       id: row.id,
       rowNumber: row.rowNumber,
       nip: row.nip,
       nama: row.nama,
-      unitOrganisasiNama: row.namaUnorEselon1,
+      unitOrganisasiNama: unitNameCandidates[0] ?? row.namaUnorEselon1,
       jabatanNama: row.namaJabatan,
       golonganNama: row.namaGolongan,
       jenisAsnNama: row.jenisAsn,
@@ -2228,13 +2242,78 @@ export class SidataImportRepository {
     };
   }
 
+  async resolveAsnUnitKerjaMapping(params: {
+    batchId: string;
+    rowId: string;
+    unitKerjaId: string;
+  }): Promise<SidataAsnImportIssueRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const [row, unitKerja] = await Promise.all([
+        tx.sidataAsnImportStaging.findFirst({
+          where: { id: params.rowId, batchId: params.batchId },
+          select: asnImportStagingSelect,
+        }),
+        tx.unitKerja.findFirst({
+          where: { id: params.unitKerjaId, deletedAt: null, isActive: true },
+          select: { id: true },
+        }),
+      ]);
+
+      if (!row) throw new Error('ASN_IMPORT_ROW_NOT_FOUND');
+      if (!unitKerja) throw new Error('UNIT_KERJA_NOT_FOUND');
+
+      const errors = this.toStringArray(row.validationErrors).filter(
+        (message) => message !== 'Referensi unit organisasi belum termapping',
+      );
+      const hasMissingReference = errors.some((message) => this.isMissingReferenceMessage(message));
+      const nextValidationStatus = errors.length === 0
+        ? SIDATA_VALIDATION_STATUS.VALID
+        : row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID
+          ? SIDATA_VALIDATION_STATUS.INVALID
+          : SIDATA_VALIDATION_STATUS.WARNING;
+      const nextMappingStatus = hasMissingReference
+        ? SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW
+        : nextValidationStatus === SIDATA_VALIDATION_STATUS.INVALID
+          ? SIDATA_ASN_MAP_STATUS.UNMAPPED
+          : SIDATA_ASN_MAP_STATUS.MAPPED;
+
+      const mappedData = {
+        ...this.parseMappedData(row.mappedData),
+        unitKerjaId: unitKerja.id,
+      };
+
+      const updated = await tx.sidataAsnImportStaging.update({
+        where: { id: row.id },
+        data: {
+          mappedData: mappedData as Prisma.InputJsonValue,
+          validationErrors: errors as Prisma.InputJsonValue,
+          validationStatus: nextValidationStatus,
+          mappingStatus: nextMappingStatus,
+        },
+        select: asnImportStagingSelect,
+      });
+
+      return this.toAsnImportIssueRow(updated);
+    });
+  }
+
   private async preloadReferenceMapsForMapping(): Promise<AsnReferenceMaps> {
     const norm = (v: string | null | undefined) => this.normalizeText(v ?? '');
 
     const [unitKerjas, jenisJabatans, jabatans, golongans, pangkats,
       jenisAsns, kedudukanHukums, jenisKelamins, agamas, statusKawins, pendidikans] =
       await Promise.all([
-        this.prisma.unitKerja.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, nama: true }, take: 20_000 }),
+        this.prisma.unitKerja.findMany({
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            kode: true,
+            nama: true,
+            parentId: true,
+            parent: { select: { nama: true } },
+          },
+          take: 20_000,
+        }),
         this.prisma.refJenisJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true } }),
         this.prisma.refJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, siasnKode: true, namaNormalized: true, jenisJabatanId: true }, take: 20_000 }),
         this.prisma.refGolongan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, nama: true }, take: 5_000 }),
@@ -2244,7 +2323,7 @@ export class SidataImportRepository {
         this.prisma.refJenisKelamin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 10 }),
         this.prisma.refAgama.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
         this.prisma.refStatusKawin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
-        this.prisma.refPendidikan.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 500 }),
+        this.prisma.refPendidikan.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20_000 }),
       ]);
 
     const simpleMap = (items: { id: string; nama: string }[]) =>
@@ -2253,9 +2332,26 @@ export class SidataImportRepository {
     const jabatanEntry = (j: { id: string; jenisJabatanId: string }) =>
       ({ id: j.id, jenisJabatanId: j.jenisJabatanId });
 
+    const unitKerjaCandidatesByNama = new Map<string, Array<{ id: string; parentId: string | null }>>();
+    for (const unit of unitKerjas) {
+      const key = norm(unit.nama);
+      const existing = unitKerjaCandidatesByNama.get(key) ?? [];
+      existing.push({ id: unit.id, parentId: unit.parentId });
+      unitKerjaCandidatesByNama.set(key, existing);
+    }
+
     return {
-      unitKerjaByKode: new Map(unitKerjas.map((u) => [u.kode, u.id])),
+      unitKerjaByKode: new Map(unitKerjas.flatMap((u) => [
+        [u.kode, u.id] as const,
+        [this.normalizeUnitKerjaCode(u.kode), u.id] as const,
+      ])),
       unitKerjaByNama: new Map(unitKerjas.map((u) => [norm(u.nama), u.id])),
+      unitKerjaCandidatesByNama,
+      unitKerjaParentNameById: new Map(
+        unitKerjas
+          .filter((u) => u.parent?.nama)
+          .map((u) => [u.id, u.parent!.nama]),
+      ),
       jenisJabatanByKode: new Map(jenisJabatans.map((j) => [j.kode, j.id])),
       jabatanBySiasnKode: new Map(
         jabatans.filter((j) => j.siasnKode).map((j) => [j.siasnKode!, jabatanEntry(j)]),
@@ -2298,7 +2394,7 @@ export class SidataImportRepository {
 
     const unitKerjaId = this.findUnitKerjaIdFromMaps(maps, {
       code: row.kdUnor,
-      names: [row.namaUnorEselon4, row.namaUnorEselon3, row.namaUnorEselon2, row.namaUnorEselon1],
+      names: this.getUnitKerjaNameCandidates(row, raw),
     });
 
     const jabatanId = this.findJabatanIdFromMaps(maps, {
@@ -2336,17 +2432,59 @@ export class SidataImportRepository {
   ): string | null {
     const code = params.code?.trim() || null;
     if (code) {
-      const byCode = maps.unitKerjaByKode.get(code);
+      const byCode =
+        maps.unitKerjaByKode.get(code) ??
+        maps.unitKerjaByKode.get(this.normalizeUnitKerjaCode(code));
       if (byCode) return byCode;
     }
     const names = params.names.map((n) => n?.trim() || null).filter(Boolean) as string[];
+    const contextNames = new Set(names.map((name) => this.normalizeText(name)));
     for (const name of names) {
-      const byName = maps.unitKerjaByNama.get(name);
-      if (byName) return byName;
-      const byNorm = maps.unitKerjaByNama.get(this.normalizeText(name));
-      if (byNorm) return byNorm;
+      const normalized = this.normalizeText(name);
+      const candidates = maps.unitKerjaCandidatesByNama.get(normalized) ?? [];
+      if (candidates.length === 1) return candidates[0].id;
+
+      const byParentContext = candidates.find((candidate) => {
+        if (!candidate.parentId) return false;
+        const parentName = maps.unitKerjaParentNameById.get(candidate.id);
+        return parentName ? contextNames.has(this.normalizeText(parentName)) : false;
+      });
+      if (byParentContext) return byParentContext.id;
+
+      if (candidates.length === 0) {
+        const byName = maps.unitKerjaByNama.get(name);
+        if (byName) return byName;
+        const byNorm = maps.unitKerjaByNama.get(normalized);
+        if (byNorm) return byNorm;
+      }
     }
     return null;
+  }
+
+  private getUnitKerjaNameCandidates(
+    row: SidataAsnImportStagingRecord,
+    raw: Record<string, unknown>,
+  ): string[] {
+    const names: string[] = [];
+    const push = (value: string | null | undefined) => {
+      const cleaned = value?.trim();
+      if (!cleaned) return;
+      names.push(cleaned);
+      for (const part of cleaned.split(/\s+-\s+/).map((item) => item.trim()).filter(Boolean)) {
+        names.push(part);
+      }
+    };
+
+    push(this.pickRaw(raw, ['unor_nama', 'nama_unor', 'unit_organisasi_nama']));
+    push(this.pickRaw(raw, ['unor_induk_nama', 'nama_unor_induk']));
+    push(this.pickRaw(raw, ['satuan_kerja_nama', 'satker_nama']));
+    push(this.pickRaw(raw, ['instansi_kerja_nama', 'instansi_nama']));
+    push(row.namaUnorEselon4);
+    push(row.namaUnorEselon3);
+    push(row.namaUnorEselon2);
+    push(row.namaUnorEselon1);
+
+    return [...new Set(names)];
   }
 
   private findJabatanIdFromMaps(
@@ -3554,12 +3692,17 @@ export class SidataImportRepository {
   ): Promise<import('./sidata-import.types').ExtractReferencesResult> {
     const stagingRows = await this.prisma.sidataAsnImportStaging.findMany({
       where: { batchId },
-      select: { rawData: true },
+      select: {
+        rawData: true,
+        namaJabatan: true,
+        jenisJabatan: true,
+        kdJabatan: true,
+        kdJabatanSiasn: true,
+      },
     });
 
     type RefPair = { kode: string | null; nama: string };
     type PendidikanPair = { kode: string | null; nama: string; tingkatNama: string | null; tingkatKode: string | null };
-
     const agama = new Map<string, RefPair>();
     const statusKawin = new Map<string, RefPair>();
     const jenisKelamin = new Map<string, RefPair>();
@@ -3569,6 +3712,7 @@ export class SidataImportRepository {
     const pendidikanTingkat = new Map<string, RefPair>();
     const pendidikan = new Map<string, PendidikanPair>();
     const jenisJabatan = new Map<string, RefPair>();
+    const jabatan = new Map<string, ExtractedAsnJabatanPair>();
 
     for (const row of stagingRows) {
       const raw = this.normalizeRawDataKeys(row.rawData as Record<string, unknown>);
@@ -3581,6 +3725,7 @@ export class SidataImportRepository {
       this.collectPair(raw, golongan, ['gol_awal_id', 'golongan_awal_id', 'kd_golongan', 'gol_id'], ['gol_awal_nama', 'golongan_awal_nama', 'nama_golongan', 'golongan']);
       this.collectPair(raw, golongan, ['gol_akhir_id', 'golongan_akhir_id'], ['gol_akhir_nama', 'golongan_akhir_nama']);
       this.collectPair(raw, jenisJabatan, ['jenis_jabatan_id'], ['jenis_jabatan_nama', 'jenis_jabatan']);
+      this.collectJabatanFromAsnRow(row, raw, jabatan);
 
       const tNama = this.pickRaw(raw, ['tingkat_pendidikan_nama', 'tingkat_pendidikan']);
       const tKode = this.pickRaw(raw, ['tingkat_pendidikan_id']);
@@ -3611,6 +3756,7 @@ export class SidataImportRepository {
 
     const pt = await this.upsertPendidikanTingkatBulk(pendidikanTingkat);
     const pend = await this.upsertPendidikanBulk(pendidikan, pt.idMap);
+    const jab = await this.upsertJabatanFromAsnBulk(jabatan);
 
     const extracted = {
       agama: a,
@@ -3622,6 +3768,7 @@ export class SidataImportRepository {
       pendidikanTingkat: pt.created,
       pendidikan: pend,
       jenisJabatan: jj,
+      jabatan: jab,
     };
 
     return {
@@ -3663,6 +3810,51 @@ export class SidataImportRepository {
     if (!map.has(key)) map.set(key, { kode, nama });
   }
 
+  private collectJabatanFromAsnRow(
+    row: {
+      namaJabatan: string | null;
+      jenisJabatan: string | null;
+      kdJabatan: string | null;
+      kdJabatanSiasn: string | null;
+    },
+    raw: Record<string, unknown>,
+    map: Map<string, ExtractedAsnJabatanPair>,
+  ) {
+    const nama = row.namaJabatan ?? this.pickRaw(raw, [
+      'jabatan_nama',
+      'nama_jabatan',
+      'jabatan',
+      'nama_jabatan_siasn',
+    ]);
+    if (!nama) return;
+
+    const jenisNama = row.jenisJabatan ?? this.pickRaw(raw, [
+      'jenis_jabatan_nama',
+      'jenis_jabatan',
+    ]);
+    const jenisKodeRaw = this.pickRaw(raw, [
+      'jenis_jabatan_id',
+      'jenis_jabatan_kode',
+      'kd_jenis_jabatan',
+      'kode_jenis_jabatan',
+    ]);
+    const jenisKode = this.normalizeJenisJabatanKode(jenisKodeRaw, jenisNama);
+    if (!jenisKode) return;
+
+    const kode = row.kdJabatan ?? row.kdJabatanSiasn ?? this.pickRaw(raw, [
+      'jabatan_id',
+      'id_jabatan',
+      'kd_jabatan_siasn',
+      'kd_jabatan',
+      'kode_jabatan',
+    ]);
+    const key = `${jenisKode}|${this.normalizeText(nama)}`;
+    const existing = map.get(key);
+    if (!existing || (!existing.kode && kode)) {
+      map.set(key, { kode, nama, jenisKode, jenisNama });
+    }
+  }
+
   private async upsertSimpleRefBulk(
     model:
       | 'refAgama'
@@ -3700,6 +3892,72 @@ export class SidataImportRepository {
     });
 
     return newPairs.length;
+  }
+
+  private async upsertJabatanFromAsnBulk(
+    pairs: Map<string, ExtractedAsnJabatanPair>,
+  ): Promise<number> {
+    if (pairs.size === 0) return 0;
+
+    const jenisJabatans = await this.prisma.refJenisJabatan.findMany({
+      where: { deletedAt: null },
+      select: { id: true, kode: true },
+    });
+    const jenisIdByKode = new Map(jenisJabatans.map((jenis) => [jenis.kode, jenis.id]));
+
+    const existingJabatans = await this.prisma.refJabatan.findMany({
+      where: { deletedAt: null },
+      select: {
+        jenisJabatanId: true,
+        kode: true,
+        siasnKode: true,
+        namaNormalized: true,
+      },
+      take: 20_000,
+    });
+    const existingKeys = new Set<string>();
+    for (const jabatan of existingJabatans) {
+      if (jabatan.namaNormalized) {
+        existingKeys.add(`${jabatan.jenisJabatanId}|name|${jabatan.namaNormalized}`);
+      }
+      if (jabatan.kode) {
+        existingKeys.add(`${jabatan.jenisJabatanId}|code|${jabatan.kode}`);
+      }
+      if (jabatan.siasnKode) {
+        existingKeys.add(`${jabatan.jenisJabatanId}|code|${jabatan.siasnKode}`);
+      }
+    }
+
+    const data: Prisma.RefJabatanCreateManyInput[] = [];
+    for (const pair of pairs.values()) {
+      const jenisJabatanId = jenisIdByKode.get(pair.jenisKode);
+      if (!jenisJabatanId) continue;
+
+      const namaNormalized = this.normalizeText(pair.nama);
+      const codeKey = pair.kode ? `${jenisJabatanId}|code|${pair.kode}` : null;
+      const nameKey = `${jenisJabatanId}|name|${namaNormalized}`;
+      if (existingKeys.has(nameKey) || (codeKey && existingKeys.has(codeKey))) continue;
+
+      data.push({
+        id: randomUUID(),
+        jenisJabatanId,
+        kode: pair.kode,
+        nama: pair.nama,
+        namaNormalized,
+        siasnId: pair.kode,
+        siasnKode: pair.kode,
+        siasnNama: pair.nama,
+        source: 'SIASN_ASN_EXTRACT',
+        isActive: true,
+      });
+      existingKeys.add(nameKey);
+      if (codeKey) existingKeys.add(codeKey);
+    }
+
+    if (data.length === 0) return 0;
+
+    const result = await this.prisma.refJabatan.createMany({ data });
+    return result.count;
   }
 
   private async upsertUnitKerjaBulk(

@@ -122,6 +122,17 @@
   *:focus-visible {
     @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
   }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 /** Custom Scrollbar **/

@@ -132,8 +132,14 @@ export type ExtractReferencesResult = {
     pendidikanTingkat: number;
     pendidikan: number;
     jenisJabatan: number;
+    jabatan: number;
   };
   totalExtracted: number;
+};
+
+export type ResolveUnitKerjaMappingPayload = {
+  unitKerjaId: string;
+  note?: string;
 };
 
 export type ReconciliationType =
@@ -281,6 +287,17 @@ export const sidataImportApi = {
         q: params?.q,
         status: params?.status,
       },
+    );
+  },
+
+  resolveUnitKerjaMapping(
+    batchId: string,
+    rowId: string,
+    payload: ResolveUnitKerjaMappingPayload,
+  ): Promise<SiasnImportIssueRow> {
+    return apiClient.post<SiasnImportIssueRow>(
+      `/sidata/import/asn-batches/${batchId}/issues/${rowId}/resolve-unit-kerja`,
+      payload,
     );
   },
 

@@ -68,10 +68,10 @@ export function LoginPage() {
         <main className="flex min-h-[560px] items-center justify-center bg-[#edf4f9]/70 px-5 py-6 shadow-[24px_24px_80px_rgba(78,107,128,0.16)] sm:px-8 lg:h-[calc(100dvh-2rem)] lg:min-h-0">
           <form className="w-full max-w-[520px]" onSubmit={handleSubmit}>
             <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-[#e3edf5] shadow-[14px_14px_28px_rgba(150,174,193,0.3),-14px_-14px_28px_rgba(255,255,255,0.72)]">
-              <div className="flex size-14 items-center justify-center bg-white">
+              <div className="flex size-14 items-center justify-center overflow-hidden rounded-full bg-white/95 p-2 shadow-[inset_4px_4px_10px_rgba(150,174,193,0.12),inset_-4px_-4px_10px_rgba(255,255,255,0.9)]">
                 <img
                   alt="Logo BKPSDM"
-                  className="h-10 w-10 object-contain"
+                  className="size-full object-contain"
                   src={toAbsoluteUrl('/media/bkpsdm/logo-bkpsdm.png')}
                 />
               </div>

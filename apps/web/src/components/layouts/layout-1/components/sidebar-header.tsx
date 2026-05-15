@@ -1,5 +1,6 @@
-import { ChevronFirst, Landmark } from 'lucide-react';
+import { ChevronFirst } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useLayout } from './context';
@@ -14,8 +15,12 @@ export function SidebarHeader() {
   return (
     <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
       <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Landmark className="size-4.5" />
+        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-1.5 shadow-sm ring-1 ring-border">
+          <img
+            alt="Logo BKPSDM"
+            className="size-full object-contain"
+            src={toAbsoluteUrl('/media/bkpsdm/logo-bkpsdm.png')}
+          />
         </span>
         <span className="default-logo min-w-0">
           <span className="block text-base font-semibold leading-none text-mono">
@@ -24,9 +29,6 @@ export function SidebarHeader() {
           <span className="mt-1 block text-xs font-medium text-muted-foreground">
             BKPSDM Workspace
           </span>
-        </span>
-        <span className="small-logo hidden text-base font-semibold leading-none text-mono">
-          SK
         </span>
       </Link>
       <Button

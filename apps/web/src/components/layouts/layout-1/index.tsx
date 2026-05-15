@@ -6,7 +6,7 @@ export function Layout1() {
   return (
     <>
       <Helmet>
-        <title>SILAKAP Workspace</title>
+        <title>Silakap</title>
       </Helmet>
 
       <LayoutProvider>

@@ -10,6 +10,7 @@ import {
   Filter,
   Layers3,
   Loader2,
+  PencilLine,
   RefreshCcw,
   RotateCcw,
   Search,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
+import { sidataApi, type SidataUnitKerja } from '@/lib/api/sidata';
 import {
   getBatchFileName,
   getCommitBlockReason,
@@ -140,6 +142,11 @@ export function SidataImportMappingReferensiPage() {
   const [issuesError, setIssuesError] = useState('');
   const [actionLoading, setActionLoading] = useState<ActionType | ''>('');
   const [exportingIssues, setExportingIssues] = useState(false);
+  const [unitOptions, setUnitOptions] = useState<SidataUnitKerja[]>([]);
+  const [unitSearch, setUnitSearch] = useState('');
+  const [resolvingIssue, setResolvingIssue] = useState<SidataImportIssueRow | null>(null);
+  const [selectedUnitKerjaId, setSelectedUnitKerjaId] = useState('');
+  const [savingResolution, setSavingResolution] = useState(false);
 
   useEffect(() => {
     void loadBatches();
@@ -186,6 +193,16 @@ export function SidataImportMappingReferensiPage() {
       warningRows: sumRows(batches, 'warningRows'),
     };
   }, [batches]);
+
+  const filteredUnitOptions = useMemo(() => {
+    const q = unitSearch.trim().toLowerCase();
+    return unitOptions
+      .filter((unit) => {
+        if (!q) return true;
+        return `${unit.kode} ${unit.nama}`.toLowerCase().includes(q);
+      })
+      .slice(0, 40);
+  }, [unitOptions, unitSearch]);
 
   const hasProcessingBatch = useMemo(
     () => batches.some((item) => (item.status ?? '').toUpperCase() === 'PROCESSING'),
@@ -339,6 +356,52 @@ export function SidataImportMappingReferensiPage() {
   function changeIssueTab(tab: IssueTab) {
     setIssueTab(tab);
     setIssuePage(1);
+  }
+
+  function canResolveUnitKerja(issue: SidataImportIssueRow) {
+    return normalizeIssueErrors(issue.validationErrors).some((error) =>
+      error.toLowerCase().includes('unit organisasi'),
+    );
+  }
+
+  async function openUnitResolver(issue: SidataImportIssueRow) {
+    setResolvingIssue(issue);
+    setSelectedUnitKerjaId('');
+    setUnitSearch(issue.unitOrganisasiNama ?? '');
+    try {
+      if (unitOptions.length === 0) {
+        setUnitOptions(await sidataApi.getUnits());
+      }
+    } catch (caught) {
+      toast.error(getErrorMessage(caught, 'Gagal memuat daftar unit kerja'));
+    }
+  }
+
+  async function saveUnitResolution() {
+    if (!selectedBatch || !resolvingIssue?.id || !selectedUnitKerjaId) {
+      toast.error('Pilih unit kerja target terlebih dahulu.');
+      return;
+    }
+
+    setSavingResolution(true);
+    try {
+      await apiClient.post(
+        `/sidata/import/asn-batches/${selectedBatch.id}/issues/${resolvingIssue.id}/resolve-unit-kerja`,
+        { unitKerjaId: selectedUnitKerjaId },
+      );
+      toast.success('Mapping unit kerja disimpan.');
+      setResolvingIssue(null);
+      setSelectedUnitKerjaId('');
+      await Promise.all([
+        loadSummary(selectedBatch.id),
+        loadIssues(selectedBatch.id, issueTab, issuePage, issueQ),
+        loadBatches(),
+      ]);
+    } catch (caught) {
+      toast.error(getErrorMessage(caught, 'Gagal menyimpan mapping unit kerja'));
+    } finally {
+      setSavingResolution(false);
+    }
   }
 
   async function exportIssuesCsv() {
@@ -779,6 +842,23 @@ export function SidataImportMappingReferensiPage() {
                       );
                     },
                   },
+                  {
+                    key: 'action',
+                    header: 'Aksi',
+                    render: (item) =>
+                      canResolveUnitKerja(item) ? (
+                        <ActionButton
+                          icon={PencilLine}
+                          onClick={() => void openUnitResolver(item)}
+                          variant="secondary"
+                        >
+                          Mapping Unit
+                        </ActionButton>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      ),
+                    className: 'w-40',
+                  },
                 ]}
               />
             )}
@@ -809,6 +889,75 @@ export function SidataImportMappingReferensiPage() {
           </div>
         )}
       </SectionCard>
+
+      {resolvingIssue ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-3xl rounded-lg border border-[#c9d9c4] bg-[#fbfdf8] shadow-2xl">
+            <div className="border-b border-[#d8e4d3] p-5">
+              <div className="text-lg font-semibold text-[#073b3a]">Mapping Unit Kerja</div>
+              <div className="mt-1 text-sm text-[#5b6b58]">
+                {resolvingIssue.nama ?? '-'} · {resolvingIssue.nip ?? '-'}
+              </div>
+              <div className="mt-3 rounded-md border border-[#d8e4d3] bg-white/70 p-3 text-sm text-[#445642]">
+                Unit dari ASN: {resolvingIssue.unitOrganisasiNama ?? '-'}
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <input
+                className={inputClass}
+                onChange={(event) => setUnitSearch(event.target.value)}
+                placeholder="Cari kode atau nama unit kerja..."
+                value={unitSearch}
+              />
+
+              <div className="max-h-80 overflow-auto rounded-lg border border-[#d8e4d3] bg-white">
+                {filteredUnitOptions.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">Unit kerja tidak ditemukan.</div>
+                ) : (
+                  filteredUnitOptions.map((unit) => (
+                    <label
+                      className="flex cursor-pointer items-start gap-3 border-b border-[#edf3ea] p-3 text-sm last:border-b-0 hover:bg-[#f1f7ed]"
+                      key={unit.id}
+                    >
+                      <input
+                        checked={selectedUnitKerjaId === unit.id}
+                        className="mt-1"
+                        name="unitKerjaTarget"
+                        onChange={() => setSelectedUnitKerjaId(unit.id)}
+                        type="radio"
+                      />
+                      <span>
+                        <span className="block font-semibold text-[#073b3a]">{unit.nama}</span>
+                        <span className="mt-1 block font-mono text-xs text-[#687761]">
+                          {unit.kode} · Level {unit.level}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#d8e4d3] p-5">
+              <ActionButton
+                disabled={savingResolution}
+                onClick={() => setResolvingIssue(null)}
+                variant="secondary"
+              >
+                Batal
+              </ActionButton>
+              <ActionButton
+                disabled={!selectedUnitKerjaId || savingResolution}
+                icon={savingResolution ? Loader2 : ShieldCheck}
+                onClick={() => void saveUnitResolution()}
+              >
+                Simpan Mapping
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

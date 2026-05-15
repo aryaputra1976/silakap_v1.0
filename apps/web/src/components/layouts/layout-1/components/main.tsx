@@ -50,7 +50,7 @@ export function Main() {
       <div className="wrapper flex grow flex-col">
         <Header />
 
-        <main className="grow bg-zinc-100 py-5" role="content">
+        <main className="grow bg-[#eef4ec] py-5" role="content">
           <div className="container-fluid max-w-[1440px]">
             <Outlet />
           </div>
