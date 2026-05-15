@@ -1,12 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CommitGenericReferenceResult,
+  CommitJfProfileResult,
   CommitReferenceJabatanResult,
   CommitSiasnAsnBatchResult,
   MapSiasnAsnBatchResult,
+  NormalizedAuditLogFilters,
   NormalizedSidataImportIssueQuery,
   PaginatedImportIssuesResponse,
   SIDATA_ASN_COMMIT_ACTION,
@@ -17,9 +19,16 @@ import {
   SIDATA_MAPPING_STATUS,
   SIDATA_VALIDATION_STATUS,
   SidataAsnMappedData,
+  SidataAsnImportIssueRow,
+  SidataAsnReconciliationFieldDiff,
+  SidataAsnReconciliationResponse,
+  SidataAsnReconciliationRow,
+  SidataAsnReconciliationSummary,
+  SidataAsnReconciliationType,
   SidataImportAuditPayload,
   SidataImportSummaryResponse,
   SiasnAsnMappedDataForCommit,
+  ValidatedJfProfileRow,
   ValidatedReferenceJabatanRow,
   ValidatedSiasnAsnRow,
 } from './sidata-import.types';
@@ -36,6 +45,7 @@ const importBatchSelect = {
   duplicateRows: true,
   warningRows: true,
   importedById: true,
+  fileChecksum: true,
   startedAt: true,
   finishedAt: true,
   errorMessage: true,
@@ -77,12 +87,29 @@ const jabatanSelect = {
   siasnId: true,
   siasnKode: true,
   siasnNama: true,
+  jenjang: true,
+  bup: true,
   source: true,
   isActive: true,
   deletedAt: true,
 } satisfies Prisma.RefJabatanSelect;
 
 const simpleIdSelect = { id: true } as const;
+
+const reconciliationAsnSelect = {
+  id: true,
+  nip: true,
+  nama: true,
+  unitKerjaId: true,
+  jabatanNama: true,
+  golonganNama: true,
+  statusAsn: true,
+  unitKerja: {
+    select: {
+      nama: true,
+    },
+  },
+} satisfies Prisma.AsnSelect;
 
 export type SidataReferenceImportBatchRecord =
   Prisma.SidataReferenceImportBatchGetPayload<{
@@ -102,6 +129,25 @@ export type RefJabatanRecord = Prisma.RefJabatanGetPayload<{
   select: typeof jabatanSelect;
 }>;
 
+// In-memory lookup maps pre-loaded once per mapping batch — eliminates N+1 queries
+type AsnReferenceMaps = {
+  unitKerjaByKode: Map<string, string>;
+  unitKerjaByNama: Map<string, string>;
+  jenisJabatanByKode: Map<string, string>;
+  jabatanBySiasnKode: Map<string, { id: string; jenisJabatanId: string }>;
+  jabatanByKode: Map<string, { id: string; jenisJabatanId: string }>;
+  jabatanByNormalized: Array<{ id: string; namaNormalized: string; jenisJabatanId: string }>;
+  golonganByKode: Map<string, string>;
+  golonganByNama: Map<string, string>;
+  pangkatByNama: Map<string, string>;
+  jenisAsnByNama: Map<string, string>;
+  kedudukanHukumByNama: Map<string, string>;
+  jenisKelaminByNama: Map<string, string>;
+  agamaByNama: Map<string, string>;
+  statusKawinByNama: Map<string, string>;
+  pendidikanByNama: Map<string, string>;
+};
+
 // ─── Phase 5: ASN Import Selects & Types ─────────────────────────────────────
 
 const asnImportBatchSelect = {
@@ -116,6 +162,7 @@ const asnImportBatchSelect = {
   duplicateRows: true,
   warningRows: true,
   importedById: true,
+  fileChecksum: true,
   startedAt: true,
   finishedAt: true,
   errorMessage: true,
@@ -193,8 +240,21 @@ export type SidataImportAuditLogRecord = Prisma.SidataImportAuditLogGetPayload<{
   select: typeof importAuditLogSelect;
 }>;
 
+type ReconciliationAsnRecord = Prisma.AsnGetPayload<{
+  select: typeof reconciliationAsnSelect;
+}>;
+
+type NormalizedAsnReconciliationQuery = {
+  page: number;
+  limit: number;
+  type?: SidataAsnReconciliationType;
+  q?: string;
+};
+
 @Injectable()
 export class SidataImportRepository {
+  private static readonly ASN_JOB_CHUNK_SIZE = 300;
+
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findBatches(): Promise<SidataReferenceImportBatchRecord[]> {
@@ -213,11 +273,39 @@ export class SidataImportRepository {
 
   async findStagingByBatchId(
     batchId: string,
-  ): Promise<SidataReferenceImportStagingRecord[]> {
-    return this.prisma.sidataReferenceImportStaging.findMany({
-      where: { batchId },
-      orderBy: { rowNumber: 'asc' },
-      select: importStagingSelect,
+    pagination?: { page: number; limit: number },
+  ): Promise<{ items: SidataReferenceImportStagingRecord[]; total: number }> {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.sidataReferenceImportStaging.findMany({
+        where: { batchId },
+        orderBy: { rowNumber: 'asc' },
+        select: importStagingSelect,
+        skip,
+        take: limit,
+      }),
+      this.prisma.sidataReferenceImportStaging.count({ where: { batchId } }),
+    ]);
+
+    return { items, total };
+  }
+
+  async findReferenceBatchByChecksum(fileChecksum: string): Promise<SidataReferenceImportBatchRecord | null> {
+    return this.prisma.sidataReferenceImportBatch.findFirst({
+      where: { fileChecksum, status: { notIn: [SIDATA_IMPORT_STATUS.FAILED, SIDATA_IMPORT_STATUS.CANCELLED] } },
+      orderBy: { createdAt: 'desc' },
+      select: importBatchSelect,
+    });
+  }
+
+  async findAsnImportBatchByChecksum(fileChecksum: string): Promise<SidataAsnImportBatchRecord | null> {
+    return this.prisma.sidataAsnImportBatch.findFirst({
+      where: { fileChecksum, status: { notIn: [SIDATA_IMPORT_STATUS.FAILED, SIDATA_IMPORT_STATUS.CANCELLED] } },
+      orderBy: { createdAt: 'desc' },
+      select: asnImportBatchSelect,
     });
   }
 
@@ -225,6 +313,7 @@ export class SidataImportRepository {
     source: string;
     importType: string;
     fileName: string;
+    fileChecksum?: string | null;
     totalRows: number;
     validRows: number;
     invalidRows: number;
@@ -238,6 +327,7 @@ export class SidataImportRepository {
         source: params.source,
         importType: params.importType,
         fileName: params.fileName,
+        fileChecksum: params.fileChecksum ?? null,
         status: SIDATA_IMPORT_STATUS.VALIDATED,
         totalRows: params.totalRows,
         validRows: params.validRows,
@@ -282,6 +372,32 @@ export class SidataImportRepository {
     });
   }
 
+  async cancelReferenceBatch(batchId: string): Promise<{ cancelled: boolean }> {
+    const result = await this.prisma.sidataReferenceImportBatch.updateMany({
+      where: {
+        id: batchId,
+        status: { notIn: [SIDATA_IMPORT_STATUS.COMMITTED, SIDATA_IMPORT_STATUS.CANCELLED] },
+      },
+      data: { status: SIDATA_IMPORT_STATUS.CANCELLED, finishedAt: new Date() },
+    });
+    return { cancelled: result.count > 0 };
+  }
+
+  async cancelAsnBatch(batchId: string): Promise<{ cancelled: boolean }> {
+    const result = await this.prisma.sidataAsnImportBatch.updateMany({
+      where: {
+        id: batchId,
+        status: { notIn: [SIDATA_IMPORT_STATUS.COMMITTED, SIDATA_IMPORT_STATUS.CANCELLED] },
+      },
+      data: { status: SIDATA_IMPORT_STATUS.CANCELLED, finishedAt: new Date() },
+    });
+    return { cancelled: result.count > 0 };
+  }
+
+  async claimAsnBatchForJob(batchId: string): Promise<boolean> {
+    return this.claimAsnBatch(batchId);
+  }
+
   async markBatchFailed(params: {
     batchId: string;
     errorMessage: string;
@@ -297,6 +413,57 @@ export class SidataImportRepository {
     });
   }
 
+  async markAsnBatchFailed(params: {
+    batchId: string;
+    errorMessage: string;
+  }): Promise<void> {
+    await this.prisma.sidataAsnImportBatch.update({
+      where: { id: params.batchId },
+      data: {
+        status: SIDATA_IMPORT_STATUS.FAILED,
+        errorMessage: params.errorMessage,
+        finishedAt: new Date(),
+      },
+      select: { id: true },
+    });
+  }
+
+  async markProcessingAsnBatchesFailedOnStartup(): Promise<{ count: number }> {
+    return this.prisma.sidataAsnImportBatch.updateMany({
+      where: { status: SIDATA_IMPORT_STATUS.PROCESSING },
+      data: {
+        status: SIDATA_IMPORT_STATUS.FAILED,
+        errorMessage:
+          'Proses background terhenti sebelum selesai. Jalankan ulang proses dari batch baru.',
+        finishedAt: new Date(),
+      },
+    });
+  }
+
+  // Atomically claims a reference batch for commit. Returns false if already claimed.
+  private async claimReferenceBatch(batchId: string): Promise<boolean> {
+    const result = await this.prisma.sidataReferenceImportBatch.updateMany({
+      where: {
+        id: batchId,
+        status: { notIn: [SIDATA_IMPORT_STATUS.COMMITTED, SIDATA_IMPORT_STATUS.PROCESSING, SIDATA_IMPORT_STATUS.CANCELLED, SIDATA_IMPORT_STATUS.FAILED] },
+      },
+      data: { status: SIDATA_IMPORT_STATUS.PROCESSING },
+    });
+    return result.count > 0;
+  }
+
+  // Atomically claims an ASN batch for commit or map. Returns false if already claimed.
+  private async claimAsnBatch(batchId: string): Promise<boolean> {
+    const result = await this.prisma.sidataAsnImportBatch.updateMany({
+      where: {
+        id: batchId,
+        status: { notIn: [SIDATA_IMPORT_STATUS.COMMITTED, SIDATA_IMPORT_STATUS.PROCESSING, SIDATA_IMPORT_STATUS.CANCELLED, SIDATA_IMPORT_STATUS.FAILED] },
+      },
+      data: { status: SIDATA_IMPORT_STATUS.PROCESSING },
+    });
+    return result.count > 0;
+  }
+
   async findJenisJabatanByKode(kode: string): Promise<RefJenisJabatanRecord | null> {
     return this.prisma.refJenisJabatan.findFirst({
       where: { kode, deletedAt: null },
@@ -308,129 +475,318 @@ export class SidataImportRepository {
     batchId: string;
     jenisJabatanId: string;
   }): Promise<CommitReferenceJabatanResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const batch = await tx.sidataReferenceImportBatch.findUnique({
-        where: { id: params.batchId },
-        select: importBatchSelect,
-      });
+    const claimed = await this.claimReferenceBatch(params.batchId);
+    if (!claimed) throw new Error('BATCH_ALREADY_PROCESSING_OR_COMMITTED');
 
-      if (!batch) {
-        throw new Error('BATCH_NOT_FOUND');
-      }
-
-      const stagingRows = await tx.sidataReferenceImportStaging.findMany({
-        where: { batchId: params.batchId },
-        orderBy: { rowNumber: 'asc' },
-        select: importStagingSelect,
-      });
-
-      let committedRows = 0;
-      let skippedRows = 0;
-      let createdRows = 0;
-      let updatedRows = 0;
-      let invalidRows = 0;
-      let mappedRows = 0;
-
-      for (const row of stagingRows) {
-        const sourceName = row.sourceName?.trim() ?? '';
-        const sourceCode = row.sourceCode?.trim() || null;
-        const namaNormalized = this.normalizeText(sourceName);
-
-        if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !sourceName) {
-          invalidRows += 1;
-          skippedRows += 1;
-          continue;
-        }
-
-        const existing = await this.findExistingJabatanInTx(tx, {
-          jenisJabatanId: params.jenisJabatanId,
-          sourceCode,
-          namaNormalized,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const batch = await tx.sidataReferenceImportBatch.findUnique({
+          where: { id: params.batchId },
+          select: importBatchSelect,
         });
 
-        let jabatan: RefJabatanRecord;
-        let action: 'CREATED' | 'UPDATED';
-
-        if (existing) {
-          jabatan = await tx.refJabatan.update({
-            where: { id: existing.id },
-            data: {
-              kode: sourceCode,
-              nama: sourceName,
-              namaNormalized,
-              siasnKode: sourceCode,
-              siasnNama: sourceName,
-              source: 'SIASN',
-              isActive: true,
-              deletedAt: null,
-            },
-            select: jabatanSelect,
-          });
-          action = SIDATA_COMMIT_ACTION.UPDATED;
-          updatedRows += 1;
-        } else {
-          jabatan = await tx.refJabatan.create({
-            data: {
-              id: randomUUID(),
-              jenisJabatanId: params.jenisJabatanId,
-              kode: sourceCode,
-              nama: sourceName,
-              namaNormalized,
-              siasnKode: sourceCode,
-              siasnNama: sourceName,
-              source: 'SIASN',
-              isActive: true,
-            },
-            select: jabatanSelect,
-          });
-          action = SIDATA_COMMIT_ACTION.CREATED;
-          createdRows += 1;
+        if (!batch) {
+          throw new Error('BATCH_NOT_FOUND');
         }
 
-        await tx.sidataReferenceImportStaging.update({
-          where: { id: row.id },
-          data: {
+        const stagingRows = await tx.sidataReferenceImportStaging.findMany({
+          where: { batchId: params.batchId },
+          orderBy: { rowNumber: 'asc' },
+          select: importStagingSelect,
+        });
+
+        let committedRows = 0;
+        let skippedRows = 0;
+        let createdRows = 0;
+        let updatedRows = 0;
+        let invalidRows = 0;
+        let mappedRows = 0;
+
+        for (const row of stagingRows) {
+          const sourceName = row.sourceName?.trim() ?? '';
+          const sourceCode = row.sourceCode?.trim() || null;
+          const namaNormalized = this.normalizeText(sourceName);
+
+          if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !sourceName) {
+            invalidRows += 1;
+            skippedRows += 1;
+            continue;
+          }
+
+          const normalizedRaw = this.normalizeRawDataKeys(row.rawData as Record<string, unknown>);
+          const jenjang = this.pickRaw(normalizedRaw, [
+            'jenjang',
+            'jenjang_jabatan',
+            'eselon_id',
+            'eselon',
+          ]);
+          const bupRaw = this.pickRaw(normalizedRaw, ['bup', 'batas_usia_pensiun', 'batas_usia_pensiun_tahun']);
+          const bup = bupRaw !== null ? parseInt(bupRaw, 10) || null : null;
+
+          const existing = await this.findExistingJabatanInTx(tx, {
+            jenisJabatanId: params.jenisJabatanId,
+            sourceCode,
+            namaNormalized,
+          });
+
+          let jabatan: RefJabatanRecord;
+          let action: 'CREATED' | 'UPDATED';
+
+          if (existing) {
+            jabatan = await tx.refJabatan.update({
+              where: { id: existing.id },
+              data: {
+                kode: sourceCode,
+                nama: sourceName,
+                namaNormalized,
+                siasnId: sourceCode,
+                siasnKode: sourceCode,
+                siasnNama: sourceName,
+                jenjang: jenjang ?? existing.jenjang,
+                bup: bup ?? existing.bup,
+                source: 'SIASN',
+                isActive: true,
+                deletedAt: null,
+              },
+              select: jabatanSelect,
+            });
+            action = SIDATA_COMMIT_ACTION.UPDATED;
+            updatedRows += 1;
+          } else {
+            jabatan = await tx.refJabatan.create({
+              data: {
+                id: randomUUID(),
+                jenisJabatanId: params.jenisJabatanId,
+                kode: sourceCode,
+                nama: sourceName,
+                namaNormalized,
+                siasnId: sourceCode,
+                siasnKode: sourceCode,
+                siasnNama: sourceName,
+                jenjang,
+                bup,
+                source: 'SIASN',
+                isActive: true,
+              },
+              select: jabatanSelect,
+            });
+            action = SIDATA_COMMIT_ACTION.CREATED;
+            createdRows += 1;
+          }
+
+          await tx.sidataReferenceImportStaging.update({
+            where: { id: row.id },
+            data: {
+              targetTable: 'ref_jabatan',
+              targetId: jabatan.id,
+              mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
+            },
+          });
+
+          await this.upsertReferenceMappingInTx(tx, {
+            sourceType: row.referenceType,
+            sourceCode,
+            sourceName,
             targetTable: 'ref_jabatan',
             targetId: jabatan.id,
             mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
+            note: `Commit ${action} dari batch ${params.batchId}`,
+          });
+
+          committedRows += 1;
+          mappedRows += 1;
+        }
+
+        await tx.sidataReferenceImportBatch.update({
+          where: { id: params.batchId },
+          data: {
+            status: SIDATA_IMPORT_STATUS.COMMITTED,
+            finishedAt: new Date(),
+            errorMessage: null,
           },
         });
 
-        await this.upsertReferenceMappingInTx(tx, {
-          sourceType: row.referenceType,
-          sourceCode,
-          sourceName,
-          targetTable: 'ref_jabatan',
-          targetId: jabatan.id,
-          mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
-          note: `Commit ${action} dari batch ${params.batchId}`,
-        });
+        return {
+          batchId: params.batchId,
+          status: SIDATA_IMPORT_STATUS.COMMITTED,
+          totalRows: stagingRows.length,
+          committedRows,
+          skippedRows,
+          createdRows,
+          updatedRows,
+          invalidRows,
+          mappedRows,
+        };
+      },
+      { timeout: 300_000, maxWait: 20_000 },
+    );
+  }
 
-        committedRows += 1;
-        mappedRows += 1;
+  private async commitUnitKerjaBatchInTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      batchId: string;
+      targetTable: string;
+      stagingRows: SidataReferenceImportStagingRecord[];
+    },
+  ): Promise<CommitGenericReferenceResult> {
+    const idBySourceCode = new Map<string, string>();
+    const levelBySourceCode = new Map<string, number>();
+    const parentCodeBySourceCode = new Map<string, string | null>();
+    const actionByRowId = new Map<string, 'CREATED' | 'UPDATED'>();
+
+    let committedRows = 0;
+    let skippedRows = 0;
+    let createdRows = 0;
+    let updatedRows = 0;
+    let invalidRows = 0;
+    let mappedRows = 0;
+
+    const validRows: Array<{
+      row: SidataReferenceImportStagingRecord;
+      sourceCode: string;
+      sourceName: string;
+      parentSourceCode: string | null;
+    }> = [];
+
+    for (const row of params.stagingRows) {
+      const sourceCode = row.sourceCode?.trim() || null;
+      const sourceName = row.sourceName?.trim() || '';
+      const parentSourceCode = this.getUnitKerjaParentCode(row);
+
+      if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !sourceCode || !sourceName) {
+        invalidRows += 1;
+        skippedRows += 1;
+        continue;
       }
 
-      await tx.sidataReferenceImportBatch.update({
-        where: { id: params.batchId },
+      validRows.push({ row, sourceCode, sourceName, parentSourceCode });
+    }
+
+    if (validRows.length > 0) {
+      await tx.unitKerja.updateMany({
+        where: {
+          kode: { notIn: validRows.map((item) => item.sourceCode) },
+          deletedAt: null,
+        },
+        data: { sortOrder: 999_999 },
+      });
+    }
+
+    for (const item of validRows) {
+      const existing = await tx.unitKerja.findFirst({
+        where: { kode: item.sourceCode, deletedAt: null },
+        select: simpleIdSelect,
+      });
+      const sortOrder = Math.max(item.row.rowNumber - 1, 0);
+
+      const saved = existing
+        ? await tx.unitKerja.update({
+            where: { id: existing.id },
+            data: {
+              nama: item.sourceName,
+              parentId: null,
+              level: 0,
+              sortOrder,
+              isActive: true,
+              deletedAt: null,
+            },
+            select: simpleIdSelect,
+          })
+        : await tx.unitKerja.create({
+            data: {
+              id: randomUUID(),
+              kode: item.sourceCode,
+              nama: item.sourceName,
+              parentId: null,
+              level: 0,
+              sortOrder,
+              isActive: true,
+            },
+            select: simpleIdSelect,
+          });
+
+      idBySourceCode.set(this.normalizeUnitKerjaCode(item.sourceCode), saved.id);
+      parentCodeBySourceCode.set(
+        this.normalizeUnitKerjaCode(item.sourceCode),
+        item.parentSourceCode ? this.normalizeUnitKerjaCode(item.parentSourceCode) : null,
+      );
+      actionByRowId.set(item.row.id, existing ? SIDATA_COMMIT_ACTION.UPDATED : SIDATA_COMMIT_ACTION.CREATED);
+    }
+
+    const resolveLevel = (sourceCode: string, seen = new Set<string>()): number => {
+      const normalized = this.normalizeUnitKerjaCode(sourceCode);
+      const cached = levelBySourceCode.get(normalized);
+      if (cached !== undefined) return cached;
+
+      const parentCode = parentCodeBySourceCode.get(normalized);
+      if (!parentCode || !idBySourceCode.has(parentCode) || seen.has(normalized)) {
+        levelBySourceCode.set(normalized, 0);
+        return 0;
+      }
+
+      seen.add(normalized);
+      const level = resolveLevel(parentCode, seen) + 1;
+      levelBySourceCode.set(normalized, level);
+      return level;
+    };
+
+    for (const item of validRows) {
+      const normalizedCode = this.normalizeUnitKerjaCode(item.sourceCode!);
+      const id = idBySourceCode.get(normalizedCode);
+      if (!id) continue;
+
+      const parentCode = parentCodeBySourceCode.get(normalizedCode);
+      const parentId = parentCode ? idBySourceCode.get(parentCode) ?? null : null;
+      const level = resolveLevel(normalizedCode);
+
+      await tx.unitKerja.update({
+        where: { id },
+        data: { parentId, level },
+      });
+
+      await tx.sidataReferenceImportStaging.update({
+        where: { id: item.row.id },
         data: {
-          status: SIDATA_IMPORT_STATUS.COMMITTED,
-          finishedAt: new Date(),
-          errorMessage: null,
+          targetTable: params.targetTable,
+          targetId: id,
+          mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
         },
       });
 
-      return {
-        batchId: params.batchId,
-        status: SIDATA_IMPORT_STATUS.COMMITTED,
-        totalRows: stagingRows.length,
-        committedRows,
-        skippedRows,
-        createdRows,
-        updatedRows,
-        invalidRows,
-        mappedRows,
-      };
+      await this.upsertReferenceMappingInTx(tx, {
+        sourceType: item.row.referenceType,
+        sourceCode: item.sourceCode,
+        sourceName: item.sourceName,
+        targetTable: params.targetTable,
+        targetId: id,
+        mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
+        note: `Commit ${actionByRowId.get(item.row.id)} dari batch ${params.batchId}`,
+      });
+
+      committedRows += 1;
+      mappedRows += 1;
+      if (actionByRowId.get(item.row.id) === SIDATA_COMMIT_ACTION.CREATED) createdRows += 1;
+      else updatedRows += 1;
+    }
+
+    await tx.sidataReferenceImportBatch.update({
+      where: { id: params.batchId },
+      data: { status: SIDATA_IMPORT_STATUS.COMMITTED, finishedAt: new Date(), errorMessage: null },
     });
+
+    return {
+      batchId: params.batchId,
+      status: SIDATA_IMPORT_STATUS.COMMITTED,
+      targetTable: params.targetTable,
+      totalRows: params.stagingRows.length,
+      committedRows,
+      skippedRows,
+      createdRows,
+      updatedRows,
+      invalidRows,
+      mappedRows,
+    };
   }
 
   private async findExistingJabatanInTx(
@@ -522,10 +878,198 @@ export class SidataImportRepository {
     });
   }
 
+  // ─── Phase 3B: JF Profile Import ─────────────────────────────────────────────
+
+  async createJfProfileStagingRows(params: {
+    batchId: string;
+    rows: ValidatedJfProfileRow[];
+  }): Promise<{ count: number }> {
+    if (params.rows.length === 0) return { count: 0 };
+
+    return this.prisma.sidataReferenceImportStaging.createMany({
+      data: params.rows.map((row) => ({
+        id: randomUUID(),
+        batchId: params.batchId,
+        rowNumber: row.rowNumber,
+        referenceType: 'JF_PROFILE',
+        sourceCode: null,
+        sourceName: row.sourceName,
+        sourceDescription: row.sourceDescription,
+        targetTable: 'ref_jabatan_fungsional_profile',
+        targetId: null,
+        mappingStatus: row.isDuplicate
+          ? SIDATA_MAPPING_STATUS.NEEDS_REVIEW
+          : SIDATA_MAPPING_STATUS.UNMAPPED,
+        validationStatus: row.validationStatus,
+        validationErrors: row.validationErrors as Prisma.InputJsonValue,
+        rawData: row.rawData as Prisma.InputJsonValue,
+      })),
+    });
+  }
+
+  async commitJfProfileBatch(params: {
+    batchId: string;
+  }): Promise<CommitJfProfileResult> {
+    const claimed = await this.claimReferenceBatch(params.batchId);
+    if (!claimed) throw new Error('BATCH_ALREADY_PROCESSING_OR_COMMITTED');
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const stagingRows = await tx.sidataReferenceImportStaging.findMany({
+          where: { batchId: params.batchId, referenceType: 'JF_PROFILE' },
+          orderBy: { rowNumber: 'asc' },
+          select: importStagingSelect,
+        });
+
+        // Pre-load semua jabatan fungsional untuk pencocokan di memori
+        const fungsionalJenis = await tx.refJenisJabatan.findFirst({
+          where: { kode: 'FUNGSIONAL', deletedAt: null },
+          select: { id: true },
+        });
+
+        const allFungsional = fungsionalJenis
+          ? await tx.refJabatan.findMany({
+              where: { jenisJabatanId: fungsionalJenis.id, deletedAt: null },
+              select: { id: true, namaNormalized: true },
+            })
+          : [];
+
+        const jabatanByNormalized = new Map(
+          allFungsional.map((j) => [j.namaNormalized ?? '', j.id]),
+        );
+
+        let committedRows = 0;
+        let matchedRows = 0;
+        let unmatchedRows = 0;
+        let createdRows = 0;
+        let updatedRows = 0;
+        let skippedRows = 0;
+        let invalidRows = 0;
+
+        for (const row of stagingRows) {
+          if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !row.sourceName) {
+            invalidRows += 1;
+            skippedRows += 1;
+            continue;
+          }
+
+          const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+            ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+            : {};
+
+          const namaJabatan = this.rawString(raw, ['_namajabatan', 'nama_jabatan_fungsional', 'nama_jabatan']);
+          const jenjang = row.sourceDescription?.trim() || this.rawString(raw, ['_jenjang', 'jenjang']);
+          const namaLengkap = row.sourceName.trim();
+
+          if (!namaJabatan || !jenjang) {
+            invalidRows += 1;
+            skippedRows += 1;
+            continue;
+          }
+
+          const namaJabatanNormalized = this.normalizeText(namaJabatan);
+          const jenjangNormalized = this.normalizeText(jenjang);
+          const namaLengkapNormalized = this.normalizeText(namaLengkap);
+
+          // Cari ref_jabatan yang cocok berdasarkan namaLengkap (format: "NAMA JENJANG")
+          const jabatanId = jabatanByNormalized.get(namaLengkapNormalized) ?? null;
+
+          if (!jabatanId) unmatchedRows += 1;
+          else matchedRows += 1;
+
+          const profileData = {
+            jabatanId,
+            namaJabatan,
+            namaJabatanNormalized,
+            jenjang,
+            jenjangNormalized,
+            namaLengkap,
+            namaLengkapNormalized,
+            dasarHukum: this.rawString(raw, ['dasar_hukum']),
+            tugasJabatan: this.rawString(raw, ['tugas_jabatan']),
+            pendidikanPengangkatanPertama: this.rawString(raw, ['pendidikan_pengangkatan_pertama']),
+            pendidikanPerpindahan: this.rawString(raw, ['pendidikan_perpindahan']),
+            kategori: this.rawString(raw, ['kategori']),
+            jenjangAwal: this.rawString(raw, ['awal', 'jenjang_awal']),
+            jenjangPuncak: this.rawString(raw, ['puncak', 'jenjang_puncak']),
+            golonganRuangAwal: this.rawString(raw, ['golongan_ruang_awal']),
+            rumpunJabatan: this.rawString(raw, ['rumpun_jabatan']),
+            ruangLingkup: this.rawString(raw, ['ruang_lingkup']),
+            kedudukan: this.rawString(raw, ['kedudukan']),
+            pengisianAsn: this.rawString(raw, ['pengisian_asn']),
+            instansiPembina: this.rawString(raw, ['instansi_pembina']),
+            peraturanPresidenTunjangan: this.rawString(raw, ['peraturan_presiden_tentang_tunjangan', 'peraturan_presiden_tunjangan']),
+            besaranTunjangan: this.rawString(raw, ['besaran_tunjangan']),
+            source: 'BKN_PROFILE',
+            rawData: row.rawData as Prisma.InputJsonValue,
+            deletedAt: null,
+          };
+
+          const existing = await tx.refJabatanFungsionalProfile.findUnique({
+            where: {
+              namaJabatanNormalized_jenjangNormalized: { namaJabatanNormalized, jenjangNormalized },
+            },
+            select: { id: true },
+          });
+
+          let targetId: string;
+
+          if (existing) {
+            await tx.refJabatanFungsionalProfile.update({
+              where: { id: existing.id },
+              data: profileData,
+            });
+            targetId = existing.id;
+            updatedRows += 1;
+          } else {
+            const created = await tx.refJabatanFungsionalProfile.create({
+              data: { id: randomUUID(), ...profileData },
+              select: { id: true },
+            });
+            targetId = created.id;
+            createdRows += 1;
+          }
+
+          await tx.sidataReferenceImportStaging.update({
+            where: { id: row.id },
+            data: {
+              targetId,
+              mappingStatus: jabatanId
+                ? SIDATA_MAPPING_STATUS.MAPPED
+                : SIDATA_MAPPING_STATUS.NEEDS_REVIEW,
+            },
+          });
+
+          committedRows += 1;
+        }
+
+        await tx.sidataReferenceImportBatch.update({
+          where: { id: params.batchId },
+          data: { status: SIDATA_IMPORT_STATUS.COMMITTED, finishedAt: new Date(), errorMessage: null },
+        });
+
+        return {
+          batchId: params.batchId,
+          status: SIDATA_IMPORT_STATUS.COMMITTED,
+          totalRows: stagingRows.length,
+          committedRows,
+          matchedRows,
+          unmatchedRows,
+          createdRows,
+          updatedRows,
+          skippedRows,
+          invalidRows,
+        };
+      },
+      { timeout: 120_000, maxWait: 20_000 },
+    );
+  }
+
   async createGenericReferenceBatch(params: {
     source: string;
     importType: string;
     fileName: string;
+    fileChecksum?: string | null;
     totalRows: number;
     validRows: number;
     invalidRows: number;
@@ -539,6 +1083,7 @@ export class SidataImportRepository {
         source: params.source,
         importType: params.importType,
         fileName: params.fileName,
+        fileChecksum: params.fileChecksum ?? null,
         status: SIDATA_IMPORT_STATUS.VALIDATED,
         totalRows: params.totalRows,
         validRows: params.validRows,
@@ -586,88 +1131,102 @@ export class SidataImportRepository {
     batchId: string;
     targetTable: string;
   }): Promise<CommitGenericReferenceResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const batch = await tx.sidataReferenceImportBatch.findUnique({
-        where: { id: params.batchId },
-        select: importBatchSelect,
-      });
+    const claimed = await this.claimReferenceBatch(params.batchId);
+    if (!claimed) throw new Error('BATCH_ALREADY_PROCESSING_OR_COMMITTED');
 
-      if (!batch) throw new Error('BATCH_NOT_FOUND');
-
-      const stagingRows = await tx.sidataReferenceImportStaging.findMany({
-        where: { batchId: params.batchId },
-        orderBy: { rowNumber: 'asc' },
-        select: importStagingSelect,
-      });
-
-      let committedRows = 0;
-      let skippedRows = 0;
-      let createdRows = 0;
-      let updatedRows = 0;
-      let invalidRows = 0;
-      let mappedRows = 0;
-
-      for (const row of stagingRows) {
-        const sourceName = row.sourceName?.trim() ?? '';
-        const sourceCode = row.sourceCode?.trim() || null;
-
-        if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !sourceName) {
-          invalidRows += 1;
-          skippedRows += 1;
-          continue;
-        }
-
-        const result = await this.upsertGenericReferenceInTx(tx, {
-          targetTable: params.targetTable,
-          sourceCode,
-          sourceName,
-          sourceDescription: row.sourceDescription,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const batch = await tx.sidataReferenceImportBatch.findUnique({
+          where: { id: params.batchId },
+          select: importBatchSelect,
         });
 
-        await tx.sidataReferenceImportStaging.update({
-          where: { id: row.id },
-          data: {
+        if (!batch) throw new Error('BATCH_NOT_FOUND');
+
+        const stagingRows = await tx.sidataReferenceImportStaging.findMany({
+          where: { batchId: params.batchId },
+          orderBy: { rowNumber: 'asc' },
+          select: importStagingSelect,
+        });
+
+        if (params.targetTable === 'ref_unit_organisasi') {
+          return this.commitUnitKerjaBatchInTx(tx, {
+            batchId: params.batchId,
+            targetTable: params.targetTable,
+            stagingRows,
+          });
+        }
+
+        let committedRows = 0;
+        let skippedRows = 0;
+        let createdRows = 0;
+        let updatedRows = 0;
+        let invalidRows = 0;
+        let mappedRows = 0;
+
+        for (const row of stagingRows) {
+          const sourceName = row.sourceName?.trim() ?? '';
+          const sourceCode = row.sourceCode?.trim() || null;
+
+          if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !sourceName) {
+            invalidRows += 1;
+            skippedRows += 1;
+            continue;
+          }
+
+          const result = await this.upsertGenericReferenceInTx(tx, {
+            targetTable: params.targetTable,
+            sourceCode,
+            sourceName,
+            sourceDescription: row.sourceDescription,
+          });
+
+          await tx.sidataReferenceImportStaging.update({
+            where: { id: row.id },
+            data: {
+              targetTable: params.targetTable,
+              targetId: result.id,
+              mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
+            },
+          });
+
+          await this.upsertReferenceMappingInTx(tx, {
+            sourceType: row.referenceType,
+            sourceCode,
+            sourceName,
             targetTable: params.targetTable,
             targetId: result.id,
             mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
-          },
+            note: `Commit ${result.action} dari batch ${params.batchId}`,
+          });
+
+          committedRows += 1;
+          mappedRows += 1;
+
+          if (result.action === SIDATA_COMMIT_ACTION.CREATED) createdRows += 1;
+          else updatedRows += 1;
+        }
+
+        await tx.sidataReferenceImportBatch.update({
+          where: { id: params.batchId },
+          data: { status: SIDATA_IMPORT_STATUS.COMMITTED, finishedAt: new Date(), errorMessage: null },
         });
 
-        await this.upsertReferenceMappingInTx(tx, {
-          sourceType: row.referenceType,
-          sourceCode,
-          sourceName,
+        return {
+          batchId: params.batchId,
+          status: SIDATA_IMPORT_STATUS.COMMITTED,
           targetTable: params.targetTable,
-          targetId: result.id,
-          mappingStatus: SIDATA_MAPPING_STATUS.MAPPED,
-          note: `Commit ${result.action} dari batch ${params.batchId}`,
-        });
-
-        committedRows += 1;
-        mappedRows += 1;
-
-        if (result.action === SIDATA_COMMIT_ACTION.CREATED) createdRows += 1;
-        else updatedRows += 1;
-      }
-
-      await tx.sidataReferenceImportBatch.update({
-        where: { id: params.batchId },
-        data: { status: SIDATA_IMPORT_STATUS.COMMITTED, finishedAt: new Date(), errorMessage: null },
-      });
-
-      return {
-        batchId: params.batchId,
-        status: SIDATA_IMPORT_STATUS.COMMITTED,
-        targetTable: params.targetTable,
-        totalRows: stagingRows.length,
-        committedRows,
-        skippedRows,
-        createdRows,
-        updatedRows,
-        invalidRows,
-        mappedRows,
-      };
-    });
+          totalRows: stagingRows.length,
+          committedRows,
+          skippedRows,
+          createdRows,
+          updatedRows,
+          invalidRows,
+          mappedRows,
+        };
+      },
+      { timeout: 120_000, maxWait: 20_000 },
+    );
   }
 
   private async upsertGenericReferenceInTx(
@@ -714,19 +1273,19 @@ export class SidataImportRepository {
     tx: Prisma.TransactionClient,
     params: { sourceCode: string | null; sourceName: string; sourceDescription: string | null },
   ): Promise<{ id: string; action: 'CREATED' | 'UPDATED' }> {
-    const orClauses: Prisma.UnitKerjaWhereInput[] = [];
-    if (params.sourceCode) orClauses.push({ kode: params.sourceCode });
-    orClauses.push({ nama: params.sourceName });
-
-    const existing = await tx.unitKerja.findFirst({
-      where: { OR: orClauses, deletedAt: null },
-      select: { id: true },
-    });
+    // Unit kerja names are NOT unique (same name can appear at different hierarchy levels).
+    // Only match by kode (SIASN ID) to avoid merging distinct units that share a name.
+    const existing = params.sourceCode
+      ? await tx.unitKerja.findFirst({
+          where: { kode: params.sourceCode, deletedAt: null },
+          select: { id: true },
+        })
+      : null;
 
     if (existing) {
       await tx.unitKerja.update({
         where: { id: existing.id },
-        data: { nama: params.sourceName, isActive: true },
+        data: { nama: params.sourceName.trim(), isActive: true, deletedAt: null },
       });
       return { id: existing.id, action: SIDATA_COMMIT_ACTION.UPDATED };
     }
@@ -735,14 +1294,37 @@ export class SidataImportRepository {
       data: {
         id: randomUUID(),
         kode: params.sourceCode ?? randomUUID(),
-        nama: params.sourceName,
-        level: 1,
+        nama: params.sourceName.trim(),
+        level: 0,
         isActive: true,
       },
       select: { id: true },
     });
 
     return { id: created.id, action: SIDATA_COMMIT_ACTION.CREATED };
+  }
+
+  private getUnitKerjaParentCode(row: SidataReferenceImportStagingRecord): string | null {
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+
+    return (
+      this.rawString(raw, [
+        'id_atasan',
+        'id atasan',
+        'parent_id',
+        'parent id',
+        'kode_atasan',
+        'kode atasan',
+      ]) ??
+      row.sourceDescription?.trim() ??
+      null
+    );
+  }
+
+  private normalizeUnitKerjaCode(value: string): string {
+    return value.trim().toLowerCase();
   }
 
   private async upsertSimpleRefInTx(
@@ -794,6 +1376,60 @@ export class SidataImportRepository {
     return value.trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
+  private stripPunctuation(value: string): string {
+    return value.toLowerCase().replace(/[.,'\-\/\\()]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private readonly SIASN_JABATAN_JENJANG_PREFIXES = new Set([
+    'AHLI PERTAMA',
+    'AHLI MUDA',
+    'AHLI MADYA',
+    'AHLI UTAMA',
+    'PEMULA',
+    'TERAMPIL',
+    'MAHIR',
+    'PENYELIA',
+  ]);
+
+  private toNamaJenjangJabatan(value: string): string | null {
+    const parts = value
+      .split('-')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length !== 2) return null;
+
+    const [jenjang, nama] = parts;
+    if (!jenjang || !nama) return null;
+
+    const normalizedJenjang = this.stripPunctuation(jenjang).toUpperCase();
+    if (!this.SIASN_JABATAN_JENJANG_PREFIXES.has(normalizedJenjang)) return null;
+
+    return `${nama} ${jenjang}`;
+  }
+
+  private toAsnAbbreviationJabatan(value: string): string | null {
+    const replaced = value.replace(/\bAparatur\s+Sipil\s+Negara\b/gi, 'ASN').trim();
+    return replaced !== value.trim() ? replaced : null;
+  }
+
+  // Nama jabatan lama dari SIASN → nama baru di ref_jabatan (format: "NAMA JENJANG")
+  private readonly GURU_LAMA_MAP: Record<string, string> = {
+    'GURU PRATAMA TINGKAT. I': 'GURU PEMULA',
+    'GURU PRATAMA':            'GURU PEMULA',
+    'GURU MUDA TINGKAT. I':    'GURU TERAMPIL',
+    'GURU MUDA':               'GURU TERAMPIL',
+    'GURU MADYA TINGKAT. I':   'GURU MAHIR',
+    'GURU MADYA':              'GURU MAHIR',
+    'GURU DEWASA TINGKAT. I':  'GURU AHLI PERTAMA',
+    'GURU DEWASA':             'GURU AHLI PERTAMA',
+    'GURU PEMBINA':            'GURU AHLI MUDA',
+    'GURU PERTAMA':            'GURU AHLI PERTAMA',
+    'PENGAWAS MADYA':                                     'PENGAWAS SEKOLAH AHLI MUDA',
+    'PENGAWAS SEKOLAH MADYA - TINGKAT MENENGAH':          'PENGAWAS SEKOLAH AHLI MADYA',
+    'PENGAWAS SEKOLAH MADYA - TK/SD':                    'PENGAWAS SEKOLAH AHLI MADYA',
+  };
+
   private toStringArray(value: unknown): string[] {
     if (!value || !Array.isArray(value)) return [];
     return (value as unknown[])
@@ -806,6 +1442,15 @@ export class SidataImportRepository {
     kode: string | null,
     nama: string | null,
   ): string | null {
+    // Check kode and nama separately against the SIASN numeric/string code map
+    for (const candidate of [kode, nama]) {
+      const raw = candidate?.trim().toLowerCase();
+      if (raw) {
+        const mapped = this.SIASN_JENIS_JABATAN_CODE_MAP[raw];
+        if (mapped) return mapped;
+      }
+    }
+
     const raw = `${kode ?? ''} ${nama ?? ''}`.trim().toUpperCase();
     if (!raw) return null;
     if (
@@ -837,18 +1482,96 @@ export class SidataImportRepository {
     });
   }
 
-  async findAsnStagingByBatchId(batchId: string): Promise<SidataAsnImportStagingRecord[]> {
-    return this.prisma.sidataAsnImportStaging.findMany({
-      where: { batchId },
-      orderBy: { rowNumber: 'asc' },
-      select: asnImportStagingSelect,
+  async findAsnStagingByBatchId(
+    batchId: string,
+    pagination?: { page: number; limit: number },
+  ): Promise<{ items: SidataAsnImportStagingRecord[]; total: number }> {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.sidataAsnImportStaging.findMany({
+        where: { batchId },
+        orderBy: { rowNumber: 'asc' },
+        select: asnImportStagingSelect,
+        skip,
+        take: limit,
+      }),
+      this.prisma.sidataAsnImportStaging.count({ where: { batchId } }),
+    ]);
+
+    return { items, total };
+  }
+
+  async reconcileAsnBatch(params: {
+    batchId: string;
+    query: NormalizedAsnReconciliationQuery;
+  }): Promise<SidataAsnReconciliationResponse> {
+    const [batchRows, masterRows] = await this.prisma.$transaction([
+      this.prisma.sidataAsnImportStaging.findMany({
+        where: { batchId: params.batchId },
+        orderBy: [{ rowNumber: 'asc' }, { id: 'asc' }],
+        select: asnImportStagingSelect,
+      }),
+      this.prisma.asn.findMany({
+        where: { deletedAt: null },
+        orderBy: [{ nama: 'asc' }, { nip: 'asc' }],
+        select: reconciliationAsnSelect,
+      }),
+    ]);
+
+    const masterByNip = new Map(
+      masterRows
+        .filter((row) => row.nip)
+        .map((row) => [this.normalizeNip(row.nip), row]),
+    );
+    const batchNips = new Set<string>();
+    const rows: SidataAsnReconciliationRow[] = [];
+
+    for (const batchRow of batchRows) {
+      const nip = this.normalizeNip(batchRow.nip);
+      if (nip) batchNips.add(nip);
+
+      const master = nip ? masterByNip.get(nip) ?? null : null;
+      rows.push(this.toReconciliationRow({ batchRow, master }));
+    }
+
+    for (const master of masterRows) {
+      const nip = this.normalizeNip(master.nip);
+      if (!nip || batchNips.has(nip)) {
+        continue;
+      }
+
+      rows.push(this.toReconciliationRow({ batchRow: null, master }));
+    }
+
+    const summary = this.summarizeReconciliationRows({
+      batchId: params.batchId,
+      totalBatchRows: batchRows.length,
+      totalMasterRows: masterRows.length,
+      rows,
     });
+
+    const filtered = rows
+      .filter((row) => (params.query.type ? row.type === params.query.type : row.type !== 'SAME'))
+      .filter((row) => this.matchesReconciliationSearch(row, params.query.q));
+    const skip = (params.query.page - 1) * params.query.limit;
+
+    return {
+      summary,
+      items: filtered.slice(skip, skip + params.query.limit),
+      page: params.query.page,
+      limit: params.query.limit,
+      total: filtered.length,
+    };
   }
 
   async createAsnImportBatch(params: {
     source: string;
     importType: string;
     fileName: string;
+    fileChecksum?: string | null;
     totalRows: number;
     validRows: number;
     invalidRows: number;
@@ -862,6 +1585,7 @@ export class SidataImportRepository {
         source: params.source,
         importType: params.importType,
         fileName: params.fileName,
+        fileChecksum: params.fileChecksum ?? null,
         status: SIDATA_IMPORT_STATUS.VALIDATED,
         totalRows: params.totalRows,
         validRows: params.validRows,
@@ -951,6 +1675,44 @@ export class SidataImportRepository {
       },
       select: importAuditLogSelect,
     });
+  }
+
+  async listAuditLogs(filters: NormalizedAuditLogFilters): Promise<{
+    items: SidataImportAuditLogRecord[];
+    total: number;
+  }> {
+    const where: Prisma.SidataImportAuditLogWhereInput = {};
+
+    if (filters.batchId) {
+      where.batchId = filters.batchId;
+    }
+    if (filters.batchType) {
+      where.batchType = filters.batchType;
+    }
+    if (filters.action) {
+      where.action = filters.action;
+    }
+    if (filters.dateFrom !== undefined || filters.dateTo !== undefined) {
+      const dateFilter: Prisma.DateTimeFilter<'SidataImportAuditLog'> = {};
+      if (filters.dateFrom !== undefined) dateFilter.gte = filters.dateFrom;
+      if (filters.dateTo !== undefined) dateFilter.lte = filters.dateTo;
+      where.createdAt = dateFilter;
+    }
+
+    const skip = (filters.page - 1) * filters.limit;
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.sidataImportAuditLog.findMany({
+        where,
+        select: importAuditLogSelect,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: filters.limit,
+      }),
+      this.prisma.sidataImportAuditLog.count({ where }),
+    ]);
+
+    return { items, total };
   }
 
   async getAsnImportBatchSummary(
@@ -1069,39 +1831,7 @@ export class SidataImportRepository {
     query: NormalizedSidataImportIssueQuery;
   }): Promise<PaginatedImportIssuesResponse> {
     const skip = (params.query.page - 1) * params.query.limit;
-
-    const where: Prisma.SidataAsnImportStagingWhereInput = {
-      batchId: params.batchId,
-    };
-
-    if (params.query.status === 'NEEDS_REVIEW') {
-      where.mappingStatus = SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW;
-    } else if (params.query.status === 'INVALID') {
-      where.validationStatus = SIDATA_VALIDATION_STATUS.INVALID;
-    } else if (params.query.status === 'UNMAPPED') {
-      where.mappingStatus = SIDATA_ASN_MAP_STATUS.UNMAPPED;
-    } else {
-      where.OR = [
-        { mappingStatus: SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW },
-        { mappingStatus: SIDATA_ASN_MAP_STATUS.UNMAPPED },
-        { validationStatus: SIDATA_VALIDATION_STATUS.INVALID },
-      ];
-    }
-
-    if (params.query.q) {
-      const q = params.query.q;
-      where.AND = [
-        {
-          OR: [
-            { nip: { contains: q } },
-            { nama: { contains: q } },
-            { namaJabatan: { contains: q } },
-            { namaUnorEselon1: { contains: q } },
-            { namaGolongan: { contains: q } },
-          ],
-        },
-      ];
-    }
+    const where = this.buildAsnImportIssueWhere(params.batchId, params.query);
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.sidataAsnImportStaging.findMany({
@@ -1115,27 +1845,244 @@ export class SidataImportRepository {
     ]);
 
     return {
-      items: items.map((row) => ({
-        id: row.id,
-        rowNumber: row.rowNumber,
-        nip: row.nip,
-        nama: row.nama,
-        unitOrganisasiNama: row.namaUnorEselon1,
-        jabatanNama: row.namaJabatan,
-        golonganNama: row.namaGolongan,
-        jenisAsnNama: row.jenisAsn,
-        statusAsnNama: row.statusKepegawaian,
-        mappingStatus: row.mappingStatus,
-        validationStatus: row.validationStatus,
-        validationErrors: row.validationErrors,
-        matchedAsnId: row.matchedAsnId,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      })),
+      items: items.map((row) => this.toAsnImportIssueRow(row)),
       page: params.query.page,
       limit: params.query.limit,
       total,
     };
+  }
+
+  async findAsnImportIssueExportPage(params: {
+    batchId: string;
+    query: NormalizedSidataImportIssueQuery;
+    cursorId?: string;
+    take: number;
+  }): Promise<SidataAsnImportStagingRecord[]> {
+    return this.prisma.sidataAsnImportStaging.findMany({
+      where: this.buildAsnImportIssueWhere(params.batchId, params.query),
+      orderBy: [{ rowNumber: 'asc' }, { id: 'asc' }],
+      cursor: params.cursorId ? { id: params.cursorId } : undefined,
+      skip: params.cursorId ? 1 : 0,
+      take: params.take,
+      select: asnImportStagingSelect,
+    });
+  }
+
+  private buildAsnImportIssueWhere(
+    batchId: string,
+    query: NormalizedSidataImportIssueQuery,
+  ): Prisma.SidataAsnImportStagingWhereInput {
+    const where: Prisma.SidataAsnImportStagingWhereInput = { batchId };
+
+    if (query.status === 'NEEDS_REVIEW') {
+      where.mappingStatus = SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW;
+    } else if (query.status === 'INVALID') {
+      where.validationStatus = SIDATA_VALIDATION_STATUS.INVALID;
+    } else if (query.status === 'UNMAPPED') {
+      where.mappingStatus = SIDATA_ASN_MAP_STATUS.UNMAPPED;
+    } else {
+      where.OR = [
+        { mappingStatus: SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW },
+        { mappingStatus: SIDATA_ASN_MAP_STATUS.UNMAPPED },
+        { validationStatus: SIDATA_VALIDATION_STATUS.INVALID },
+      ];
+    }
+
+    if (query.q) {
+      const q = query.q;
+      where.AND = [
+        {
+          OR: [
+            { nip: { contains: q } },
+            { nama: { contains: q } },
+            { namaJabatan: { contains: q } },
+            { namaUnorEselon1: { contains: q } },
+            { namaGolongan: { contains: q } },
+          ],
+        },
+      ];
+    }
+
+    return where;
+  }
+
+  private toAsnImportIssueRow(
+    row: SidataAsnImportStagingRecord,
+  ): SidataAsnImportIssueRow {
+    return {
+      id: row.id,
+      rowNumber: row.rowNumber,
+      nip: row.nip,
+      nama: row.nama,
+      unitOrganisasiNama: row.namaUnorEselon1,
+      jabatanNama: row.namaJabatan,
+      golonganNama: row.namaGolongan,
+      jenisAsnNama: row.jenisAsn,
+      statusAsnNama: row.statusKepegawaian,
+      mappingStatus: row.mappingStatus,
+      validationStatus: row.validationStatus,
+      validationErrors: row.validationErrors,
+      matchedAsnId: row.matchedAsnId,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private toReconciliationRow(params: {
+    batchRow: SidataAsnImportStagingRecord | null;
+    master: ReconciliationAsnRecord | null;
+  }): SidataAsnReconciliationRow {
+    const { batchRow, master } = params;
+    const mappedData = this.parseMappedData(batchRow?.mappedData);
+    const batchUnitKerjaId = mappedData.unitKerjaId ?? null;
+    const batchUnitKerjaNama = batchRow?.namaUnorEselon1 ?? null;
+    const diffs = this.buildReconciliationDiffs({
+      batchRow,
+      master,
+      batchUnitKerjaId,
+      batchUnitKerjaNama,
+    });
+
+    const type: SidataAsnReconciliationType = !master
+      ? 'ONLY_IN_BATCH'
+      : !batchRow
+        ? 'ONLY_IN_MASTER'
+        : diffs.length > 0
+          ? 'DIFFERENT'
+          : 'SAME';
+
+    return {
+      key: batchRow?.id ?? master?.id ?? randomUUID(),
+      type,
+      nip: batchRow?.nip ?? master?.nip ?? null,
+      nama: batchRow?.nama ?? master?.nama ?? null,
+      batch: batchRow
+        ? {
+            rowId: batchRow.id,
+            rowNumber: batchRow.rowNumber,
+            nama: batchRow.nama,
+            unitKerjaId: batchUnitKerjaId,
+            unitKerjaNama: batchUnitKerjaNama,
+            jabatanNama: batchRow.namaJabatan,
+            golonganNama: batchRow.namaGolongan,
+            statusAsn: batchRow.statusKepegawaian,
+            mappingStatus: batchRow.mappingStatus,
+            validationStatus: batchRow.validationStatus,
+          }
+        : null,
+      master: master
+        ? {
+            asnId: master.id,
+            nama: master.nama,
+            unitKerjaId: master.unitKerjaId,
+            unitKerjaNama: master.unitKerja?.nama ?? null,
+            jabatanNama: master.jabatanNama,
+            golonganNama: master.golonganNama,
+            statusAsn: master.statusAsn,
+          }
+        : null,
+      diffs,
+    };
+  }
+
+  private buildReconciliationDiffs(params: {
+    batchRow: SidataAsnImportStagingRecord | null;
+    master: ReconciliationAsnRecord | null;
+    batchUnitKerjaId: string | null;
+    batchUnitKerjaNama: string | null;
+  }): SidataAsnReconciliationFieldDiff[] {
+    const { batchRow, master, batchUnitKerjaId, batchUnitKerjaNama } = params;
+    if (!batchRow || !master) return [];
+
+    const diffs: SidataAsnReconciliationFieldDiff[] = [];
+    const pushDiff = (
+      field: SidataAsnReconciliationFieldDiff['field'],
+      label: string,
+      masterValue: string | null,
+      batchValue: string | null,
+    ) => {
+      if (this.normalizeCompare(masterValue) !== this.normalizeCompare(batchValue)) {
+        diffs.push({ field, label, master: masterValue, batch: batchValue });
+      }
+    };
+
+    if (batchUnitKerjaId || master.unitKerjaId) {
+      pushDiff(
+        'unitKerja',
+        'Unit Kerja',
+        master.unitKerjaId,
+        batchUnitKerjaId,
+      );
+    } else {
+      pushDiff(
+        'unitKerja',
+        'Unit Kerja',
+        master.unitKerja?.nama ?? null,
+        batchUnitKerjaNama,
+      );
+    }
+
+    pushDiff('jabatan', 'Jabatan', master.jabatanNama, batchRow.namaJabatan);
+    pushDiff('golongan', 'Golongan', master.golonganNama, batchRow.namaGolongan);
+    pushDiff('statusAsn', 'Status ASN', master.statusAsn, batchRow.statusKepegawaian);
+
+    return diffs;
+  }
+
+  private summarizeReconciliationRows(params: {
+    batchId: string;
+    totalBatchRows: number;
+    totalMasterRows: number;
+    rows: SidataAsnReconciliationRow[];
+  }): SidataAsnReconciliationSummary {
+    const onlyInBatch = params.rows.filter((row) => row.type === 'ONLY_IN_BATCH').length;
+    const onlyInMaster = params.rows.filter((row) => row.type === 'ONLY_IN_MASTER').length;
+    const different = params.rows.filter((row) => row.type === 'DIFFERENT').length;
+    const same = params.rows.filter((row) => row.type === 'SAME').length;
+
+    return {
+      batchId: params.batchId,
+      totalBatchRows: params.totalBatchRows,
+      totalMasterRows: params.totalMasterRows,
+      onlyInBatch,
+      onlyInMaster,
+      different,
+      same,
+      attentionRows: onlyInBatch + onlyInMaster + different,
+    };
+  }
+
+  private matchesReconciliationSearch(
+    row: SidataAsnReconciliationRow,
+    query: string | undefined,
+  ): boolean {
+    const q = query?.trim().toLowerCase();
+    if (!q) return true;
+
+    return [
+      row.nip,
+      row.nama,
+      row.batch?.unitKerjaNama,
+      row.batch?.jabatanNama,
+      row.batch?.golonganNama,
+      row.master?.unitKerjaNama,
+      row.master?.jabatanNama,
+      row.master?.golonganNama,
+      row.master?.statusAsn,
+      row.batch?.statusAsn,
+    ]
+      .map((value) => value ?? '')
+      .join(' ')
+      .toLowerCase()
+      .includes(q);
+  }
+
+  private normalizeNip(value: string | null | undefined): string {
+    return (value ?? '').replace(/\D/g, '').trim();
+  }
+
+  private normalizeCompare(value: string | null | undefined): string {
+    return this.normalizeText(value ?? '');
   }
 
   async findAsnImportNeedsReview(params: {
@@ -1163,90 +2110,317 @@ export class SidataImportRepository {
   async mapSiasnAsnBatch(params: {
     batchId: string;
   }): Promise<MapSiasnAsnBatchResult> {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const batch = await tx.sidataAsnImportBatch.findUnique({
-          where: { id: params.batchId },
-          select: asnImportBatchSelect,
-        });
+    const batch = await this.prisma.sidataAsnImportBatch.findUnique({
+      where: { id: params.batchId },
+      select: asnImportBatchSelect,
+    });
+    if (!batch) throw new Error('ASN_BATCH_NOT_FOUND');
 
-        if (!batch) throw new Error('ASN_BATCH_NOT_FOUND');
+    const rows = await this.prisma.sidataAsnImportStaging.findMany({
+      where: { batchId: params.batchId },
+      orderBy: { rowNumber: 'asc' },
+      select: asnImportStagingSelect,
+    });
 
-        const rows = await tx.sidataAsnImportStaging.findMany({
-          where: { batchId: params.batchId },
-          orderBy: { rowNumber: 'asc' },
-          select: asnImportStagingSelect,
-        });
+    // Pre-load ALL reference data in parallel — one query per table instead of per row
+    const [refMaps, existingAsnMap] = await Promise.all([
+      this.preloadReferenceMapsForMapping(),
+      this.preloadExistingAsnByNip(rows.map((r) => r.nip).filter(Boolean) as string[]),
+    ]);
 
-        let mappedRows = 0;
-        let needsReviewRows = 0;
-        let unmappedRows = 0;
-        let invalidRows = 0;
-        let existingAsnRows = 0;
-        let missingReferenceRows = 0;
+    // Compute all mapped data in-memory with zero additional DB queries
+    type RowResult = {
+      id: string;
+      mappedData: SidataAsnMappedData;
+      nextValidationStatus: string;
+      nextMappingStatus: string;
+      nextValidationErrors: string[];
+      matchedAsnId: string | null;
+    };
 
-        for (const row of rows) {
-          const validationErrors = this.toStringArray(row.validationErrors);
-          const mappedData = await this.resolveAsnMappedDataInTx(tx, row);
-          const missingReferences = this.getMissingReferenceMessages(row, mappedData);
-          const matchedAsn = await this.findExistingAsnInTx(tx, { nip: row.nip });
+    let mappedRows = 0;
+    let needsReviewRows = 0;
+    let unmappedRows = 0;
+    let invalidRows = 0;
+    let existingAsnRows = 0;
+    let missingReferenceRows = 0;
 
-          const nextValidationErrors = [...validationErrors, ...missingReferences];
-          const hasRequiredInvalid =
-            row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID ||
-            !row.nip ||
-            !row.nama;
+    const results: RowResult[] = [];
+    for (const row of rows) {
+      const validationErrors = this.toStringArray(row.validationErrors).filter(
+        (message) => !this.isMissingReferenceMessage(message),
+      );
+      const mappedData = this.resolveAsnMappedDataFromMaps(row, refMaps);
+      const missingReferences = this.getMissingReferenceMessages(row, mappedData);
+      const matchedAsnId = row.nip ? (existingAsnMap.get(row.nip) ?? null) : null;
 
-          let nextValidationStatus: string = row.validationStatus;
-          let nextMappingStatus: string = SIDATA_ASN_MAP_STATUS.MAPPED;
+      const nextValidationErrors = [...validationErrors, ...missingReferences];
+      const hasRequiredInvalid =
+        row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !row.nip || !row.nama;
 
-          if (hasRequiredInvalid) {
-            nextValidationStatus = SIDATA_VALIDATION_STATUS.INVALID;
-            nextMappingStatus = SIDATA_ASN_MAP_STATUS.UNMAPPED;
-            invalidRows += 1;
-            unmappedRows += 1;
-          } else if (missingReferences.length > 0) {
-            nextValidationStatus = SIDATA_VALIDATION_STATUS.WARNING;
-            nextMappingStatus = SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW;
-            needsReviewRows += 1;
-            missingReferenceRows += 1;
-          } else {
-            mappedRows += 1;
-          }
+      let nextValidationStatus: string = row.validationStatus;
+      let nextMappingStatus: string = SIDATA_ASN_MAP_STATUS.MAPPED;
 
-          if (matchedAsn) existingAsnRows += 1;
+      if (hasRequiredInvalid) {
+        nextValidationStatus = SIDATA_VALIDATION_STATUS.INVALID;
+        nextMappingStatus = SIDATA_ASN_MAP_STATUS.UNMAPPED;
+        invalidRows += 1;
+        unmappedRows += 1;
+      } else if (missingReferences.length > 0) {
+        nextValidationStatus = SIDATA_VALIDATION_STATUS.WARNING;
+        nextMappingStatus = SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW;
+        needsReviewRows += 1;
+        missingReferenceRows += 1;
+      } else {
+        mappedRows += 1;
+      }
 
-          await tx.sidataAsnImportStaging.update({
-            where: { id: row.id },
-            data: {
-              mappedData: mappedData as unknown as Prisma.InputJsonValue,
-              mappingStatus: nextMappingStatus,
-              validationStatus: nextValidationStatus,
-              validationErrors: nextValidationErrors as Prisma.InputJsonValue,
-              matchedAsnId: matchedAsn?.id ?? null,
-            },
-          });
-        }
+      if (matchedAsnId) existingAsnRows += 1;
+      results.push({ id: row.id, mappedData, nextValidationStatus, nextMappingStatus, nextValidationErrors, matchedAsnId });
+    }
 
-        return {
-          batchId: params.batchId,
-          totalRows: rows.length,
-          mappedRows,
-          needsReviewRows,
-          unmappedRows,
-          invalidRows,
-          existingAsnRows,
-          missingReferenceRows,
-        };
-      },
-      { timeout: 120000 },
-    );
+    // Persist results in a single transaction — all updates + batch status
+    for (const chunk of this.chunkArray(results, SidataImportRepository.ASN_JOB_CHUNK_SIZE)) {
+      await this.prisma.$transaction(
+        async (tx) => {
+          await Promise.all(
+            chunk.map((r) =>
+              tx.sidataAsnImportStaging.update({
+                where: { id: r.id },
+                data: {
+                  mappedData: r.mappedData as unknown as Prisma.InputJsonValue,
+                  mappingStatus: r.nextMappingStatus,
+                  validationStatus: r.nextValidationStatus,
+                  validationErrors: r.nextValidationErrors as Prisma.InputJsonValue,
+                  matchedAsnId: r.matchedAsnId,
+                },
+              }),
+            ),
+          );
+        },
+        { timeout: 60_000, maxWait: 10_000 },
+      );
+      await this.yieldToEventLoop();
+    }
+
+    await this.prisma.sidataAsnImportBatch.update({
+      where: { id: params.batchId },
+      data: { status: SIDATA_IMPORT_STATUS.VALIDATED },
+    });
+
+    return {
+      batchId: params.batchId,
+      totalRows: rows.length,
+      mappedRows,
+      needsReviewRows,
+      unmappedRows,
+      invalidRows,
+      existingAsnRows,
+      missingReferenceRows,
+    };
+  }
+
+  private async preloadReferenceMapsForMapping(): Promise<AsnReferenceMaps> {
+    const norm = (v: string | null | undefined) => this.normalizeText(v ?? '');
+
+    const [unitKerjas, jenisJabatans, jabatans, golongans, pangkats,
+      jenisAsns, kedudukanHukums, jenisKelamins, agamas, statusKawins, pendidikans] =
+      await Promise.all([
+        this.prisma.unitKerja.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, nama: true }, take: 20_000 }),
+        this.prisma.refJenisJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true } }),
+        this.prisma.refJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, siasnKode: true, namaNormalized: true, jenisJabatanId: true }, take: 20_000 }),
+        this.prisma.refGolongan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, nama: true }, take: 5_000 }),
+        this.prisma.refPangkat.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 5_000 }),
+        this.prisma.refJenisAsn.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 100 }),
+        this.prisma.refKedudukanHukum.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 100 }),
+        this.prisma.refJenisKelamin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 10 }),
+        this.prisma.refAgama.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
+        this.prisma.refStatusKawin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
+        this.prisma.refPendidikan.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 500 }),
+      ]);
+
+    const simpleMap = (items: { id: string; nama: string }[]) =>
+      new Map(items.map((i) => [norm(i.nama), i.id]));
+
+    const jabatanEntry = (j: { id: string; jenisJabatanId: string }) =>
+      ({ id: j.id, jenisJabatanId: j.jenisJabatanId });
+
+    return {
+      unitKerjaByKode: new Map(unitKerjas.map((u) => [u.kode, u.id])),
+      unitKerjaByNama: new Map(unitKerjas.map((u) => [norm(u.nama), u.id])),
+      jenisJabatanByKode: new Map(jenisJabatans.map((j) => [j.kode, j.id])),
+      jabatanBySiasnKode: new Map(
+        jabatans.filter((j) => j.siasnKode).map((j) => [j.siasnKode!, jabatanEntry(j)]),
+      ),
+      jabatanByKode: new Map(
+        jabatans.filter((j) => j.kode).map((j) => [j.kode!, jabatanEntry(j)]),
+      ),
+      jabatanByNormalized: jabatans
+        .filter((j) => j.namaNormalized)
+        .map((j) => ({ id: j.id, namaNormalized: j.namaNormalized!, jenisJabatanId: j.jenisJabatanId })),
+      golonganByKode: new Map(golongans.filter((g) => g.kode).map((g) => [g.kode!, g.id])),
+      golonganByNama: simpleMap(golongans),
+      pangkatByNama: simpleMap(pangkats),
+      jenisAsnByNama: simpleMap(jenisAsns),
+      kedudukanHukumByNama: simpleMap(kedudukanHukums),
+      jenisKelaminByNama: simpleMap(jenisKelamins),
+      agamaByNama: simpleMap(agamas),
+      statusKawinByNama: simpleMap(statusKawins),
+      pendidikanByNama: simpleMap(pendidikans),
+    };
+  }
+
+  private async preloadExistingAsnByNip(nips: string[]): Promise<Map<string, string>> {
+    if (nips.length === 0) return new Map();
+    const existing = await this.prisma.asn.findMany({
+      where: { nip: { in: nips }, deletedAt: null },
+      select: { id: true, nip: true },
+    });
+    return new Map(existing.map((a) => [a.nip, a.id]));
+  }
+
+  private resolveAsnMappedDataFromMaps(
+    row: SidataAsnImportStagingRecord,
+    maps: AsnReferenceMaps,
+  ): SidataAsnMappedData {
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+    const rawJabatanCode = this.pickRaw(raw, ['jabatan_id', 'id_jabatan', 'kd_jabatan_siasn', 'kd_jabatan', 'kode_jabatan']);
+
+    const unitKerjaId = this.findUnitKerjaIdFromMaps(maps, {
+      code: row.kdUnor,
+      names: [row.namaUnorEselon4, row.namaUnorEselon3, row.namaUnorEselon2, row.namaUnorEselon1],
+    });
+
+    const jabatanId = this.findJabatanIdFromMaps(maps, {
+      code: row.kdJabatan ?? row.kdJabatanSiasn ?? rawJabatanCode,
+      name: row.namaJabatan,
+      jenisJabatanKode: null,
+      jenisJabatanNama: row.jenisJabatan,
+    });
+
+    const norm = (v: string | null | undefined) => this.normalizeText(v ?? '');
+    const fromMap = (map: Map<string, string>, code: string | null | undefined, name: string | null | undefined) => {
+      if (code) { const v = map.get(code); if (v) return v; }
+      if (name) { return map.get(norm(name)) ?? null; }
+      return null;
+    };
+
+    return {
+      unitKerjaId,
+      jabatanId,
+      golonganId: fromMap(maps.golonganByKode, row.kdGolongan ?? row.kdGolonganSiasn, null)
+        ?? fromMap(maps.golonganByNama, null, row.namaGolongan),
+      pangkatId: fromMap(maps.pangkatByNama, null, row.namaRuang),
+      jenisAsnId: fromMap(maps.jenisAsnByNama, null, row.jenisAsn),
+      kedudukanHukumId: fromMap(maps.kedudukanHukumByNama, null, row.kedudukanHukum),
+      jenisKelaminId: fromMap(maps.jenisKelaminByNama, null, row.jenisKelamin),
+      agamaId: fromMap(maps.agamaByNama, null, row.agama),
+      statusKawinId: fromMap(maps.statusKawinByNama, null, row.statusKawin),
+      pendidikanId: fromMap(maps.pendidikanByNama, null, row.pendidikanTerakhir),
+    };
+  }
+
+  private findUnitKerjaIdFromMaps(
+    maps: AsnReferenceMaps,
+    params: { code: string | null; names: (string | null)[] },
+  ): string | null {
+    const code = params.code?.trim() || null;
+    if (code) {
+      const byCode = maps.unitKerjaByKode.get(code);
+      if (byCode) return byCode;
+    }
+    const names = params.names.map((n) => n?.trim() || null).filter(Boolean) as string[];
+    for (const name of names) {
+      const byName = maps.unitKerjaByNama.get(name);
+      if (byName) return byName;
+      const byNorm = maps.unitKerjaByNama.get(this.normalizeText(name));
+      if (byNorm) return byNorm;
+    }
+    return null;
+  }
+
+  private findJabatanIdFromMaps(
+    maps: AsnReferenceMaps,
+    params: { code: string | null; name: string | null; jenisJabatanKode: string | null; jenisJabatanNama: string | null },
+  ): string | null {
+    const code = params.code?.trim() || null;
+    const name = params.name?.trim() || null;
+    const jenisKode = this.normalizeJenisJabatanKode(params.jenisJabatanKode, params.jenisJabatanNama);
+    const jenisJabatanId = jenisKode ? maps.jenisJabatanByKode.get(jenisKode) : undefined;
+
+    const matchesJenis = (entry: { jenisJabatanId: string }) =>
+      !jenisJabatanId || entry.jenisJabatanId === jenisJabatanId;
+
+    if (code) {
+      const bySiasnKode = maps.jabatanBySiasnKode.get(code);
+      if (bySiasnKode && matchesJenis(bySiasnKode)) return bySiasnKode.id;
+      const byKode = maps.jabatanByKode.get(code);
+      if (byKode && matchesJenis(byKode)) return byKode.id;
+      // Fallback without jenis filter
+      if (jenisJabatanId) {
+        if (bySiasnKode) return bySiasnKode.id;
+        if (byKode) return byKode.id;
+      }
+    }
+
+    if (name) {
+      const normalized = this.normalizeText(name);
+      const byNorm = maps.jabatanByNormalized.find(
+        (j) => j.namaNormalized === normalized && matchesJenis(j),
+      ) ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normalized);
+      if (byNorm) return byNorm.id;
+
+      const stripped = this.stripPunctuation(name);
+      const byStripped = maps.jabatanByNormalized.find(
+        (j) => this.stripPunctuation(j.namaNormalized) === stripped && matchesJenis(j),
+      ) ?? maps.jabatanByNormalized.find((j) => this.stripPunctuation(j.namaNormalized) === stripped);
+      if (byStripped) return byStripped.id;
+
+      const guruLamaTarget = this.GURU_LAMA_MAP[name.trim().toUpperCase()];
+      if (guruLamaTarget) {
+        const normTarget = this.normalizeText(guruLamaTarget);
+        const byGuru = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
+          ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
+        if (byGuru) return byGuru.id;
+      }
+
+      const namaJenjangTarget = this.toNamaJenjangJabatan(name);
+      if (namaJenjangTarget) {
+        const normTarget = this.normalizeText(namaJenjangTarget);
+        const byNJ = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
+          ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
+        if (byNJ) return byNJ.id;
+      }
+
+      const abbrevTarget = this.toAsnAbbreviationJabatan(name);
+      if (abbrevTarget) {
+        const normTarget = this.normalizeText(abbrevTarget);
+        const byAbbrev = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
+          ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
+        if (byAbbrev) return byAbbrev.id;
+      }
+    }
+
+    return null;
   }
 
   private async resolveAsnMappedDataInTx(
     tx: Prisma.TransactionClient,
     row: SidataAsnImportStagingRecord,
   ): Promise<SidataAsnMappedData> {
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+    const rawJabatanCode = this.pickRaw(raw, [
+      'jabatan_id',
+      'id_jabatan',
+      'kd_jabatan_siasn',
+      'kd_jabatan',
+      'kode_jabatan',
+    ]);
+
     const [
       unitKerjaId,
       jabatanId,
@@ -1259,9 +2433,12 @@ export class SidataImportRepository {
       statusKawinId,
       pendidikanId,
     ] = await Promise.all([
-      this.findUnitKerjaIdInTx(tx, { code: row.kdUnor, name: row.namaUnorEselon1 }),
+      this.findUnitKerjaIdInTx(tx, {
+        code: row.kdUnor,
+        names: [row.namaUnorEselon4, row.namaUnorEselon3, row.namaUnorEselon2, row.namaUnorEselon1],
+      }),
       this.findJabatanIdInTx(tx, {
-        code: row.kdJabatan ?? row.kdJabatanSiasn,
+        code: row.kdJabatan ?? row.kdJabatanSiasn ?? rawJabatanCode,
         name: row.namaJabatan,
         jenisJabatanKode: null,
         jenisJabatanNama: row.jenisJabatan,
@@ -1324,10 +2501,10 @@ export class SidataImportRepository {
 
   private async findUnitKerjaIdInTx(
     tx: Prisma.TransactionClient,
-    params: { code: string | null; name: string | null },
+    params: { code: string | null; names: (string | null)[] },
   ): Promise<string | null> {
     const code = params.code?.trim() || null;
-    const name = params.name?.trim() || null;
+    const names = params.names.map((n) => n?.trim() || null).filter(Boolean) as string[];
 
     if (code) {
       const byCode = await tx.unitKerja.findFirst({
@@ -1337,23 +2514,27 @@ export class SidataImportRepository {
       if (byCode) return byCode.id;
     }
 
-    if (name) {
-      const byName = await tx.unitKerja.findFirst({
-        where: { nama: name, deletedAt: null },
-        select: simpleIdSelect,
-      });
-      if (byName) return byName.id;
+    if (names.length > 0) {
+      // Try exact match for each name (most specific first)
+      for (const name of names) {
+        const byName = await tx.unitKerja.findFirst({
+          where: { nama: name, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byName) return byName.id;
+      }
 
-      const normalizedName = this.normalizeText(name);
-      const candidates = await tx.unitKerja.findMany({
+      // Fuzzy normalized match — load all once, try each name
+      const allUnits = await tx.unitKerja.findMany({
         where: { deletedAt: null },
         select: { id: true, nama: true },
         take: 5000,
       });
-      const fuzzy = candidates.find(
-        (c) => this.normalizeText(c.nama) === normalizedName,
-      );
-      if (fuzzy) return fuzzy.id;
+      for (const name of names) {
+        const normalized = this.normalizeText(name);
+        const fuzzy = allUnits.find((c) => this.normalizeText(c.nama) === normalized);
+        if (fuzzy) return fuzzy.id;
+      }
     }
 
     return null;
@@ -1396,6 +2577,22 @@ export class SidataImportRepository {
         select: simpleIdSelect,
       });
       if (byKode) return byKode.id;
+
+      // SIASN job IDs are authoritative and unique. Some PPPK rows have
+      // inconsistent jenis jabatan metadata, so fall back to the ID alone.
+      if (jenisJabatan) {
+        const byAnySiasnCode = await tx.refJabatan.findFirst({
+          where: { siasnKode: code, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byAnySiasnCode) return byAnySiasnCode.id;
+
+        const byAnyKode = await tx.refJabatan.findFirst({
+          where: { kode: code, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byAnyKode) return byAnyKode.id;
+      }
     }
 
     if (name) {
@@ -1411,6 +2608,50 @@ export class SidataImportRepository {
         select: simpleIdSelect,
       });
       if (byName) return byName.id;
+
+      // Fuzzy fallback: strip punctuation (handles "Guru Madya Tingkat. I" vs "Guru Madya Tingkat I")
+      const stripped = this.stripPunctuation(name);
+      const allCandidates = await tx.refJabatan.findMany({
+        where: { ...jenisFilter, deletedAt: null },
+        select: { id: true, namaNormalized: true },
+        take: 10000,
+      });
+      const fuzzy = allCandidates.find(
+        (c) => c.namaNormalized && this.stripPunctuation(c.namaNormalized) === stripped,
+      );
+      if (fuzzy) return fuzzy.id;
+
+      // GURU_LAMA_MAP fallback: nama jabatan lama SIASN → nama baru di ref_jabatan
+      const guruLamaTarget = this.GURU_LAMA_MAP[name.trim().toUpperCase()];
+      if (guruLamaTarget) {
+        const normalized = this.normalizeText(guruLamaTarget);
+        const byGuruLama = await tx.refJabatan.findFirst({
+          where: { namaNormalized: normalized, ...jenisFilter, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byGuruLama) return byGuruLama.id;
+      }
+
+      // PPPK SIASN sometimes sends "JENJANG - NAMA"; ref_jabatan stores "NAMA JENJANG".
+      const namaJenjangTarget = this.toNamaJenjangJabatan(name);
+      if (namaJenjangTarget) {
+        const normalized = this.normalizeText(namaJenjangTarget);
+        const byNamaJenjang = await tx.refJabatan.findFirst({
+          where: { namaNormalized: normalized, ...jenisFilter, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byNamaJenjang) return byNamaJenjang.id;
+      }
+
+      const asnAbbreviationTarget = this.toAsnAbbreviationJabatan(name);
+      if (asnAbbreviationTarget) {
+        const normalized = this.normalizeText(asnAbbreviationTarget);
+        const byAsnAbbreviation = await tx.refJabatan.findFirst({
+          where: { namaNormalized: normalized, ...jenisFilter, deletedAt: null },
+          select: simpleIdSelect,
+        });
+        if (byAsnAbbreviation) return byAsnAbbreviation.id;
+      }
     }
 
     return null;
@@ -1484,104 +2725,159 @@ export class SidataImportRepository {
 
   async commitSiasnAsnBatch(params: {
     batchId: string;
+    skipClaim?: boolean;
   }): Promise<CommitSiasnAsnBatchResult> {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const batch = await tx.sidataAsnImportBatch.findUnique({
-          where: { id: params.batchId },
-          select: asnImportBatchSelect,
-        });
+    if (!params.skipClaim) {
+      const claimed = await this.claimAsnBatch(params.batchId);
+      if (!claimed) throw new Error('BATCH_ALREADY_PROCESSING_OR_COMMITTED');
+    }
 
-        if (!batch) throw new Error('ASN_BATCH_NOT_FOUND');
+    const batchRecord = await this.prisma.sidataAsnImportBatch.findUnique({
+      where: { id: params.batchId },
+      select: asnImportBatchSelect,
+    });
 
-        const rows = await tx.sidataAsnImportStaging.findMany({
-          where: { batchId: params.batchId },
-          orderBy: { rowNumber: 'asc' },
-          select: asnImportStagingSelect,
-        });
+    if (!batchRecord) throw new Error('ASN_BATCH_NOT_FOUND');
 
-        let eligibleRows = 0;
-        let committedRows = 0;
-        let createdRows = 0;
-        let updatedRows = 0;
-        let skippedRows = 0;
-        let invalidRows = 0;
-        let needsReviewRows = 0;
-        let unmappedRows = 0;
+    const tipePegawai = this.tipePegawaiFromImportType(batchRecord.importType);
+    const stagingRows = await this.prisma.sidataAsnImportStaging.findMany({
+      where: { batchId: params.batchId },
+      orderBy: { rowNumber: 'asc' },
+      select: asnImportStagingSelect,
+    });
 
-        for (const row of rows) {
-          if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID) {
-            invalidRows += 1;
-            skippedRows += 1;
-            continue;
-          }
+    let eligibleRows = 0;
+    let committedRows = 0;
+    let createdRows = 0;
+    let updatedRows = 0;
+    let skippedRows = 0;
+    let invalidRows = 0;
+    let needsReviewRows = 0;
+    let unmappedRows = 0;
 
-          if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW) {
-            needsReviewRows += 1;
-            skippedRows += 1;
-            continue;
-          }
+    for (const chunk of this.chunkArray(stagingRows, SidataImportRepository.ASN_JOB_CHUNK_SIZE)) {
+      const chunkResult = await this.prisma.$transaction(
+        (tx) =>
+          this.commitSiasnAsnRowsChunkInTx(tx, {
+            rows: chunk,
+            batchId: params.batchId,
+            importType: batchRecord.importType,
+            tipePegawai,
+          }),
+        { timeout: 60_000, maxWait: 10_000 },
+      );
 
-          if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.UNMAPPED) {
-            unmappedRows += 1;
-            skippedRows += 1;
-            continue;
-          }
+      eligibleRows += chunkResult.eligibleRows;
+      committedRows += chunkResult.committedRows;
+      createdRows += chunkResult.createdRows;
+      updatedRows += chunkResult.updatedRows;
+      skippedRows += chunkResult.skippedRows;
+      invalidRows += chunkResult.invalidRows;
+      needsReviewRows += chunkResult.needsReviewRows;
+      unmappedRows += chunkResult.unmappedRows;
 
-          if (row.mappingStatus !== SIDATA_ASN_MAP_STATUS.MAPPED) {
-            skippedRows += 1;
-            continue;
-          }
+      await this.yieldToEventLoop();
+    }
 
-          if (!row.nip || !row.nama) {
-            invalidRows += 1;
-            skippedRows += 1;
-            continue;
-          }
-
-          eligibleRows += 1;
-
-          const mappedData = this.parseMappedData(row.mappedData);
-          const commitResult = await this.upsertAsnFromStagingInTx(tx, { row, mappedData });
-
-          await tx.sidataAsnImportStaging.update({
-            where: { id: row.id },
-            data: {
-              matchedAsnId: commitResult.asnId,
-              mappingStatus: SIDATA_ASN_MAP_STATUS.MAPPED,
-            },
-          });
-
-          committedRows += 1;
-          if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.CREATED) createdRows += 1;
-          if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.UPDATED) updatedRows += 1;
-        }
-
-        await tx.sidataAsnImportBatch.update({
-          where: { id: params.batchId },
-          data: {
-            status: SIDATA_IMPORT_STATUS.COMMITTED,
-            finishedAt: new Date(),
-            errorMessage: null,
-          },
-        });
-
-        return {
-          batchId: params.batchId,
-          status: SIDATA_IMPORT_STATUS.COMMITTED,
-          totalRows: rows.length,
-          eligibleRows,
-          committedRows,
-          createdRows,
-          updatedRows,
-          skippedRows,
-          invalidRows,
-          needsReviewRows,
-          unmappedRows,
-        };
+    await this.prisma.sidataAsnImportBatch.update({
+      where: { id: params.batchId },
+      data: {
+        status: SIDATA_IMPORT_STATUS.COMMITTED,
+        finishedAt: new Date(),
+        errorMessage: null,
       },
-      { timeout: 120_000, maxWait: 20_000 },
-    );
+    });
+
+    return {
+      batchId: params.batchId,
+      status: SIDATA_IMPORT_STATUS.COMMITTED,
+      totalRows: stagingRows.length,
+      eligibleRows,
+      committedRows,
+      createdRows,
+      updatedRows,
+      skippedRows,
+      invalidRows,
+      needsReviewRows,
+      unmappedRows,
+    };
+
+  }
+
+  private async commitSiasnAsnRowsChunkInTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      rows: SidataAsnImportStagingRecord[];
+      batchId: string;
+      importType: string;
+      tipePegawai: string | null;
+    },
+  ): Promise<{
+    eligibleRows: number;
+    committedRows: number;
+    createdRows: number;
+    updatedRows: number;
+    skippedRows: number;
+    invalidRows: number;
+    needsReviewRows: number;
+    unmappedRows: number;
+  }> {
+    let eligibleRows = 0;
+    let committedRows = 0;
+    let createdRows = 0;
+    let updatedRows = 0;
+    let skippedRows = 0;
+    let invalidRows = 0;
+    let needsReviewRows = 0;
+    let unmappedRows = 0;
+
+    for (const row of params.rows) {
+      if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !row.nip || !row.nama) {
+        invalidRows += 1;
+        skippedRows += 1;
+        continue;
+      }
+
+      if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW) {
+        needsReviewRows += 1;
+      } else if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.UNMAPPED) {
+        unmappedRows += 1;
+      }
+
+      eligibleRows += 1;
+
+      const mappedData = this.parseMappedData(row.mappedData);
+      const commitResult = await this.upsertAsnFromStagingInTx(tx, {
+        row,
+        mappedData,
+        tipePegawai: params.tipePegawai,
+        batchId: params.batchId,
+        importType: params.importType,
+      });
+
+      await tx.sidataAsnImportStaging.update({
+        where: { id: row.id },
+        data: {
+          matchedAsnId: commitResult.asnId,
+          mappingStatus: SIDATA_ASN_MAP_STATUS.MAPPED,
+        },
+      });
+
+      committedRows += 1;
+      if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.CREATED) createdRows += 1;
+      if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.UPDATED) updatedRows += 1;
+    }
+
+    return {
+      eligibleRows,
+      committedRows,
+      createdRows,
+      updatedRows,
+      skippedRows,
+      invalidRows,
+      needsReviewRows,
+      unmappedRows,
+    };
   }
 
   private async upsertAsnFromStagingInTx(
@@ -1589,6 +2885,9 @@ export class SidataImportRepository {
     params: {
       row: SidataAsnImportStagingRecord;
       mappedData: SiasnAsnMappedDataForCommit;
+      tipePegawai: string | null;
+      batchId: string;
+      importType: string;
     },
   ): Promise<{ asnId: string; action: 'CREATED' | 'UPDATED' }> {
     const { row } = params;
@@ -1611,6 +2910,10 @@ export class SidataImportRepository {
         data: safeData,
         select: simpleIdSelect,
       });
+      await this.upsertAsnEnterpriseRecordsInTx(tx, {
+        ...params,
+        asnId: updated.id,
+      });
       return { asnId: updated.id, action: SIDATA_ASN_COMMIT_ACTION.UPDATED };
     }
 
@@ -1618,27 +2921,491 @@ export class SidataImportRepository {
       data: { id: randomUUID(), ...safeData },
       select: simpleIdSelect,
     });
+    await this.upsertAsnEnterpriseRecordsInTx(tx, {
+      ...params,
+      asnId: created.id,
+    });
     return { asnId: created.id, action: SIDATA_ASN_COMMIT_ACTION.CREATED };
   }
 
   private buildAsnSafeDataFromStaging(params: {
     row: SidataAsnImportStagingRecord;
     mappedData: SiasnAsnMappedDataForCommit;
+    tipePegawai: string | null;
+    batchId?: string;
+    importType?: string;
   }) {
-    const { row, mappedData } = params;
+    const { row, mappedData, tipePegawai } = params;
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+    const siasnJabatanId = row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']);
+    const siasnUnorId = row.kdUnor ?? this.rawString(raw, ['unor_id']);
+    const siasnGolonganId = row.kdGolongan ?? row.kdGolonganSiasn ?? this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']);
+    const jenisAsnNama = row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']);
+    const kedudukanHukumNama = row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']);
 
-    return {
+    const currentData = {
+      siasnPnsId: this.rawString(raw, ['pns_id']),
       nip: row.nip ?? '',
+      nipLama: row.nipLama,
+      nik: this.rawString(raw, ['nik']),
       nama: row.nama ?? '',
-      unitKerjaId: mappedData.unitKerjaId ?? null,
-      jabatanNama: row.namaJabatan,
-      golonganNama: row.namaGolongan,
-      jenisAsn: row.jenisAsn,
-      statusAsn: row.statusKepegawaian,
-      tanggalLahir: row.tanggalLahir,
+      namaSearch: this.normalizeText(row.nama ?? ''),
+      gelarDepan: this.rawString(raw, ['gelar_depan']),
+      gelarBelakang: this.rawString(raw, ['gelar_belakang']),
+      tipePegawai: tipePegawai ?? undefined,
+      jenisAsnRefId: mappedData.jenisAsnId ?? null,
+      jenisAsnNama,
+      statusAsn: row.statusKepegawaian ?? kedudukanHukumNama,
+      isActive: !row.tmtPensiun || new Date(row.tmtPensiun) > new Date(),
+      kedudukanHukumRefId: mappedData.kedudukanHukumId ?? null,
+      kedudukanHukumNama,
       tmtPensiun: row.tmtPensiun,
+      unitKerjaId: mappedData.unitKerjaId ?? null,
+      siasnUnorId,
+      unorNama: this.rawString(raw, ['unor_nama']),
+      jabatanRefId: mappedData.jabatanId ?? null,
+      siasnJabatanId,
+      jenisJabatanNama: row.jenisJabatan,
+      jabatanNama: row.namaJabatan,
+      tmtJabatan: row.tmtJabatan,
+      golonganRefId: mappedData.golonganId ?? null,
+      siasnGolonganId,
+      golonganNama: row.namaGolongan,
+      tmtGolongan: row.tmtGolongan,
+      sourceBatchId: params.batchId ?? null,
       deletedAt: null,
     };
+
+    return {
+      ...currentData,
+      syncedAt: new Date(),
+      checksum: this.checksumJson(currentData),
+    };
+  }
+
+  private async upsertAsnEnterpriseRecordsInTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      asnId: string;
+      batchId: string;
+      importType: string;
+      row: SidataAsnImportStagingRecord;
+      mappedData: SiasnAsnMappedDataForCommit;
+      tipePegawai: string | null;
+    },
+  ): Promise<void> {
+    const { asnId, batchId, importType, row, mappedData, tipePegawai } = params;
+    const raw = row.rawData && typeof row.rawData === 'object' && !Array.isArray(row.rawData)
+      ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
+      : {};
+    const rawData = row.rawData as Prisma.InputJsonValue;
+    const mappedJson = row.mappedData
+      ? (row.mappedData as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+    const profileData = this.buildSiasnProfileData(row, mappedData, tipePegawai, raw);
+    const rawChecksum = this.checksumJson({ rawData: row.rawData, mappedData: row.mappedData });
+    const now = new Date();
+    const siasnPnsId = this.rawString(raw, ['pns_id']);
+    const siasnUnorId = row.kdUnor ?? this.rawString(raw, ['unor_id']);
+    const siasnJabatanId = row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']);
+    const siasnGolonganId = row.kdGolongan ?? row.kdGolonganSiasn ?? this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']);
+    const siasnPendidikanId = this.rawString(raw, ['pendidikan_id']);
+    const siasnTingkatPendidikanId = this.rawString(raw, ['tingkat_pendidikan_id']);
+
+    await tx.asnSiasnProfile.upsert({
+      where: { asnId },
+      create: {
+        id: randomUUID(),
+        asnId,
+        sourceBatchId: batchId,
+        siasnPnsId,
+        email: this.rawString(raw, ['email']),
+        emailGov: this.rawString(raw, ['email_gov']),
+        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: this.rawString(raw, ['alamat']),
+        npwpNomor: this.rawString(raw, ['npwp_nomor', 'npwp']),
+        bpjsNomor: this.rawString(raw, ['bpjs', 'bpjs_nomor']),
+        tempatLahirId: this.rawString(raw, ['tempat_lahir_id']),
+        tempatLahirNama: row.tempatLahir ?? this.rawString(raw, ['tempat_lahir_nama']),
+        tanggalLahir: row.tanggalLahir,
+        jenisKelaminRefId: mappedData.jenisKelaminId ?? null,
+        siasnJenisKelaminId: this.rawString(raw, ['jenis_kelamin_id']),
+        jenisKelaminNama: row.jenisKelamin,
+        agamaRefId: mappedData.agamaId ?? null,
+        siasnAgamaId: this.rawString(raw, ['agama_id']),
+        agamaNama: row.agama ?? this.rawString(raw, ['agama_nama']),
+        statusKawinRefId: mappedData.statusKawinId ?? null,
+        siasnStatusKawinId: this.rawString(raw, ['jenis_kawin_id', 'status_kawin_id']),
+        statusKawinNama: row.statusKawin,
+        siasnJenisPegawaiId: this.rawString(raw, ['jenis_pegawai_id', 'jenis_asn_id']),
+        jenisPegawaiNama: row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']),
+        kedudukanHukumRefId: mappedData.kedudukanHukumId ?? null,
+        siasnKedudukanHukumId: this.rawString(raw, ['kedudukan_hukum_id']),
+        kedudukanHukumNama: row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']),
+        statusCpnsPns: this.rawString(raw, ['status_cpns_pns']),
+        kartuAsnVirtual: this.rawString(raw, ['kartu_asn_virtual']),
+        nomorSkCpns: this.rawString(raw, ['nomor_sk_cpns']),
+        tanggalSkCpns: this.rawDate(raw, ['tanggal_sk_cpns']),
+        tmtCpns: this.rawDate(raw, ['tmt_cpns']),
+        nomorSkPns: this.rawString(raw, ['nomor_sk_pns']) ?? row.noSk,
+        tanggalSkPns: this.rawDate(raw, ['tanggal_sk_pns']) ?? row.tanggalSk,
+        tmtPns: row.tmtPns,
+        tmtPensiun: row.tmtPensiun,
+        kpknId: this.rawString(raw, ['kpkn_id']),
+        kpknNama: this.rawString(raw, ['kpkn_nama']),
+        lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
+        lokasiKerjaNama: this.rawString(raw, ['lokasi_kerja_nama']),
+        siasnUnorId,
+        unorNama: this.rawString(raw, ['unor_nama']),
+        instansiIndukId: this.rawString(raw, ['instansi_induk_id']),
+        instansiIndukNama: this.rawString(raw, ['instansi_induk_nama']),
+        instansiKerjaId: this.rawString(raw, ['instansi_kerja_id']),
+        instansiKerjaNama: this.rawString(raw, ['instansi_kerja_nama']),
+        satuanKerjaIndukId: this.rawString(raw, ['satuan_kerja_induk_id']),
+        satuanKerjaIndukNama: this.rawString(raw, ['satuan_kerja_induk_nama']),
+        satuanKerjaKerjaId: this.rawString(raw, ['satuan_kerja_kerja_id']),
+        satuanKerjaKerjaNama: this.rawString(raw, ['satuan_kerja_kerja_nama']),
+        isValidNik: this.rawString(raw, ['is_valid_nik']),
+        flagIkd: this.rawString(raw, ['flag_ikd']),
+        profileData,
+        rawData,
+        checksum: rawChecksum,
+        syncedAt: now,
+        deletedAt: null,
+      },
+      update: {
+        sourceBatchId: batchId,
+        siasnPnsId,
+        email: this.rawString(raw, ['email']),
+        emailGov: this.rawString(raw, ['email_gov']),
+        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: this.rawString(raw, ['alamat']),
+        npwpNomor: this.rawString(raw, ['npwp_nomor', 'npwp']),
+        bpjsNomor: this.rawString(raw, ['bpjs', 'bpjs_nomor']),
+        tempatLahirId: this.rawString(raw, ['tempat_lahir_id']),
+        tempatLahirNama: row.tempatLahir ?? this.rawString(raw, ['tempat_lahir_nama']),
+        tanggalLahir: row.tanggalLahir,
+        jenisKelaminRefId: mappedData.jenisKelaminId ?? null,
+        siasnJenisKelaminId: this.rawString(raw, ['jenis_kelamin_id']),
+        jenisKelaminNama: row.jenisKelamin,
+        agamaRefId: mappedData.agamaId ?? null,
+        siasnAgamaId: this.rawString(raw, ['agama_id']),
+        agamaNama: row.agama ?? this.rawString(raw, ['agama_nama']),
+        statusKawinRefId: mappedData.statusKawinId ?? null,
+        siasnStatusKawinId: this.rawString(raw, ['jenis_kawin_id', 'status_kawin_id']),
+        statusKawinNama: row.statusKawin,
+        siasnJenisPegawaiId: this.rawString(raw, ['jenis_pegawai_id', 'jenis_asn_id']),
+        jenisPegawaiNama: row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']),
+        kedudukanHukumRefId: mappedData.kedudukanHukumId ?? null,
+        siasnKedudukanHukumId: this.rawString(raw, ['kedudukan_hukum_id']),
+        kedudukanHukumNama: row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']),
+        statusCpnsPns: this.rawString(raw, ['status_cpns_pns']),
+        kartuAsnVirtual: this.rawString(raw, ['kartu_asn_virtual']),
+        nomorSkCpns: this.rawString(raw, ['nomor_sk_cpns']),
+        tanggalSkCpns: this.rawDate(raw, ['tanggal_sk_cpns']),
+        tmtCpns: this.rawDate(raw, ['tmt_cpns']),
+        nomorSkPns: this.rawString(raw, ['nomor_sk_pns']) ?? row.noSk,
+        tanggalSkPns: this.rawDate(raw, ['tanggal_sk_pns']) ?? row.tanggalSk,
+        tmtPns: row.tmtPns,
+        tmtPensiun: row.tmtPensiun,
+        kpknId: this.rawString(raw, ['kpkn_id']),
+        kpknNama: this.rawString(raw, ['kpkn_nama']),
+        lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
+        lokasiKerjaNama: this.rawString(raw, ['lokasi_kerja_nama']),
+        siasnUnorId,
+        unorNama: this.rawString(raw, ['unor_nama']),
+        instansiIndukId: this.rawString(raw, ['instansi_induk_id']),
+        instansiIndukNama: this.rawString(raw, ['instansi_induk_nama']),
+        instansiKerjaId: this.rawString(raw, ['instansi_kerja_id']),
+        instansiKerjaNama: this.rawString(raw, ['instansi_kerja_nama']),
+        satuanKerjaIndukId: this.rawString(raw, ['satuan_kerja_induk_id']),
+        satuanKerjaIndukNama: this.rawString(raw, ['satuan_kerja_induk_nama']),
+        satuanKerjaKerjaId: this.rawString(raw, ['satuan_kerja_kerja_id']),
+        satuanKerjaKerjaNama: this.rawString(raw, ['satuan_kerja_kerja_nama']),
+        isValidNik: this.rawString(raw, ['is_valid_nik']),
+        flagIkd: this.rawString(raw, ['flag_ikd']),
+        profileData,
+        rawData,
+        checksum: rawChecksum,
+        syncedAt: now,
+        deletedAt: null,
+      },
+    });
+
+    await tx.asnImportSnapshot.upsert({
+      where: { asnId_sourceBatchId: { asnId, sourceBatchId: batchId } },
+      create: {
+        id: randomUUID(),
+        asnId,
+        sourceBatchId: batchId,
+        rowNumber: row.rowNumber,
+        importType,
+        nip: row.nip,
+        rawData,
+        mappedData: mappedJson,
+        checksum: rawChecksum,
+        syncedAt: now,
+        deletedAt: null,
+      },
+      update: {
+        rowNumber: row.rowNumber,
+        importType,
+        nip: row.nip,
+        rawData,
+        mappedData: mappedJson,
+        checksum: rawChecksum,
+        syncedAt: now,
+        deletedAt: null,
+      },
+    });
+
+    const assignmentRawData = this.buildAssignmentHistoryData(row, mappedData, raw);
+    const assignmentChecksum = this.checksumJson(assignmentRawData);
+    const assignmentData = {
+      unitKerjaId: mappedData.unitKerjaId ?? null,
+      siasnUnorId,
+      unorNama: this.rawString(raw, ['unor_nama']),
+      jabatanRefId: mappedData.jabatanId ?? null,
+      siasnJabatanId,
+      jabatanNama: row.namaJabatan,
+      jenisJabatanRefId: null,
+      siasnJenisJabatanId: this.rawString(raw, ['jenis_jabatan_id']),
+      jenisJabatanNama: row.jenisJabatan,
+      tmtJabatan: row.tmtJabatan,
+      effectiveDate: row.tmtJabatan,
+      rawData: assignmentRawData,
+      checksum: assignmentChecksum,
+      syncedAt: now,
+      deletedAt: null,
+    };
+    const assignmentInBatch = await tx.asnAssignmentHistory.findUnique({
+      where: { asnId_sourceBatchId: { asnId, sourceBatchId: batchId } },
+      select: simpleIdSelect,
+    });
+    if (assignmentInBatch) {
+      await tx.asnAssignmentHistory.update({
+        where: { id: assignmentInBatch.id },
+        data: assignmentData,
+      });
+    } else {
+      const duplicateAssignment = await tx.asnAssignmentHistory.findFirst({
+        where: { asnId, checksum: assignmentChecksum, deletedAt: null },
+        select: simpleIdSelect,
+      });
+      if (!duplicateAssignment) {
+        await tx.asnAssignmentHistory.create({
+          data: {
+            id: randomUUID(),
+            asnId,
+            sourceBatchId: batchId,
+            ...assignmentData,
+          },
+        });
+      }
+    }
+
+    const golonganRawData = this.buildGolonganHistoryData(row, raw);
+    const golonganChecksum = this.checksumJson(golonganRawData);
+    const golonganData = {
+      golonganRefId: mappedData.golonganId ?? null,
+      siasnGolonganId,
+      golonganNama: row.namaGolongan,
+      pangkatNama: row.namaRuang,
+      ruangNama: row.namaRuang,
+      siasnGolonganAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
+      golonganAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
+      siasnGolonganAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
+      golonganAkhirNama: row.namaGolongan,
+      tmtGolongan: row.tmtGolongan,
+      mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
+      mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
+      effectiveDate: row.tmtGolongan,
+      rawData: golonganRawData,
+      checksum: golonganChecksum,
+      syncedAt: now,
+      deletedAt: null,
+    };
+    const golonganInBatch = await tx.asnGolonganHistory.findUnique({
+      where: { asnId_sourceBatchId: { asnId, sourceBatchId: batchId } },
+      select: simpleIdSelect,
+    });
+    if (golonganInBatch) {
+      await tx.asnGolonganHistory.update({
+        where: { id: golonganInBatch.id },
+        data: golonganData,
+      });
+    } else {
+      const duplicateGolongan = await tx.asnGolonganHistory.findFirst({
+        where: { asnId, checksum: golonganChecksum, deletedAt: null },
+        select: simpleIdSelect,
+      });
+      if (!duplicateGolongan) {
+        await tx.asnGolonganHistory.create({
+          data: {
+            id: randomUUID(),
+            asnId,
+            sourceBatchId: batchId,
+            ...golonganData,
+          },
+        });
+      }
+    }
+
+    const pendidikanRawData = this.buildPendidikanHistoryData(row, raw);
+    const pendidikanChecksum = this.checksumJson(pendidikanRawData);
+    const pendidikanData = {
+      pendidikanRefId: mappedData.pendidikanId ?? null,
+      siasnPendidikanId,
+      pendidikanNama: row.pendidikanTerakhir,
+      tingkatPendidikanRefId: null,
+      siasnTingkatPendidikanId,
+      tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
+      tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+      namaSekolah: row.namaSekolah,
+      effectiveDate: this.rawDate(raw, ['tanggal_lulus', 'tgl_lulus']),
+      rawData: pendidikanRawData,
+      checksum: pendidikanChecksum,
+      syncedAt: now,
+      deletedAt: null,
+    };
+    const pendidikanInBatch = await tx.asnPendidikanHistory.findUnique({
+      where: { asnId_sourceBatchId: { asnId, sourceBatchId: batchId } },
+      select: simpleIdSelect,
+    });
+    if (pendidikanInBatch) {
+      await tx.asnPendidikanHistory.update({
+        where: { id: pendidikanInBatch.id },
+        data: pendidikanData,
+      });
+    } else {
+      const duplicatePendidikan = await tx.asnPendidikanHistory.findFirst({
+        where: { asnId, checksum: pendidikanChecksum, deletedAt: null },
+        select: simpleIdSelect,
+      });
+      if (!duplicatePendidikan) {
+        await tx.asnPendidikanHistory.create({
+          data: {
+            id: randomUUID(),
+            asnId,
+            sourceBatchId: batchId,
+            ...pendidikanData,
+          },
+        });
+      }
+    }
+  }
+
+  private buildSiasnProfileData(
+    row: SidataAsnImportStagingRecord,
+    mappedData: SiasnAsnMappedDataForCommit,
+    tipePegawai: string | null,
+    raw: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    return {
+      identity: {
+        nip: row.nip,
+        nipLama: row.nipLama,
+        nik: this.rawString(raw, ['nik']),
+        nama: row.nama,
+        gelarDepan: this.rawString(raw, ['gelar_depan']),
+        gelarBelakang: this.rawString(raw, ['gelar_belakang']),
+      },
+      contact: {
+        email: this.rawString(raw, ['email']),
+        emailGov: this.rawString(raw, ['email_gov']),
+        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: this.rawString(raw, ['alamat']),
+      },
+      employment: {
+        tipePegawai,
+        jenisAsn: row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']),
+        statusAsn: row.statusKepegawaian ?? row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']),
+        kedudukanHukumId: this.rawString(raw, ['kedudukan_hukum_id']),
+        kedudukanHukumNama: row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']),
+        statusCpnsPns: this.rawString(raw, ['status_cpns_pns']),
+      },
+      assignment: {
+        unitKerjaId: mappedData.unitKerjaId ?? null,
+        siasnUnorId: row.kdUnor ?? this.rawString(raw, ['unor_id']),
+        unorNama: this.rawString(raw, ['unor_nama']),
+        siasnJabatanId: row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']),
+        jabatanNama: row.namaJabatan,
+        jenisJabatanNama: row.jenisJabatan,
+        tmtJabatan: row.tmtJabatan?.toISOString() ?? null,
+      },
+      golongan: {
+        golAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
+        golAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
+        golAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
+        golAkhirNama: row.namaGolongan,
+        tmtGolongan: row.tmtGolongan?.toISOString() ?? null,
+        mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
+        mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
+      },
+      education: {
+        tingkatPendidikanId: this.rawString(raw, ['tingkat_pendidikan_id']),
+        tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
+        pendidikanId: this.rawString(raw, ['pendidikan_id']),
+        pendidikanNama: row.pendidikanTerakhir,
+        tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+        namaSekolah: row.namaSekolah,
+      },
+      mappedReference: mappedData as Record<string, string | null | undefined>,
+    } as Prisma.InputJsonValue;
+  }
+
+  private buildAssignmentHistoryData(
+    row: SidataAsnImportStagingRecord,
+    mappedData: SiasnAsnMappedDataForCommit,
+    raw: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    return {
+      unitKerjaId: mappedData.unitKerjaId ?? null,
+      siasnUnorId: row.kdUnor ?? this.rawString(raw, ['unor_id']),
+      unorNama: this.rawString(raw, ['unor_nama']),
+      siasnJabatanId: row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']),
+      jabatanNama: row.namaJabatan,
+      jenisJabatanNama: row.jenisJabatan,
+      tmtJabatan: row.tmtJabatan?.toISOString() ?? null,
+    } as Prisma.InputJsonValue;
+  }
+
+  private buildGolonganHistoryData(
+    row: SidataAsnImportStagingRecord,
+    raw: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    return {
+      golAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
+      golAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
+      golAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
+      golAkhirNama: row.namaGolongan,
+      tmtGolongan: row.tmtGolongan?.toISOString() ?? null,
+      mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
+      mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
+    } as Prisma.InputJsonValue;
+  }
+
+  private buildPendidikanHistoryData(
+    row: SidataAsnImportStagingRecord,
+    raw: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    return {
+      tingkatPendidikanId: this.rawString(raw, ['tingkat_pendidikan_id']),
+      tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
+      pendidikanId: this.rawString(raw, ['pendidikan_id']),
+      pendidikanNama: row.pendidikanTerakhir,
+      tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+      namaSekolah: row.namaSekolah,
+    } as Prisma.InputJsonValue;
+  }
+
+  private tipePegawaiFromImportType(importType: string): string | null {
+    if (importType === 'SIASN_ASN_PNS') return 'PNS';
+    if (importType === 'SIASN_ASN_PPPK') return 'PPPK';
+    if (importType === 'SIASN_ASN_PPPK_PARUH_WAKTU') return 'PPPK_PARUH_WAKTU';
+    return null;
   }
 
   private parseMappedData(value: unknown): SiasnAsnMappedDataForCommit {
@@ -1666,13 +3433,79 @@ export class SidataImportRepository {
     return normalized || null;
   }
 
+  private checksumJson(value: unknown): string {
+    return createHash('sha256')
+      .update(this.stableStringify(value))
+      .digest('hex');
+  }
+
+  private stableStringify(value: unknown): string {
+    if (value instanceof Date) return JSON.stringify(value.toISOString());
+    if (value === null || typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`)
+      .join(',')}}`;
+  }
+
+  private chunkArray<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let index = 0; index < items.length; index += size) {
+      chunks.push(items.slice(index, index + size));
+    }
+    return chunks;
+  }
+
+  private yieldToEventLoop(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
+  }
+
+  private rawString(raw: Record<string, unknown>, candidates: string[]): string | null {
+    const value = this.pickRaw(raw, candidates);
+    if (!value) return null;
+    const cleaned = value.replace(/^'+/, '').trim();
+    return cleaned || null;
+  }
+
+  private rawInt(raw: Record<string, unknown>, candidates: string[]): number | null {
+    const value = this.rawString(raw, candidates);
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private rawDate(raw: Record<string, unknown>, candidates: string[]): Date | null {
+    const value = this.rawString(raw, candidates);
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private parseMasaKerja(value: string | null | undefined): { tahun: number | null; bulan: number | null } {
+    if (!value) return { tahun: null, bulan: null };
+    const tahunMatch = /(\d+)\s*tahun/i.exec(value);
+    const bulanMatch = /(\d+)\s*bulan/i.exec(value);
+    return {
+      tahun: tahunMatch ? Number.parseInt(tahunMatch[1], 10) : null,
+      bulan: bulanMatch ? Number.parseInt(bulanMatch[1], 10) : null,
+    };
+  }
+
+  private isMissingReferenceMessage(message: string): boolean {
+    return /^Referensi .+ belum termapping$/.test(message);
+  }
+
   private getMissingReferenceMessages(
     row: SidataAsnImportStagingRecord,
     mappedData: SidataAsnMappedData,
   ): string[] {
     const errors: string[] = [];
 
-    if ((row.kdUnor || row.namaUnorEselon1) && !mappedData.unitKerjaId) {
+    const hasUnorInfo = row.kdUnor || row.namaUnorEselon1 || row.namaUnorEselon2 || row.namaUnorEselon3 || row.namaUnorEselon4;
+    if (hasUnorInfo && !mappedData.unitKerjaId) {
       errors.push('Referensi unit organisasi belum termapping');
     }
     if ((row.kdJabatan || row.namaJabatan) && !mappedData.jabatanId) {
@@ -1704,5 +3537,296 @@ export class SidataImportRepository {
     }
 
     return errors;
+  }
+
+  // ─── Phase 12: Extract References from ASN Batch ──────────────────────────────
+
+  async extractReferencesFromAsnBatch(
+    batchId: string,
+  ): Promise<import('./sidata-import.types').ExtractReferencesResult> {
+    const stagingRows = await this.prisma.sidataAsnImportStaging.findMany({
+      where: { batchId },
+      select: { rawData: true },
+    });
+
+    type RefPair = { kode: string | null; nama: string };
+    type PendidikanPair = { kode: string | null; nama: string; tingkatNama: string | null; tingkatKode: string | null };
+
+    const agama = new Map<string, RefPair>();
+    const statusKawin = new Map<string, RefPair>();
+    const jenisKelamin = new Map<string, RefPair>();
+    const jenisAsn = new Map<string, RefPair>();
+    const kedudukanHukum = new Map<string, RefPair>();
+    const golongan = new Map<string, RefPair>();
+    const pendidikanTingkat = new Map<string, RefPair>();
+    const pendidikan = new Map<string, PendidikanPair>();
+    const jenisJabatan = new Map<string, RefPair>();
+
+    for (const row of stagingRows) {
+      const raw = this.normalizeRawDataKeys(row.rawData as Record<string, unknown>);
+
+      this.collectPair(raw, agama, ['agama_id', 'id_agama'], ['agama_nama', 'nama_agama', 'agama']);
+      this.collectPair(raw, statusKawin, ['jenis_kawin_id', 'kawin_id', 'status_kawin_id'], ['jenis_kawin_nama', 'kawin_nama', 'status_kawin_nama', 'status_kawin']);
+      this.collectPair(raw, jenisKelamin, ['jenis_kelamin_id'], ['jenis_kelamin_nama', 'jenis_kelamin', 'kelamin']);
+      this.collectPair(raw, jenisAsn, ['jenis_pegawai_id', 'jenis_asn_id'], ['jenis_pegawai_nama', 'jenis_asn_nama', 'jenis_asn', 'jenis_pegawai']);
+      this.collectPair(raw, kedudukanHukum, ['kedudukan_hukum_id'], ['kedudukan_hukum_nama', 'kedudukan_hukum']);
+      this.collectPair(raw, golongan, ['gol_awal_id', 'golongan_awal_id', 'kd_golongan', 'gol_id'], ['gol_awal_nama', 'golongan_awal_nama', 'nama_golongan', 'golongan']);
+      this.collectPair(raw, golongan, ['gol_akhir_id', 'golongan_akhir_id'], ['gol_akhir_nama', 'golongan_akhir_nama']);
+      this.collectPair(raw, jenisJabatan, ['jenis_jabatan_id'], ['jenis_jabatan_nama', 'jenis_jabatan']);
+
+      const tNama = this.pickRaw(raw, ['tingkat_pendidikan_nama', 'tingkat_pendidikan']);
+      const tKode = this.pickRaw(raw, ['tingkat_pendidikan_id']);
+      if (tNama) {
+        const key = this.normalizeText(tNama);
+        if (!pendidikanTingkat.has(key)) pendidikanTingkat.set(key, { kode: tKode, nama: tNama });
+      }
+
+      const pNama = this.pickRaw(raw, ['pendidikan_nama', 'pendidikan_terakhir']);
+      const pKode = this.pickRaw(raw, ['pendidikan_id']);
+      if (pNama) {
+        const key = this.normalizeText(pNama);
+        if (!pendidikan.has(key)) {
+          pendidikan.set(key, { kode: pKode, nama: pNama, tingkatNama: tNama, tingkatKode: tKode });
+        }
+      }
+    }
+
+    const [a, sk, jk, ja, kh, gol, jj] = await Promise.all([
+      this.upsertSimpleRefBulk('refAgama', agama),
+      this.upsertSimpleRefBulk('refStatusKawin', statusKawin),
+      this.upsertSimpleRefBulk('refJenisKelamin', jenisKelamin),
+      this.upsertSimpleRefBulk('refJenisAsn', jenisAsn),
+      this.upsertSimpleRefBulk('refKedudukanHukum', kedudukanHukum),
+      this.upsertSimpleRefBulk('refGolongan', golongan),
+      this.upsertJenisJabatanBulk(jenisJabatan),
+    ]);
+
+    const pt = await this.upsertPendidikanTingkatBulk(pendidikanTingkat);
+    const pend = await this.upsertPendidikanBulk(pendidikan, pt.idMap);
+
+    const extracted = {
+      agama: a,
+      statusKawin: sk,
+      jenisKelamin: jk,
+      jenisAsn: ja,
+      kedudukanHukum: kh,
+      golongan: gol,
+      pendidikanTingkat: pt.created,
+      pendidikan: pend,
+      jenisJabatan: jj,
+    };
+
+    return {
+      batchId,
+      extracted,
+      totalExtracted: Object.values(extracted).reduce((s, n) => s + n, 0),
+    };
+  }
+
+  private normalizeRawDataKeys(raw: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      out[k.trim().toLowerCase().replace(/\s+/g, '_')] = v;
+    }
+    return out;
+  }
+
+  private pickRaw(raw: Record<string, unknown>, candidates: string[]): string | null {
+    for (const key of candidates) {
+      const val = raw[key.trim().toLowerCase().replace(/\s+/g, '_')];
+      if (val !== null && val !== undefined) {
+        const str = String(val).trim();
+        if (str && str !== 'null' && str !== 'undefined') return str;
+      }
+    }
+    return null;
+  }
+
+  private collectPair(
+    raw: Record<string, unknown>,
+    map: Map<string, { kode: string | null; nama: string }>,
+    idCandidates: string[],
+    namaCandidates: string[],
+  ) {
+    const nama = this.pickRaw(raw, namaCandidates);
+    if (!nama) return;
+    const kode = this.pickRaw(raw, idCandidates);
+    const key = this.normalizeText(nama);
+    if (!map.has(key)) map.set(key, { kode, nama });
+  }
+
+  private async upsertSimpleRefBulk(
+    model:
+      | 'refAgama'
+      | 'refStatusKawin'
+      | 'refJenisKelamin'
+      | 'refJenisAsn'
+      | 'refKedudukanHukum'
+      | 'refGolongan'
+      | 'refPendidikan',
+    pairs: Map<string, { kode: string | null; nama: string }>,
+  ): Promise<number> {
+    if (pairs.size === 0) return 0;
+
+    const delegate = (this.prisma[model] as unknown) as {
+      findMany(args: { select: { nama: true } }): Promise<{ nama: string }[]>;
+      createMany(args: { data: Array<{ id: string; kode: string | null; nama: string; isActive: boolean }> }): Promise<{ count: number }>;
+    };
+
+    const existing = await delegate.findMany({ select: { nama: true } });
+    const existingNames = new Set(existing.map((r) => this.normalizeText(r.nama)));
+
+    const newPairs = [...pairs.values()].filter(
+      (p) => !existingNames.has(this.normalizeText(p.nama)),
+    );
+
+    if (newPairs.length === 0) return 0;
+
+    await delegate.createMany({
+      data: newPairs.map((p) => ({
+        id: randomUUID(),
+        kode: p.kode,
+        nama: p.nama,
+        isActive: true,
+      })),
+    });
+
+    return newPairs.length;
+  }
+
+  private async upsertUnitKerjaBulk(
+    pairs: Map<string, { kode: string | null; nama: string }>,
+  ): Promise<number> {
+    if (pairs.size === 0) return 0;
+
+    let created = 0;
+    for (const [, pair] of pairs) {
+      const kode = pair.kode ?? this.normalizeText(pair.nama);
+      const existing = await this.prisma.unitKerja.findFirst({
+        where: { OR: [{ kode }, { nama: pair.nama }], deletedAt: null },
+        select: { id: true },
+      });
+      if (!existing) {
+        await this.prisma.unitKerja.create({
+          data: { id: randomUUID(), kode, nama: pair.nama, level: 1, isActive: true },
+        });
+        created++;
+      }
+    }
+    return created;
+  }
+
+  private readonly SIASN_JENIS_JABATAN_CODE_MAP: Record<string, string> = {
+    '1': 'STRUKTURAL',
+    '2': 'FUNGSIONAL',
+    '3': 'FUNGSIONAL',
+    '4': 'PELAKSANA',
+    'struktural': 'STRUKTURAL',
+    'fungsional': 'FUNGSIONAL',
+    'pelaksana': 'PELAKSANA',
+  };
+
+  private async upsertJenisJabatanBulk(
+    pairs: Map<string, { kode: string | null; nama: string }>,
+  ): Promise<number> {
+    if (pairs.size === 0) return 0;
+
+    const existing = await this.prisma.refJenisJabatan.findMany({
+      select: { kode: true, nama: true },
+    });
+    const existingNames = new Set(existing.map((r) => this.normalizeText(r.nama)));
+    const existingCodes = new Set(existing.map((r) => r.kode));
+
+    let created = 0;
+    for (const [, pair] of pairs) {
+      // Map SIASN numeric/raw codes to canonical codes
+      const rawKode = pair.kode?.trim().toLowerCase() ?? '';
+      const canonicalKode =
+        this.SIASN_JENIS_JABATAN_CODE_MAP[rawKode] ??
+        this.normalizeText(pair.nama).toUpperCase().replace(/\s+/g, '_');
+
+      if (existingCodes.has(canonicalKode) || existingNames.has(this.normalizeText(pair.nama))) continue;
+
+      await this.prisma.refJenisJabatan.upsert({
+        where: { kode: canonicalKode },
+        update: {},
+        create: { id: randomUUID(), kode: canonicalKode, nama: pair.nama, isActive: true },
+      });
+      created++;
+    }
+    return created;
+  }
+
+  private async upsertPendidikanTingkatBulk(
+    pairs: Map<string, { kode: string | null; nama: string }>,
+  ): Promise<{ created: number; idMap: Map<string, string> }> {
+    const idMap = new Map<string, string>();
+
+    if (pairs.size === 0) return { created: 0, idMap };
+
+    const existing = await this.prisma.refPendidikanTingkat.findMany({
+      select: { id: true, nama: true },
+    });
+
+    for (const r of existing) {
+      idMap.set(this.normalizeText(r.nama), r.id);
+    }
+
+    let created = 0;
+    for (const [normalizedNama, pair] of pairs) {
+      if (idMap.has(normalizedNama)) continue;
+
+      const record = await this.prisma.refPendidikanTingkat.create({
+        data: { id: randomUUID(), kode: pair.kode, nama: pair.nama, isActive: true },
+        select: { id: true },
+      });
+      idMap.set(normalizedNama, record.id);
+      created++;
+    }
+
+    return { created, idMap };
+  }
+
+  private async upsertPendidikanBulk(
+    pairs: Map<string, { kode: string | null; nama: string; tingkatNama: string | null; tingkatKode: string | null }>,
+    tingkatIdMap: Map<string, string>,
+  ): Promise<number> {
+    if (pairs.size === 0) return 0;
+
+    const existing = await this.prisma.refPendidikan.findMany({
+      select: { id: true, nama: true, tingkatPendidikanId: true },
+    });
+    const existingMap = new Map(existing.map((r) => [this.normalizeText(r.nama), r]));
+
+    let created = 0;
+    for (const [normalizedNama, pair] of pairs) {
+      const tingkatId = pair.tingkatNama
+        ? (tingkatIdMap.get(this.normalizeText(pair.tingkatNama)) ?? null)
+        : null;
+
+      const existingRow = existingMap.get(normalizedNama);
+      if (existingRow) {
+        if (tingkatId && !existingRow.tingkatPendidikanId) {
+          await this.prisma.refPendidikan.update({
+            where: { id: existingRow.id },
+            data: { tingkatPendidikanId: tingkatId },
+          });
+        }
+        continue;
+      }
+
+      await this.prisma.refPendidikan.create({
+        data: {
+          id: randomUUID(),
+          kode: pair.kode,
+          nama: pair.nama,
+          tingkatPendidikanId: tingkatId,
+          isActive: true,
+        },
+      });
+      created++;
+    }
+
+    return created;
   }
 }

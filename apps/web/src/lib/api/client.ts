@@ -44,6 +44,16 @@ function toQuery(params: Record<string, string | number | undefined>) {
   return serialized ? `?${serialized}` : '';
 }
 
+function appendQuery(path: string, params: Record<string, string | number | undefined>) {
+  const query = toQuery(params);
+
+  if (!query) {
+    return path;
+  }
+
+  return path.includes('?') ? `${path}&${query.slice(1)}` : `${path}${query}`;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = tokenStore.get();
@@ -144,8 +154,12 @@ export const apiClient = {
     });
   },
 
-  async download(path: string, fileName: string) {
-    const blob = await request<Blob>(path, {
+  async download(
+    path: string,
+    fileName: string,
+    params: Record<string, string | number | undefined> = {},
+  ) {
+    const blob = await request<Blob>(appendQuery(path, params), {
       method: 'GET',
     });
 

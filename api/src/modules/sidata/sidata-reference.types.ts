@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsNumberString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export const JENIS_JABATAN_KODE = {
   STRUKTURAL: 'STRUKTURAL',
@@ -53,3 +53,115 @@ export type NormalizedJabatanFilters = {
   page: number;
   limit: number;
 };
+
+export const SIDATA_GENERIC_REF_TYPE = {
+  GOLONGAN: 'GOLONGAN',
+  PANGKAT: 'PANGKAT',
+  PENDIDIKAN: 'PENDIDIKAN',
+  AGAMA: 'AGAMA',
+  JENIS_KELAMIN: 'JENIS_KELAMIN',
+  STATUS_KAWIN: 'STATUS_KAWIN',
+  KEDUDUKAN_HUKUM: 'KEDUDUKAN_HUKUM',
+  JENIS_ASN: 'JENIS_ASN',
+} as const;
+
+export type SidataGenericReferenceType = (typeof SIDATA_GENERIC_REF_TYPE)[keyof typeof SIDATA_GENERIC_REF_TYPE];
+
+export class SidataGenericReferenceQueryDto {
+  @IsNotEmpty()
+  @IsIn(Object.values(SIDATA_GENERIC_REF_TYPE))
+  type!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export type NormalizedGenericReferenceFilters = {
+  type: SidataGenericReferenceType;
+  q?: string;
+  isActive?: boolean;
+};
+
+export class SidataManualGenericReferenceDto {
+  @IsNotEmpty()
+  @IsIn(Object.values(SIDATA_GENERIC_REF_TYPE))
+  type!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  kode?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(200)
+  nama!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class SidataManualUnitDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(80)
+  kode!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(200)
+  nama!: string;
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
+  @IsOptional()
+  @IsNumberString({ no_symbols: true })
+  level?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class SidataManualJabatanDto {
+  @IsNotEmpty()
+  @IsString()
+  jenisJabatanId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  kode?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(300)
+  nama!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  rumpun?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  jenjang?: string;
+
+  @IsOptional()
+  @IsNumberString({ no_symbols: true })
+  kelasJabatan?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}

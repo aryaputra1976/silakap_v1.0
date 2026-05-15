@@ -49,6 +49,20 @@ export type AsnRecord = {
   tmtPensiun: string | null;
 };
 
+export type SidataAsnDocument = {
+  id: string;
+  asnId: string | null;
+  documentType: string;
+  fileName: string;
+  originalFileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  checksum: string | null;
+  version: number;
+  uploadedBy: string | null;
+  uploadedAt: string;
+};
+
 export type SiapCaseSummary = {
   id: string;
   caseNumber: string;

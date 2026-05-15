@@ -9,6 +9,7 @@ const unitSelect = {
   nama: true,
   parentId: true,
   level: true,
+  sortOrder: true,
   isActive: true,
 } satisfies Prisma.UnitKerjaSelect;
 
@@ -20,7 +21,92 @@ const asnInclude = {
       nama: true,
     },
   },
+  siasnProfile: {
+    select: {
+      email: true,
+      emailGov: true,
+      phone: true,
+      tempatLahirNama: true,
+      tanggalLahir: true,
+      jenisKelaminNama: true,
+      agamaNama: true,
+      statusKawinNama: true,
+      tmtPns: true,
+      tmtPensiun: true,
+    },
+  },
 } satisfies Prisma.AsnInclude;
+
+const asnAssignmentHistorySelect = {
+  id: true,
+  asnId: true,
+  sourceBatchId: true,
+  unitKerjaId: true,
+  siasnUnorId: true,
+  unorNama: true,
+  jabatanRefId: true,
+  siasnJabatanId: true,
+  jabatanNama: true,
+  jenisJabatanNama: true,
+  tmtJabatan: true,
+  effectiveDate: true,
+  syncedAt: true,
+  createdAt: true,
+  unitKerja: {
+    select: {
+      id: true,
+      kode: true,
+      nama: true,
+    },
+  },
+  sourceBatch: {
+    select: {
+      id: true,
+      fileName: true,
+      importType: true,
+      createdAt: true,
+    },
+  },
+} satisfies Prisma.AsnAssignmentHistorySelect;
+
+const asnGolonganHistorySelect = {
+  id: true,
+  asnId: true,
+  sourceBatchId: true,
+  golonganRefId: true,
+  siasnGolonganId: true,
+  golonganNama: true,
+  pangkatNama: true,
+  ruangNama: true,
+  tmtGolongan: true,
+  effectiveDate: true,
+  syncedAt: true,
+  createdAt: true,
+  sourceBatch: {
+    select: {
+      id: true,
+      fileName: true,
+      importType: true,
+      createdAt: true,
+    },
+  },
+} satisfies Prisma.AsnGolonganHistorySelect;
+
+const asnDocumentSelect = {
+  id: true,
+  asnId: true,
+  documentType: true,
+  fileName: true,
+  originalFileName: true,
+  storagePath: true,
+  mimeType: true,
+  fileSize: true,
+  checksum: true,
+  version: true,
+  uploadedBy: true,
+  uploadedAt: true,
+  createdAt: true,
+} satisfies Prisma.DocumentSelect;
 
 export type UnitKerjaRecord = Prisma.UnitKerjaGetPayload<{
   select: typeof unitSelect;
@@ -28,6 +114,19 @@ export type UnitKerjaRecord = Prisma.UnitKerjaGetPayload<{
 
 export type AsnRecord = Prisma.AsnGetPayload<{
   include: typeof asnInclude;
+}>;
+
+export type AsnAssignmentHistoryRecord =
+  Prisma.AsnAssignmentHistoryGetPayload<{
+    select: typeof asnAssignmentHistorySelect;
+  }>;
+
+export type AsnGolonganHistoryRecord = Prisma.AsnGolonganHistoryGetPayload<{
+  select: typeof asnGolonganHistorySelect;
+}>;
+
+export type AsnDocumentRecord = Prisma.DocumentGetPayload<{
+  select: typeof asnDocumentSelect;
 }>;
 
 @Injectable()
@@ -40,7 +139,7 @@ export class SidataRepository {
         deletedAt: null,
         isActive: true,
       },
-      orderBy: [{ level: 'asc' }, { kode: 'asc' }, { nama: 'asc' }],
+      orderBy: [{ sortOrder: 'asc' }, { level: 'asc' }, { kode: 'asc' }],
       select: unitSelect,
     });
   }
@@ -106,6 +205,96 @@ export class SidataRepository {
     });
   }
 
+  async updateAsn(
+    id: string,
+    data: Prisma.AsnUncheckedUpdateInput,
+  ): Promise<AsnRecord> {
+    return this.prisma.asn.update({
+      where: { id },
+      data,
+      include: asnInclude,
+    });
+  }
+
+  async findAsnExportPage(params: {
+    filters: NormalizedAsnFilters;
+    cursorId?: string;
+    take: number;
+  }): Promise<AsnRecord[]> {
+    return this.prisma.asn.findMany({
+      where: this.buildAsnWhere(params.filters),
+      include: asnInclude,
+      orderBy: [{ nama: 'asc' }, { nip: 'asc' }, { id: 'asc' }],
+      cursor: params.cursorId ? { id: params.cursorId } : undefined,
+      skip: params.cursorId ? 1 : 0,
+      take: params.take,
+    });
+  }
+
+  async findAsnAssignmentHistory(
+    asnId: string,
+  ): Promise<AsnAssignmentHistoryRecord[]> {
+    return this.prisma.asnAssignmentHistory.findMany({
+      where: {
+        asnId,
+        deletedAt: null,
+      },
+      orderBy: [
+        { effectiveDate: 'desc' },
+        { syncedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: asnAssignmentHistorySelect,
+    });
+  }
+
+  async findAsnGolonganHistory(
+    asnId: string,
+  ): Promise<AsnGolonganHistoryRecord[]> {
+    return this.prisma.asnGolonganHistory.findMany({
+      where: {
+        asnId,
+        deletedAt: null,
+      },
+      orderBy: [
+        { effectiveDate: 'desc' },
+        { syncedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: asnGolonganHistorySelect,
+    });
+  }
+
+  async findAsnDocuments(asnId: string): Promise<AsnDocumentRecord[]> {
+    return this.prisma.document.findMany({
+      where: { asnId, deletedAt: null },
+      orderBy: [{ uploadedAt: 'desc' }, { createdAt: 'desc' }],
+      select: asnDocumentSelect,
+    });
+  }
+
+  async findAsnDocumentById(id: string): Promise<AsnDocumentRecord | null> {
+    return this.prisma.document.findFirst({
+      where: { id, deletedAt: null, asnId: { not: null } },
+      select: asnDocumentSelect,
+    });
+  }
+
+  async createAsnDocument(data: Prisma.DocumentUncheckedCreateInput): Promise<AsnDocumentRecord> {
+    return this.prisma.document.create({
+      data,
+      select: asnDocumentSelect,
+    });
+  }
+
+  async softDeleteAsnDocument(id: string): Promise<AsnDocumentRecord> {
+    return this.prisma.document.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      select: asnDocumentSelect,
+    });
+  }
+
   private buildAsnWhere(filters: NormalizedAsnFilters): Prisma.AsnWhereInput {
     const where: Prisma.AsnWhereInput = {
       deletedAt: null,
@@ -120,7 +309,7 @@ export class SidataRepository {
     }
 
     if (filters.jenisAsn) {
-      where.jenisAsn = filters.jenisAsn;
+      where.jenisAsnNama = filters.jenisAsn;
     }
 
     if (filters.q) {
@@ -128,7 +317,8 @@ export class SidataRepository {
         { nip: { contains: filters.q } },
         { nik: { contains: filters.q } },
         { nama: { contains: filters.q } },
-        { email: { contains: filters.q } },
+        { siasnProfile: { email: { contains: filters.q } } },
+        { siasnProfile: { phone: { contains: filters.q } } },
         { jabatanNama: { contains: filters.q } },
       ];
     }

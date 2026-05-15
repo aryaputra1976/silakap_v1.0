@@ -1,4 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { EventsModule } from './events/events.module';
@@ -15,6 +17,11 @@ import { DmsModule } from './dms/dms.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{
+      name: 'upload',
+      ttl: 60_000,
+      limit: 10,
+    }]),
     PrismaModule,
     AnalyticsModule,
     AuthModule,
@@ -30,6 +37,9 @@ import { DmsModule } from './dms/dms.module';
   ],
   controllers: [
     HealthController,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule implements NestModule {

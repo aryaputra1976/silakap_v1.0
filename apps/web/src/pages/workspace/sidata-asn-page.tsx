@@ -3,7 +3,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  FileDown,
   FilePlus2,
+  Loader2,
   Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -58,6 +60,7 @@ export function SidataAsnPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [creatingId, setCreatingId] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const isMounted = useRef(true);
 
@@ -142,6 +145,25 @@ export function SidataAsnPage() {
     }
   }
 
+  async function handleExportCsv() {
+    setExporting(true);
+    setError('');
+
+    try {
+      await sidataApi.exportAsnCsv({ q, statusAsn, jenisAsn, unitKerjaId });
+    } catch (caught) {
+      if (isMounted.current) {
+        setError(
+          caught instanceof ApiError ? caught.message : 'Gagal export data ASN',
+        );
+      }
+    } finally {
+      if (isMounted.current) {
+        setExporting(false);
+      }
+    }
+  }
+
   function resetFilters() {
     setSearchInput('');
     setQ('');
@@ -170,6 +192,16 @@ export function SidataAsnPage() {
           total > 0 ? (
             <StatusBadge value={`${total} ASN`} tone="info" />
           ) : undefined
+        }
+        actions={
+          <ActionButton
+            disabled={exporting}
+            icon={exporting ? Loader2 : FileDown}
+            onClick={() => void handleExportCsv()}
+            variant="secondary"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </ActionButton>
         }
       />
 

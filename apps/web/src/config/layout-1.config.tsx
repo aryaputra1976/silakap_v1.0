@@ -67,7 +67,7 @@ export const MENU_SIDEBAR: MenuConfig = [
         title: 'Import & Sinkronisasi',
         children: [
           { title: 'Import SIASN', path: '/sidata/import/siasn' },
-          { title: 'Import Excel', path: '/sidata/import/excel' },
+          { title: 'Import Excel', disabled: true },
           { title: 'Import Referensi', path: '/sidata/import/referensi' },
           { title: 'Mapping Referensi', path: '/sidata/import/mapping-referensi' },
           { title: 'Riwayat Import', path: '/sidata/import/riwayat' },

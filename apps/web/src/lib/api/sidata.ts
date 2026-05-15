@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { AsnRecord, PaginatedResult } from './types';
+import type { AsnRecord, PaginatedResult, SidataAsnDocument } from './types';
 
 export type SidataUnitKerja = {
   id: string;
@@ -21,6 +21,68 @@ export type SidataAsnListQuery = {
   jenisAsn?: string;
   page?: number;
   limit?: number;
+};
+
+export type SidataUpdateAsnPayload = Partial<{
+  nipLama: string;
+  nik: string;
+  nama: string;
+  jenisAsn: string;
+  statusAsn: string;
+  unitKerjaId: string;
+  jabatanRefId: string;
+  jabatanNama: string;
+  golonganRefId: string;
+  golonganNama: string;
+  tmtJabatan: string;
+  tmtGolongan: string;
+  tmtPensiun: string;
+  isActive: boolean;
+}>;
+
+export type SidataAsnHistoryBatch = {
+  id: string;
+  fileName: string | null;
+  importType: string;
+  createdAt: string;
+};
+
+export type SidataAsnAssignmentHistory = {
+  id: string;
+  type: 'ASSIGNMENT';
+  unitKerjaId: string | null;
+  unitKerja: SidataUnitKerja | null;
+  siasnUnorId: string | null;
+  unorNama: string | null;
+  jabatanRefId: string | null;
+  siasnJabatanId: string | null;
+  jabatanNama: string | null;
+  jenisJabatanNama: string | null;
+  tmtJabatan: string | null;
+  effectiveDate: string | null;
+  syncedAt: string;
+  createdAt: string;
+  sourceBatch: SidataAsnHistoryBatch | null;
+};
+
+export type SidataAsnGolonganHistory = {
+  id: string;
+  type: 'GOLONGAN';
+  golonganRefId: string | null;
+  siasnGolonganId: string | null;
+  golonganNama: string | null;
+  pangkatNama: string | null;
+  ruangNama: string | null;
+  tmtGolongan: string | null;
+  effectiveDate: string | null;
+  syncedAt: string;
+  createdAt: string;
+  sourceBatch: SidataAsnHistoryBatch | null;
+};
+
+export type SidataAsnHistory = {
+  assignment: SidataAsnAssignmentHistory[];
+  golongan: SidataAsnGolonganHistory[];
 };
 
 export const SIDATA_STATUS_ASN_OPTIONS = [
@@ -52,6 +114,45 @@ export const sidataApi = {
     return apiClient.get<AsnRecord>(`/sidata/asn/${id}`);
   },
 
+  getAsnHistory(id: string): Promise<SidataAsnHistory> {
+    return apiClient.get<SidataAsnHistory>(`/sidata/asn/${id}/history`);
+  },
+
+  updateAsn(id: string, payload: SidataUpdateAsnPayload): Promise<AsnRecord> {
+    return apiClient.patch<AsnRecord>(`/sidata/asn/${id}`, payload);
+  },
+
+  getAsnDocuments(id: string): Promise<SidataAsnDocument[]> {
+    return apiClient.get<SidataAsnDocument[]>(`/sidata/asn/${id}/documents`);
+  },
+
+  uploadAsnDocument(id: string, file: File, documentType: string): Promise<SidataAsnDocument> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('documentType', documentType);
+    return apiClient.upload<SidataAsnDocument>(`/sidata/asn/${id}/documents`, form);
+  },
+
+  downloadAsnDocument(asnId: string, document: SidataAsnDocument) {
+    return apiClient.download(
+      `/sidata/asn/${asnId}/documents/${document.id}/download`,
+      document.originalFileName ?? document.fileName,
+    );
+  },
+
+  deleteAsnDocument(asnId: string, documentId: string): Promise<SidataAsnDocument> {
+    return apiClient.delete<SidataAsnDocument>(`/sidata/asn/${asnId}/documents/${documentId}`);
+  },
+
+  exportAsnCsv(query: SidataAsnListQuery) {
+    return apiClient.download('/sidata/asn/export', buildSidataAsnCsvFileName(), {
+      q: query.q,
+      unitKerjaId: query.unitKerjaId,
+      statusAsn: query.statusAsn,
+      jenisAsn: query.jenisAsn,
+    });
+  },
+
   getUnits(): Promise<SidataUnitKerja[]> {
     return apiClient.get<SidataUnitKerja[]>('/sidata/units');
   },
@@ -60,3 +161,7 @@ export const sidataApi = {
     return apiClient.get<SidataUnitTreeNode[]>('/sidata/units/tree');
   },
 };
+
+function buildSidataAsnCsvFileName() {
+  return `sidata-asn-${new Date().toISOString().slice(0, 10)}.csv`;
+}

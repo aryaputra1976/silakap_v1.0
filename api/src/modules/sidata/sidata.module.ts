@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { EventsModule } from '../events/events.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SidataImportController } from './sidata-import.controller';
 import { SidataImportRepository } from './sidata-import.repository';
@@ -12,7 +13,7 @@ import { SidataRepository } from './sidata.repository';
 import { SidataService } from './sidata.service';
 
 @Module({
-  imports: [AuthModule, PrismaModule],
+  imports: [AuthModule, PrismaModule, EventsModule],
   controllers: [SidataController, SidataReferenceController, SidataImportController],
   providers: [
     SidataRepository,

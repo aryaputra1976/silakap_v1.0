@@ -6,6 +6,7 @@ export const SIDATA_IMPORT_TYPE = {
   SIASN_REFERENCE_JABATAN_STRUKTURAL: 'SIASN_REFERENCE_JABATAN_STRUKTURAL',
   SIASN_REFERENCE_JABATAN_FUNGSIONAL: 'SIASN_REFERENCE_JABATAN_FUNGSIONAL',
   SIASN_REFERENCE_JABATAN_PELAKSANA: 'SIASN_REFERENCE_JABATAN_PELAKSANA',
+  SIASN_REFERENCE_JF_PROFILE: 'SIASN_REFERENCE_JF_PROFILE',
 } as const;
 
 export const SIDATA_IMPORT_STATUS = {
@@ -34,6 +35,7 @@ export const SIDATA_REFERENCE_TYPE = {
   JABATAN_STRUKTURAL: 'JABATAN_STRUKTURAL',
   JABATAN_FUNGSIONAL: 'JABATAN_FUNGSIONAL',
   JABATAN_PELAKSANA: 'JABATAN_PELAKSANA',
+  JF_PROFILE: 'JF_PROFILE',
 } as const;
 
 export const SIDATA_JENIS_JABATAN = {
@@ -70,6 +72,8 @@ export type ParsedReferenceJabatanRow = {
   sourceCode: string | null;
   sourceName: string | null;
   sourceDescription: string | null;
+  jenjang: string | null;
+  bup: string | null;
   rawData: Record<string, unknown>;
 };
 
@@ -114,6 +118,37 @@ export const SIDATA_COMMIT_ACTION = {
   UPDATED: 'UPDATED',
   SKIPPED: 'SKIPPED',
 } as const;
+
+// ─── Phase 3B: JF Profile Types ───────────────────────────────────────────────
+
+export type ParsedJfProfileRow = {
+  rowNumber: number;
+  namaJabatan: string | null;
+  jenjang: string | null;
+  namaLengkap: string | null;
+  rawData: Record<string, unknown>;
+};
+
+export type ValidatedJfProfileRow = ParsedJfProfileRow & {
+  validationStatus: SidataValidationStatus;
+  validationErrors: string[];
+  isDuplicate: boolean;
+  sourceName: string;
+  sourceDescription: string | null;
+};
+
+export type CommitJfProfileResult = {
+  batchId: string;
+  status: string;
+  totalRows: number;
+  committedRows: number;
+  matchedRows: number;
+  unmatchedRows: number;
+  createdRows: number;
+  updatedRows: number;
+  skippedRows: number;
+  invalidRows: number;
+};
 
 // ─── Phase 4: Generic Reference Types ─────────────────────────────────────────
 
@@ -188,7 +223,19 @@ export type CommitGenericReferenceResult = {
 
 export const SIDATA_ASN_IMPORT_TYPE = {
   SIASN_ASN: 'SIASN_ASN',
+  SIASN_ASN_PNS: 'SIASN_ASN_PNS',
+  SIASN_ASN_PPPK: 'SIASN_ASN_PPPK',
+  SIASN_ASN_PPPK_PARUH_WAKTU: 'SIASN_ASN_PPPK_PARUH_WAKTU',
 } as const;
+
+export const SIDATA_ASN_TIPE_PEGAWAI = {
+  PNS: 'PNS',
+  PPPK: 'PPPK',
+  PPPK_PARUH_WAKTU: 'PPPK_PARUH_WAKTU',
+} as const;
+
+export type SidataAsnTipePegawai =
+  (typeof SIDATA_ASN_TIPE_PEGAWAI)[keyof typeof SIDATA_ASN_TIPE_PEGAWAI];
 
 export const SIDATA_ASN_MAPPING_STATUS = {
   UNMAPPED: 'UNMAPPED',
@@ -198,6 +245,7 @@ export const SIDATA_ASN_MAPPING_STATUS = {
 } as const;
 
 export type SidataAsnUploadDto = {
+  tipePegawai?: string;
   note?: string;
 };
 
@@ -399,7 +447,25 @@ export const SIDATA_IMPORT_AUDIT_ACTION = {
   COMMIT_ASN: 'COMMIT_ASN',
   REMAP_ASN: 'REMAP_ASN',
   VIEW_ISSUES: 'VIEW_ISSUES',
+  EXTRACT_REFERENCES: 'EXTRACT_REFERENCES',
+  CANCEL_BATCH: 'CANCEL_BATCH',
 } as const;
+
+export type ExtractReferencesResult = {
+  batchId: string;
+  extracted: {
+    agama: number;
+    statusKawin: number;
+    jenisKelamin: number;
+    jenisAsn: number;
+    kedudukanHukum: number;
+    golongan: number;
+    pendidikanTingkat: number;
+    pendidikan: number;
+    jenisJabatan: number;
+  };
+  totalExtracted: number;
+};
 
 export type SidataImportAuditAction =
   (typeof SIDATA_IMPORT_AUDIT_ACTION)[keyof typeof SIDATA_IMPORT_AUDIT_ACTION];
@@ -425,10 +491,22 @@ export type SidataImportSummaryResponse = {
   updatedAt: string;
 };
 
+export type SidataStagingQueryDto = {
+  page?: string;
+  limit?: string;
+};
+
 export type SidataImportIssueQueryDto = {
   page?: string;
   limit?: string;
   status?: string;
+  q?: string;
+};
+
+export type SidataAsnReconciliationQueryDto = {
+  page?: string;
+  limit?: string;
+  type?: string;
   q?: string;
 };
 
@@ -464,6 +542,74 @@ export type PaginatedImportIssuesResponse = {
   total: number;
 };
 
+export type SidataAsnReconciliationType =
+  | 'ONLY_IN_BATCH'
+  | 'ONLY_IN_MASTER'
+  | 'DIFFERENT'
+  | 'SAME';
+
+export type SidataAsnReconciliationFieldDiff = {
+  field: 'unitKerja' | 'jabatan' | 'golongan' | 'statusAsn';
+  label: string;
+  master: string | null;
+  batch: string | null;
+};
+
+export type SidataAsnReconciliationRow = {
+  key: string;
+  type: SidataAsnReconciliationType;
+  nip: string | null;
+  nama: string | null;
+  batch: {
+    rowId: string;
+    rowNumber: number;
+    nama: string | null;
+    unitKerjaId: string | null;
+    unitKerjaNama: string | null;
+    jabatanNama: string | null;
+    golonganNama: string | null;
+    statusAsn: string | null;
+    mappingStatus: string;
+    validationStatus: string;
+  } | null;
+  master: {
+    asnId: string;
+    nama: string;
+    unitKerjaId: string | null;
+    unitKerjaNama: string | null;
+    jabatanNama: string | null;
+    golonganNama: string | null;
+    statusAsn: string | null;
+  } | null;
+  diffs: SidataAsnReconciliationFieldDiff[];
+};
+
+export type SidataAsnReconciliationSummary = {
+  batchId: string;
+  totalBatchRows: number;
+  totalMasterRows: number;
+  onlyInBatch: number;
+  onlyInMaster: number;
+  different: number;
+  same: number;
+  attentionRows: number;
+};
+
+export type SidataAsnReconciliationResponse = {
+  summary: SidataAsnReconciliationSummary;
+  items: SidataAsnReconciliationRow[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type PaginatedStagingResponse<T> = {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
 export type SidataImportAuditPayload = {
   action: SidataImportAuditAction;
   batchId: string;
@@ -474,4 +620,56 @@ export type SidataImportAuditPayload = {
 
 export type RemapSiasnAsnBatchResult = MapSiasnAsnBatchResult & {
   remapped: boolean;
+};
+
+export type SidataImportJobAction = 'MAP_ASN' | 'REMAP_ASN' | 'COMMIT_ASN';
+
+export type SidataImportJobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export type SidataImportJobResponse = {
+  jobId: string;
+  batchId: string;
+  action: SidataImportJobAction;
+  status: SidataImportJobStatus;
+  batchStatus: string;
+  message: string;
+};
+
+// ─── Phase 11A: Audit Log Query Types ─────────────────────────────────────────
+
+export type SidataAuditLogQueryDto = {
+  batchId?: string;
+  batchType?: string;
+  action?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: string;
+  limit?: string;
+};
+
+export type NormalizedAuditLogFilters = {
+  batchId?: string;
+  batchType?: string;
+  action?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page: number;
+  limit: number;
+};
+
+export type AuditLogRow = {
+  id: string;
+  batchId: string | null;
+  batchType: string | null;
+  action: string;
+  actorId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type PaginatedAuditLogResponse = {
+  items: AuditLogRow[];
+  page: number;
+  limit: number;
+  total: number;
 };
