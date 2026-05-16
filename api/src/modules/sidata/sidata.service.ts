@@ -15,6 +15,7 @@ import {
   SidataRepository,
   UnitKerjaRecord,
   type SidataAsnDocumentAuditAction,
+  type SidataAsnQualityBreakdownRecord,
 } from './sidata.repository';
 import {
   NormalizedAsnFilters,
@@ -26,6 +27,7 @@ import {
   SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
   SidataAsnDocumentUploadDto,
   SidataAccessScope,
+  SidataAsnQualityDashboardResponse,
   SidataAsnQueryDto,
   SidataUpdateAsnDto,
   UnitTreeNode,
@@ -187,6 +189,71 @@ export class SidataService {
       page: filters.page,
       limit: filters.limit,
       total: result.total,
+    };
+  }
+
+  async getAsnQualityDashboard(user: AuthUser): Promise<SidataAsnQualityDashboardResponse> {
+    const scope = this.getAccessScope(user);
+
+    if (scope === 'UNIT' && !user.unitKerjaId) {
+      throw new ForbiddenException('Akun belum memiliki unit kerja untuk melihat dashboard SIDATA');
+    }
+
+    const unitKerjaId = scope === 'UNIT' ? user.unitKerjaId ?? undefined : undefined;
+    const today = this.startOfUtcDay(new Date());
+    const bupUntil = this.addUtcMonths(today, 12);
+
+    const dashboard = await this.sidataRepository.getAsnQualityDashboard({
+      unitKerjaId,
+      today,
+      bupUntil,
+    });
+
+    const totalAsn = dashboard.aggregate.totalAsn;
+    const completeCoreRows = dashboard.aggregate.completeCoreRows;
+    const issueRows = Math.max(totalAsn - completeCoreRows, 0);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      scope: {
+        type: scope,
+        unitKerjaId: unitKerjaId ?? null,
+      },
+      period: {
+        today: today.toISOString(),
+        bupUntil: bupUntil.toISOString(),
+        bupWindowMonths: 12,
+      },
+      totals: {
+        totalAsn,
+        activeAsn: dashboard.aggregate.activeAsn,
+        inactiveAsn: dashboard.aggregate.inactiveAsn,
+        pns: dashboard.aggregate.pnsRows,
+        pppk: dashboard.aggregate.pppkRows,
+        pppkParuhWaktu: dashboard.aggregate.pppkParuhWaktuRows,
+      },
+      completeness: {
+        withoutUnitKerja: dashboard.aggregate.withoutUnitKerjaRows,
+        withoutJabatan: dashboard.aggregate.withoutJabatanRows,
+        withoutGolongan: dashboard.aggregate.withoutGolonganRows,
+        withoutNik: dashboard.aggregate.withoutNikRows,
+        withoutTanggalLahir: dashboard.aggregate.withoutTanggalLahirRows,
+        withoutTmtPensiun: dashboard.aggregate.withoutTmtPensiunRows,
+        withoutSiasnProfile: dashboard.aggregate.withoutSiasnProfileRows,
+      },
+      retirement: {
+        bupNext12Months: dashboard.aggregate.bupNext12MonthsRows,
+        bupOverdueActive: dashboard.aggregate.bupOverdueActiveRows,
+      },
+      quality: {
+        completeCoreRows,
+        issueRows,
+        qualityScore: this.toPercentage(completeCoreRows, totalAsn),
+      },
+      breakdown: {
+        byStatusAsn: this.toQualityBreakdownItems(dashboard.byStatusAsn, totalAsn),
+        byJenisAsn: this.toQualityBreakdownItems(dashboard.byJenisAsn, totalAsn),
+      },
     };
   }
 
@@ -677,6 +744,50 @@ export class SidataService {
       .replace(/\.\d{3}Z$/, 'Z');
 
     return `${prefix}-${timestamp}.xlsx`;
+  }
+
+  private startOfUtcDay(value: Date): Date {
+    return new Date(Date.UTC(
+      value.getUTCFullYear(),
+      value.getUTCMonth(),
+      value.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ));
+  }
+
+  private addUtcMonths(value: Date, months: number): Date {
+    const result = new Date(value.getTime());
+    result.setUTCMonth(result.getUTCMonth() + months);
+    return result;
+  }
+
+  private toPercentage(value: number, total: number): number {
+    if (total <= 0) return 0;
+    return Math.round((value / total) * 10_000) / 100;
+  }
+
+  private toQualityBreakdownItems(
+    rows: SidataAsnQualityBreakdownRecord[],
+    total: number,
+  ) {
+    return rows.map((row) => ({
+      key: row.label,
+      label: this.toQualityBreakdownLabel(row.label),
+      total: row.total,
+      percentage: this.toPercentage(row.total, total),
+    }));
+  }
+
+  private toQualityBreakdownLabel(value: string): string {
+    if (value === 'TIDAK_DIISI') return 'Tidak Diisi';
+    if (value === 'PPPK_PARUH_WAKTU') return 'PPPK Paruh Waktu';
+    return value
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
   }
 
   private getAccessScope(user: AuthUser): SidataAccessScope {

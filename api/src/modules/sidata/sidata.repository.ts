@@ -184,6 +184,62 @@ export type CreateSidataAsnDocumentAuditLogParams = {
   metadata?: Prisma.InputJsonValue;
 };
 
+type RawCountValue = number | bigint | null;
+
+type AsnQualityAggregateSqlRow = {
+  totalAsn: RawCountValue;
+  activeAsn: RawCountValue;
+  inactiveAsn: RawCountValue;
+  pnsRows: RawCountValue;
+  pppkRows: RawCountValue;
+  pppkParuhWaktuRows: RawCountValue;
+  withoutUnitKerjaRows: RawCountValue;
+  withoutJabatanRows: RawCountValue;
+  withoutGolonganRows: RawCountValue;
+  withoutNikRows: RawCountValue;
+  withoutTanggalLahirRows: RawCountValue;
+  withoutTmtPensiunRows: RawCountValue;
+  withoutSiasnProfileRows: RawCountValue;
+  bupNext12MonthsRows: RawCountValue;
+  bupOverdueActiveRows: RawCountValue;
+  completeCoreRows: RawCountValue;
+};
+
+type AsnQualityBreakdownSqlRow = {
+  label: string | null;
+  total: RawCountValue;
+};
+
+export type SidataAsnQualityAggregateRecord = {
+  totalAsn: number;
+  activeAsn: number;
+  inactiveAsn: number;
+  pnsRows: number;
+  pppkRows: number;
+  pppkParuhWaktuRows: number;
+  withoutUnitKerjaRows: number;
+  withoutJabatanRows: number;
+  withoutGolonganRows: number;
+  withoutNikRows: number;
+  withoutTanggalLahirRows: number;
+  withoutTmtPensiunRows: number;
+  withoutSiasnProfileRows: number;
+  bupNext12MonthsRows: number;
+  bupOverdueActiveRows: number;
+  completeCoreRows: number;
+};
+
+export type SidataAsnQualityBreakdownRecord = {
+  label: string;
+  total: number;
+};
+
+export type SidataAsnQualityDashboardRecord = {
+  aggregate: SidataAsnQualityAggregateRecord;
+  byStatusAsn: SidataAsnQualityBreakdownRecord[];
+  byJenisAsn: SidataAsnQualityBreakdownRecord[];
+};
+
 @Injectable()
 export class SidataRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -382,6 +438,185 @@ export class SidataRepository {
         afterData: metadata,
       },
     });
+  }
+
+  async getAsnQualityDashboard(params: {
+    unitKerjaId?: string;
+    today: Date;
+    bupUntil: Date;
+  }): Promise<SidataAsnQualityDashboardRecord> {
+    const whereSql = await this.buildAsnQualityWhereSql(params.unitKerjaId);
+
+    const aggregateRows = await this.prisma.$queryRaw<AsnQualityAggregateSqlRow[]>(Prisma.sql`
+      SELECT
+        COUNT(*) AS totalAsn,
+
+        SUM(CASE WHEN a.is_active = 1 THEN 1 ELSE 0 END) AS activeAsn,
+        SUM(CASE WHEN a.is_active = 0 THEN 1 ELSE 0 END) AS inactiveAsn,
+
+        SUM(CASE WHEN a.tipe_pegawai = 'PNS' THEN 1 ELSE 0 END) AS pnsRows,
+        SUM(CASE WHEN a.tipe_pegawai = 'PPPK' THEN 1 ELSE 0 END) AS pppkRows,
+        SUM(CASE WHEN a.tipe_pegawai = 'PPPK_PARUH_WAKTU' THEN 1 ELSE 0 END) AS pppkParuhWaktuRows,
+
+        SUM(CASE
+          WHEN a.unit_kerja_id IS NULL OR a.unit_kerja_id = '' THEN 1
+          ELSE 0
+        END) AS withoutUnitKerjaRows,
+
+        SUM(CASE
+          WHEN (a.jabatan_ref_id IS NULL OR a.jabatan_ref_id = '')
+           AND (a.jabatan_nama IS NULL OR a.jabatan_nama = '') THEN 1
+          ELSE 0
+        END) AS withoutJabatanRows,
+
+        SUM(CASE
+          WHEN (a.golongan_ref_id IS NULL OR a.golongan_ref_id = '')
+           AND (a.golongan_nama IS NULL OR a.golongan_nama = '') THEN 1
+          ELSE 0
+        END) AS withoutGolonganRows,
+
+        SUM(CASE
+          WHEN a.nik IS NULL OR a.nik = '' THEN 1
+          ELSE 0
+        END) AS withoutNikRows,
+
+        SUM(CASE
+          WHEN sp.id IS NULL OR sp.tanggal_lahir IS NULL THEN 1
+          ELSE 0
+        END) AS withoutTanggalLahirRows,
+
+        SUM(CASE
+          WHEN a.tmt_pensiun IS NULL THEN 1
+          ELSE 0
+        END) AS withoutTmtPensiunRows,
+
+        SUM(CASE
+          WHEN sp.id IS NULL THEN 1
+          ELSE 0
+        END) AS withoutSiasnProfileRows,
+
+        SUM(CASE
+          WHEN a.is_active = 1
+           AND a.tmt_pensiun IS NOT NULL
+           AND a.tmt_pensiun >= ${params.today}
+           AND a.tmt_pensiun <= ${params.bupUntil} THEN 1
+          ELSE 0
+        END) AS bupNext12MonthsRows,
+
+        SUM(CASE
+          WHEN a.is_active = 1
+           AND a.tmt_pensiun IS NOT NULL
+           AND a.tmt_pensiun < ${params.today} THEN 1
+          ELSE 0
+        END) AS bupOverdueActiveRows,
+
+        SUM(CASE
+          WHEN a.unit_kerja_id IS NOT NULL AND a.unit_kerja_id <> ''
+           AND (
+             (a.jabatan_ref_id IS NOT NULL AND a.jabatan_ref_id <> '')
+             OR (a.jabatan_nama IS NOT NULL AND a.jabatan_nama <> '')
+           )
+           AND (
+             (a.golongan_ref_id IS NOT NULL AND a.golongan_ref_id <> '')
+             OR (a.golongan_nama IS NOT NULL AND a.golongan_nama <> '')
+           )
+           AND a.nik IS NOT NULL AND a.nik <> ''
+           AND a.tmt_pensiun IS NOT NULL
+           AND sp.id IS NOT NULL
+           AND sp.tanggal_lahir IS NOT NULL THEN 1
+          ELSE 0
+        END) AS completeCoreRows
+
+      FROM asn a
+      LEFT JOIN asn_siasn_profile sp
+        ON sp.asn_id = a.id
+       AND sp.deleted_at IS NULL
+      WHERE ${whereSql}
+    `);
+
+    const statusRows = await this.prisma.$queryRaw<AsnQualityBreakdownSqlRow[]>(Prisma.sql`
+      SELECT
+        COALESCE(NULLIF(a.status_asn, ''), 'TIDAK_DIISI') AS label,
+        COUNT(*) AS total
+      FROM asn a
+      LEFT JOIN asn_siasn_profile sp
+        ON sp.asn_id = a.id
+       AND sp.deleted_at IS NULL
+      WHERE ${whereSql}
+      GROUP BY COALESCE(NULLIF(a.status_asn, ''), 'TIDAK_DIISI')
+      ORDER BY total DESC, label ASC
+    `);
+
+    const jenisRows = await this.prisma.$queryRaw<AsnQualityBreakdownSqlRow[]>(Prisma.sql`
+      SELECT
+        COALESCE(NULLIF(a.tipe_pegawai, ''), 'TIDAK_DIISI') AS label,
+        COUNT(*) AS total
+      FROM asn a
+      LEFT JOIN asn_siasn_profile sp
+        ON sp.asn_id = a.id
+       AND sp.deleted_at IS NULL
+      WHERE ${whereSql}
+      GROUP BY COALESCE(NULLIF(a.tipe_pegawai, ''), 'TIDAK_DIISI')
+      ORDER BY total DESC, label ASC
+    `);
+
+    const aggregate = aggregateRows[0];
+
+    return {
+      aggregate: this.toAsnQualityAggregateRecord(aggregate),
+      byStatusAsn: statusRows.map((row) => ({
+        label: row.label ?? 'TIDAK_DIISI',
+        total: this.toRawCountNumber(row.total),
+      })),
+      byJenisAsn: jenisRows.map((row) => ({
+        label: row.label ?? 'TIDAK_DIISI',
+        total: this.toRawCountNumber(row.total),
+      })),
+    };
+  }
+
+  private async buildAsnQualityWhereSql(unitKerjaId?: string): Promise<Prisma.Sql> {
+    const clauses: Prisma.Sql[] = [Prisma.sql`a.deleted_at IS NULL`];
+
+    if (unitKerjaId) {
+      const unitIds = await this.findUnitKerjaDescendantIds(unitKerjaId);
+      clauses.push(
+        Prisma.sql`a.unit_kerja_id IN (${Prisma.join(
+          unitIds.length > 0 ? unitIds : [unitKerjaId],
+        )})`,
+      );
+    }
+
+    return Prisma.join(clauses, ' AND ');
+  }
+
+  private toAsnQualityAggregateRecord(
+    row: AsnQualityAggregateSqlRow | undefined,
+  ): SidataAsnQualityAggregateRecord {
+    return {
+      totalAsn: this.toRawCountNumber(row?.totalAsn),
+      activeAsn: this.toRawCountNumber(row?.activeAsn),
+      inactiveAsn: this.toRawCountNumber(row?.inactiveAsn),
+      pnsRows: this.toRawCountNumber(row?.pnsRows),
+      pppkRows: this.toRawCountNumber(row?.pppkRows),
+      pppkParuhWaktuRows: this.toRawCountNumber(row?.pppkParuhWaktuRows),
+      withoutUnitKerjaRows: this.toRawCountNumber(row?.withoutUnitKerjaRows),
+      withoutJabatanRows: this.toRawCountNumber(row?.withoutJabatanRows),
+      withoutGolonganRows: this.toRawCountNumber(row?.withoutGolonganRows),
+      withoutNikRows: this.toRawCountNumber(row?.withoutNikRows),
+      withoutTanggalLahirRows: this.toRawCountNumber(row?.withoutTanggalLahirRows),
+      withoutTmtPensiunRows: this.toRawCountNumber(row?.withoutTmtPensiunRows),
+      withoutSiasnProfileRows: this.toRawCountNumber(row?.withoutSiasnProfileRows),
+      bupNext12MonthsRows: this.toRawCountNumber(row?.bupNext12MonthsRows),
+      bupOverdueActiveRows: this.toRawCountNumber(row?.bupOverdueActiveRows),
+      completeCoreRows: this.toRawCountNumber(row?.completeCoreRows),
+    };
+  }
+
+  private toRawCountNumber(value: RawCountValue | undefined): number {
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    return 0;
   }
 
   private async buildAsnWhere(filters: NormalizedAsnFilters): Promise<Prisma.AsnWhereInput> {

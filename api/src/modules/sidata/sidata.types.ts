@@ -67,6 +67,56 @@ export const SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME: Record<
 
 export type SidataAccessScope = 'ALL' | 'UNIT';
 
+export type SidataAsnQualityBreakdownItem = {
+  key: string;
+  label: string;
+  total: number;
+  percentage: number;
+};
+
+export type SidataAsnQualityDashboardResponse = {
+  generatedAt: string;
+  scope: {
+    type: SidataAccessScope;
+    unitKerjaId: string | null;
+  };
+  period: {
+    today: string;
+    bupUntil: string;
+    bupWindowMonths: number;
+  };
+  totals: {
+    totalAsn: number;
+    activeAsn: number;
+    inactiveAsn: number;
+    pns: number;
+    pppk: number;
+    pppkParuhWaktu: number;
+  };
+  completeness: {
+    withoutUnitKerja: number;
+    withoutJabatan: number;
+    withoutGolongan: number;
+    withoutNik: number;
+    withoutTanggalLahir: number;
+    withoutTmtPensiun: number;
+    withoutSiasnProfile: number;
+  };
+  retirement: {
+    bupNext12Months: number;
+    bupOverdueActive: number;
+  };
+  quality: {
+    completeCoreRows: number;
+    issueRows: number;
+    qualityScore: number;
+  };
+  breakdown: {
+    byStatusAsn: SidataAsnQualityBreakdownItem[];
+    byJenisAsn: SidataAsnQualityBreakdownItem[];
+  };
+};
+
 export class SidataAsnQueryDto {
   @IsOptional()
   @IsString()

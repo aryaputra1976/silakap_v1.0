@@ -56,6 +56,12 @@ export class SidataController {
     return ok(tree);
   }
 
+  @Get('dashboard/quality')
+  async getAsnQualityDashboard(@CurrentUser() user: AuthUser) {
+    const dashboard = await this.sidataService.getAsnQualityDashboard(user);
+    return ok(dashboard);
+  }
+
   @Get('asn')
   async findAsn(
     @Query() query: SidataAsnQueryDto,
