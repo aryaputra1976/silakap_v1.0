@@ -71,21 +71,20 @@ import {
   serializeCsvJson,
 } from './sidata-csv.util';
 
+type SidataAsnBackgroundJobSnapshot = {
+  jobId: string;
+  batchId: string;
+  action: SidataImportJobAction;
+  status: SidataImportJobStatus;
+  error?: string;
+  startedAt: Date;
+  finishedAt?: Date;
+};
+
 @Injectable()
 export class SidataImportService implements OnModuleInit {
   private readonly logger = new Logger(SidataImportService.name);
   private static readonly CSV_PAGE_SIZE = 1000;
-  private readonly asnJobs = new Map<
-    string,
-    {
-      batchId: string;
-      action: SidataImportJobAction;
-      status: SidataImportJobStatus;
-      error?: string;
-      startedAt: Date;
-      finishedAt?: Date;
-    }
-  >();
 
   constructor(
     @Inject(SidataImportRepository)
@@ -1776,15 +1775,16 @@ export class SidataImportService implements OnModuleInit {
     }
 
     const jobId = randomUUID();
-    this.asnJobs.set(jobId, {
+    const job: SidataAsnBackgroundJobSnapshot = {
+      jobId,
       batchId: params.batchId,
       action: params.action,
       status: 'QUEUED',
       startedAt: new Date(),
-    });
+    };
 
     setImmediate(() => {
-      void this.runAsnBackgroundJob(jobId, params.runner);
+      void this.runAsnBackgroundJob(job, params.runner);
     });
 
     return {
@@ -1798,49 +1798,62 @@ export class SidataImportService implements OnModuleInit {
   }
 
   private async runAsnBackgroundJob(
-    jobId: string,
+    job: SidataAsnBackgroundJobSnapshot,
     runner: () => Promise<unknown>,
   ): Promise<void> {
-    const job = this.asnJobs.get(jobId);
-    if (!job) return;
-
-    job.status = 'PROCESSING';
-    this.asnJobs.set(jobId, job);
+    const processingJob: SidataAsnBackgroundJobSnapshot = {
+      ...job,
+      status: 'PROCESSING',
+    };
 
     try {
       await runner();
-      job.status = 'COMPLETED';
-      job.finishedAt = new Date();
-      this.asnJobs.set(jobId, job);
-      await this.publishAsnJobNotification(job, true).catch((err) => {
+
+      const completedJob: SidataAsnBackgroundJobSnapshot = {
+        ...processingJob,
+        status: 'COMPLETED',
+        finishedAt: new Date(),
+      };
+
+      await this.publishAsnJobNotification(completedJob, true).catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Failed publishing SIDATA job success notification jobId=${jobId}: ${message}`);
+        this.logger.warn(
+          `Failed publishing SIDATA job success notification jobId=${completedJob.jobId}: ${message}`,
+        );
       });
-      this.logger.log(`SIDATA ASN background job completed jobId=${jobId} action=${job.action} batchId=${job.batchId}`);
+
+      this.logger.log(
+        `SIDATA ASN background job completed jobId=${completedJob.jobId} action=${completedJob.action} batchId=${completedJob.batchId}`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      job.status = 'FAILED';
-      job.error = message;
-      job.finishedAt = new Date();
-      this.asnJobs.set(jobId, job);
+
+      const failedJob: SidataAsnBackgroundJobSnapshot = {
+        ...processingJob,
+        status: 'FAILED',
+        error: message,
+        finishedAt: new Date(),
+      };
+
       if (message !== 'Batch belum aman untuk commit: masih ada invalid/needs review/unmapped rows.') {
-        await this.sidataImportRepository.markAsnBatchFailed({
-          batchId: job.batchId,
-          errorMessage: message,
-        }).catch(() => undefined);
+        await this.sidataImportRepository
+          .markAsnBatchFailed({
+            batchId: failedJob.batchId,
+            errorMessage: message,
+          })
+          .catch(() => undefined);
       }
-      await this.publishAsnJobNotification(job, false).catch(() => undefined);
-      this.logger.error(`SIDATA ASN background job failed jobId=${jobId} action=${job.action} batchId=${job.batchId}: ${message}`);
+
+      await this.publishAsnJobNotification(failedJob, false).catch(() => undefined);
+
+      this.logger.error(
+        `SIDATA ASN background job failed jobId=${failedJob.jobId} action=${failedJob.action} batchId=${failedJob.batchId}: ${message}`,
+      );
     }
   }
 
   private async publishAsnJobNotification(
-    job: {
-      batchId: string;
-      action: SidataImportJobAction;
-      status: SidataImportJobStatus;
-      error?: string;
-    },
+    job: SidataAsnBackgroundJobSnapshot,
     success: boolean,
   ): Promise<void> {
     const actionLabel: Record<SidataImportJobAction, string> = {
