@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { ArrowLeft, BriefcaseBusiness, FilePlus2, History, Save, SquarePen } from 'lucide-react';
 import { ApiError, apiClient } from '@/lib/api/client';
 import {
+  formatJenisAsn,
   sidataApi,
   type SidataAsnHistory,
 } from '@/lib/api/sidata';
@@ -271,7 +272,7 @@ export function SidataAsnDetailPage() {
                     : 'bg-purple-100 text-purple-700'
                 }`}
               >
-                {asn.jenisAsn}
+                {formatJenisAsn(asn.jenisAsn)}
               </span>
             ) : null}
             <StatusBadge value={asn.statusAsn ?? '-'} />
@@ -326,7 +327,7 @@ export function SidataAsnDetailPage() {
             <InfoRow label="NIP" value={asn.nip} />
             <InfoRow label="Jabatan" value={asn.jabatanNama} />
             <InfoRow label="Golongan" value={asn.golonganNama} />
-            <InfoRow label="Jenis ASN" value={asn.jenisAsn} />
+            <InfoRow label="Jenis ASN" value={formatJenisAsn(asn.jenisAsn)} />
             <InfoRow label="Status ASN" value={asn.statusAsn} />
             <InfoRow label="Unit Kerja" value={asn.unitKerja?.nama} />
             <InfoRow label="TMT Pensiun" value={formatDate(asn.tmtPensiun)} />
@@ -383,6 +384,7 @@ export function SidataAsnDetailPage() {
                 ) : (
                   <DataTable
                     items={history.assignment}
+                    empty="Belum ada riwayat jabatan"
                     rowKey={(item) => item.id}
                     columns={[
                       {
@@ -434,6 +436,7 @@ export function SidataAsnDetailPage() {
                 ) : (
                   <DataTable
                     items={history.golongan}
+                    empty="Belum ada riwayat golongan"
                     rowKey={(item) => item.id}
                     columns={[
                       {

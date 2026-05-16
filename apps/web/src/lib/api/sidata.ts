@@ -96,7 +96,12 @@ export const SIDATA_STATUS_ASN_OPTIONS = [
 export const SIDATA_JENIS_ASN_OPTIONS = [
   { value: 'PNS', label: 'PNS' },
   { value: 'PPPK', label: 'PPPK' },
+  { value: 'PPPK_PARUH_WAKTU', label: 'PPPK Paruh Waktu' },
 ] as const;
+
+export function formatJenisAsn(value: string | null | undefined) {
+  return SIDATA_JENIS_ASN_OPTIONS.find((option) => option.value === value)?.label ?? value ?? '-';
+}
 
 export const sidataApi = {
   getAsnList(query: SidataAsnListQuery): Promise<PaginatedResult<AsnRecord>> {
@@ -144,8 +149,8 @@ export const sidataApi = {
     return apiClient.delete<SidataAsnDocument>(`/sidata/asn/${asnId}/documents/${documentId}`);
   },
 
-  exportAsnCsv(query: SidataAsnListQuery) {
-    return apiClient.download('/sidata/asn/export', buildSidataAsnCsvFileName(), {
+  exportAsnExcel(query: SidataAsnListQuery) {
+    return apiClient.download('/sidata/asn/export', buildSidataAsnExcelFileName(), {
       q: query.q,
       unitKerjaId: query.unitKerjaId,
       statusAsn: query.statusAsn,
@@ -162,6 +167,6 @@ export const sidataApi = {
   },
 };
 
-function buildSidataAsnCsvFileName() {
-  return `sidata-asn-${new Date().toISOString().slice(0, 10)}.csv`;
+function buildSidataAsnExcelFileName() {
+  return `sidata-asn-${new Date().toISOString().slice(0, 10)}.xlsx`;
 }

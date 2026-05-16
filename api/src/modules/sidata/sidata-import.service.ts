@@ -1269,12 +1269,14 @@ export class SidataImportService implements OnModuleInit {
     ]);
     const hTmtJabatan = h(['tmt_jabatan', 'tmt jabatan']);
     const hNamaGolongan = h([
+      'gol akhir nama', 'golongan akhir nama',
+      'gol_akhir_nama', 'golongan_akhir_nama',
       'nama_golongan', 'golongan', 'nama golongan',
       'gol awal nama', 'golongan awal nama', 'gol_awal_nama', 'golongan_awal_nama',
-      'gol akhir nama', 'golongan akhir nama',
     ]);
     const hNamaRuang = h(['nama_ruang', 'ruang', 'nama ruang', 'pangkat', 'nama pangkat']);
     const hKdGolongan = h([
+      'gol akhir id', 'golongan akhir id', 'gol_akhir_id', 'golongan_akhir_id',
       'kd_golongan', 'kode_golongan', 'kd golongan', 'kode golongan',
       'gol awal id', 'golongan awal id', 'gol_awal_id', 'golongan_awal_id', 'gol id', 'kd gol',
     ]);

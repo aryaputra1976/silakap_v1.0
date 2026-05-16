@@ -1,20 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Eye,
   FileDown,
   FilePlus2,
+  Folder,
+  FolderOpen,
   Loader2,
   Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
+  formatJenisAsn,
   sidataApi,
   SIDATA_JENIS_ASN_OPTIONS,
   SIDATA_STATUS_ASN_OPTIONS,
-  type SidataUnitKerja,
+  type SidataUnitTreeNode,
 } from '@/lib/api/sidata';
 import type { AsnRecord, PaginatedResult, SipensiunCaseDetail } from '@/lib/api/types';
 import { apiClient } from '@/lib/api/client';
@@ -40,9 +44,47 @@ function JenisAsnBadge({ value }: { value: string | null }) {
           : 'bg-purple-100 text-purple-700'
       }`}
     >
-      {value}
+      {formatJenisAsn(value)}
     </span>
   );
+}
+
+type UnitTreeOption = {
+  id: string;
+  kode: string;
+  nama: string;
+  level: number;
+  path: string;
+};
+
+function flattenUnitTree(nodes: SidataUnitTreeNode[], parentPath = ''): UnitTreeOption[] {
+  return nodes.flatMap((node) => {
+    const path = parentPath ? `${parentPath} / ${node.nama}` : node.nama;
+    return [
+      {
+        id: node.id,
+        kode: node.kode,
+        nama: node.nama,
+        level: node.level,
+        path,
+      },
+      ...flattenUnitTree(node.children, path),
+    ];
+  });
+}
+
+function unitTreeMatches(node: SidataUnitTreeNode, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${node.nama} ${node.kode}`.toLowerCase();
+  return haystack.includes(query) || node.children.some((child) => unitTreeMatches(child, query));
+}
+
+function formatShortDate(value: string | null | undefined): string {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('id-ID', {
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export function SidataAsnPage() {
@@ -56,13 +98,17 @@ export function SidataAsnPage() {
   const [page, setPage] = useState(1);
 
   const [data, setData] = useState<PaginatedResult<AsnRecord> | null>(null);
-  const [units, setUnits] = useState<SidataUnitKerja[]>([]);
+  const [unitTree, setUnitTree] = useState<SidataUnitTreeNode[]>([]);
+  const [unitComboOpen, setUnitComboOpen] = useState(false);
+  const [unitSearch, setUnitSearch] = useState('');
+  const [expandedUnitIds, setExpandedUnitIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [creatingId, setCreatingId] = useState('');
   const [exporting, setExporting] = useState(false);
 
   const isMounted = useRef(true);
+  const unitComboRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
@@ -76,22 +122,33 @@ export function SidataAsnPage() {
     const timer = setTimeout(() => {
       setQ(searchInput);
       setPage(1);
-    }, 300);
+    }, 650);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Load unit kerja options once on mount
+  // Load unit kerja tree once on mount
   useEffect(() => {
     sidataApi
-      .getUnits()
+      .getUnitTree()
       .then((result) => {
         if (isMounted.current) {
-          setUnits(result);
+          setUnitTree(result);
         }
       })
       .catch(() => {
         // Unit list failure is non-critical; filter stays hidden
       });
+  }, []);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!unitComboRef.current?.contains(event.target as Node)) {
+        setUnitComboOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, []);
 
   // Fetch ASN list when any filter or page changes
@@ -145,12 +202,12 @@ export function SidataAsnPage() {
     }
   }
 
-  async function handleExportCsv() {
+  async function handleExportExcel() {
     setExporting(true);
     setError('');
 
     try {
-      await sidataApi.exportAsnCsv({ q, statusAsn, jenisAsn, unitKerjaId });
+      await sidataApi.exportAsnExcel({ q, statusAsn, jenisAsn, unitKerjaId });
     } catch (caught) {
       if (isMounted.current) {
         setError(
@@ -182,6 +239,75 @@ export function SidataAsnPage() {
   const canNext = data ? page * limit < total : false;
 
   const hasActiveFilter = !!(searchInput || statusAsn || jenisAsn || unitKerjaId);
+  const unitOptions = flattenUnitTree(unitTree);
+  const selectedUnit = unitOptions.find((unit) => unit.id === unitKerjaId);
+  const unitQuery = unitSearch.trim().toLowerCase();
+  const hasVisibleUnits = unitTree.some((node) => unitTreeMatches(node, unitQuery));
+
+  function toggleUnitNode(unitId: string) {
+    setExpandedUnitIds((current) => {
+      const next = new Set(current);
+      if (next.has(unitId)) {
+        next.delete(unitId);
+      } else {
+        next.add(unitId);
+      }
+      return next;
+    });
+  }
+
+  function selectUnit(unitId: string) {
+    setPage(1);
+    setUnitKerjaId(unitId);
+    setUnitSearch('');
+    setUnitComboOpen(false);
+  }
+
+  function renderUnitNode(node: SidataUnitTreeNode, depth = 0): ReactNode {
+    if (!unitTreeMatches(node, unitQuery)) return null;
+
+    const hasChildren = node.children.length > 0;
+    const isExpanded = unitQuery ? true : expandedUnitIds.has(node.id);
+    const isSelected = unitKerjaId === node.id;
+    const FolderIcon = isExpanded && hasChildren ? FolderOpen : Folder;
+
+    return (
+      <div key={node.id}>
+        <div
+          className={`flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-[#eef7ec] ${
+            isSelected ? 'bg-[#e7f4ef] text-[#0f766e]' : 'text-[#173c36]'
+          }`}
+          style={{ paddingLeft: `${8 + depth * 18}px` }}
+        >
+          <button
+            aria-label={isExpanded ? 'Tutup unit' : 'Buka unit'}
+            className={`flex size-6 shrink-0 items-center justify-center rounded hover:bg-[#dcebe0] ${
+              hasChildren ? 'visible' : 'invisible'
+            }`}
+            onClick={() => hasChildren && toggleUnitNode(node.id)}
+            type="button"
+          >
+            {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          </button>
+
+          <button
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-left"
+            onClick={() => selectUnit(node.id)}
+            type="button"
+          >
+            <FolderIcon className="size-4 shrink-0 text-[#c59a28]" />
+            <span className="truncate font-medium">{node.nama}</span>
+          </button>
+        </div>
+
+        {hasChildren && isExpanded ? (
+          <div>
+            {node.children.map((child) => renderUnitNode(child, depth + 1))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -197,10 +323,10 @@ export function SidataAsnPage() {
           <ActionButton
             disabled={exporting}
             icon={exporting ? Loader2 : FileDown}
-            onClick={() => void handleExportCsv()}
+            onClick={() => void handleExportExcel()}
             variant="secondary"
           >
-            {exporting ? 'Exporting...' : 'Export CSV'}
+            {exporting ? 'Exporting...' : 'Export Excel'}
           </ActionButton>
         }
       />
@@ -251,22 +377,64 @@ export function SidataAsnPage() {
             ))}
           </select>
 
-          {units.length > 0 && (
-            <select
-              className={inputClass}
-              value={unitKerjaId}
-              onChange={(event) => {
-                setPage(1);
-                setUnitKerjaId(event.target.value);
-              }}
-            >
-              <option value="">Semua unit kerja</option>
-              {units.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.nama}
-                </option>
-              ))}
-            </select>
+          {unitOptions.length > 0 && (
+            <div className="relative" ref={unitComboRef}>
+              <button
+                className={`${inputClass} flex w-full cursor-pointer items-center justify-between gap-3 text-left`}
+                onClick={() => setUnitComboOpen((current) => !current)}
+                type="button"
+              >
+                <span className="truncate">
+                  {selectedUnit ? selectedUnit.nama : 'Semua unit kerja'}
+                </span>
+                <ChevronDown
+                  className={`size-4 shrink-0 text-[#60705b] transition-transform ${
+                    unitComboOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {unitComboOpen ? (
+                <div className="absolute left-0 right-0 z-30 mt-2 rounded-lg border border-[#c9d9c4] bg-[#fbfdf8] p-2 shadow-xl">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      className={`${inputClass} h-10 w-full pl-9`}
+                      onChange={(event) => setUnitSearch(event.target.value)}
+                      placeholder="Cari unit kerja..."
+                      value={unitSearch}
+                    />
+                  </div>
+
+                  <div className="mt-2 max-h-80 overflow-auto rounded-md border border-[#d8e4d3] bg-white p-1">
+                    <button
+                      className={`flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-[#eef7ec] ${
+                        !unitKerjaId ? 'font-semibold text-[#0f766e]' : 'text-[#173c36]'
+                      }`}
+                      onClick={() => {
+                        setPage(1);
+                        setUnitKerjaId('');
+                        setUnitSearch('');
+                        setUnitComboOpen(false);
+                      }}
+                      type="button"
+                    >
+                      <span className="size-6 shrink-0" />
+                      <FolderOpen className="size-4 shrink-0 text-[#c59a28]" />
+                      <span className="truncate">Semua unit kerja</span>
+                    </button>
+
+                    {!hasVisibleUnits ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">
+                        Unit kerja tidak ditemukan.
+                      </div>
+                    ) : (
+                      unitTree.map((node) => renderUnitNode(node))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           )}
 
           {hasActiveFilter && (
@@ -309,6 +477,11 @@ export function SidataAsnPage() {
                   <div className="text-xs text-muted-foreground">
                     {item.jabatanNama ?? '-'}
                   </div>
+                  <div className="mt-1 text-xs text-[#60735b]">
+                    {[item.pendidikanTingkatNama ?? item.pendidikanNama, item.usia ? `${item.usia} th` : null]
+                      .filter(Boolean)
+                      .join(' · ') || '-'}
+                  </div>
                 </div>
               ),
             },
@@ -325,7 +498,17 @@ export function SidataAsnPage() {
             {
               key: 'golongan',
               header: 'Golongan',
-              render: (item) => item.golonganNama ?? '-',
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-[#173c36]">{item.golonganNama ?? '-'}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    TMT {formatShortDate(item.tmtGolongan)}
+                  </div>
+                  <div className="text-xs text-[#60735b]">
+                    MK {item.masaKerjaGolongan ?? '-'}
+                  </div>
+                </div>
+              ),
             },
             {
               key: 'status',

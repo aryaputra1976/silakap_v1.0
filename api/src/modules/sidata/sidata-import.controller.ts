@@ -67,7 +67,7 @@ export class SidataImportController {
 
   @Post('reference-jabatan/upload')
   @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPERATOR_IMPORT')
-  @Throttle({ upload: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -97,7 +97,7 @@ export class SidataImportController {
 
   @Post('reference/upload')
   @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPERATOR_IMPORT')
-  @Throttle({ upload: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -136,7 +136,7 @@ export class SidataImportController {
 
   @Post('reference-jf-profile/upload')
   @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPERATOR_IMPORT')
-  @Throttle({ upload: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -162,7 +162,7 @@ export class SidataImportController {
 
   @Post('asn/upload')
   @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPERATOR_IMPORT')
-  @Throttle({ upload: { limit: 3, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

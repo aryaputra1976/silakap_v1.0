@@ -3088,6 +3088,7 @@ export class SidataImportRepository {
     const siasnJabatanId = row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']);
     const siasnUnorId = row.kdUnor ?? this.rawString(raw, ['unor_id']);
     const siasnGolonganId = row.kdGolongan ?? row.kdGolonganSiasn ?? this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']);
+    const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
     const jenisAsnNama = row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']);
     const kedudukanHukumNama = row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']);
 
@@ -3118,7 +3119,7 @@ export class SidataImportRepository {
       tmtJabatan: row.tmtJabatan,
       golonganRefId: mappedData.golonganId ?? null,
       siasnGolonganId,
-      golonganNama: row.namaGolongan,
+      golonganNama: golonganAkhirNama,
       tmtGolongan: row.tmtGolongan,
       sourceBatchId: params.batchId ?? null,
       deletedAt: null,
@@ -3157,6 +3158,7 @@ export class SidataImportRepository {
     const siasnUnorId = row.kdUnor ?? this.rawString(raw, ['unor_id']);
     const siasnJabatanId = row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']);
     const siasnGolonganId = row.kdGolongan ?? row.kdGolonganSiasn ?? this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']);
+    const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
     const siasnPendidikanId = this.rawString(raw, ['pendidikan_id']);
     const siasnTingkatPendidikanId = this.rawString(raw, ['tingkat_pendidikan_id']);
 
@@ -3357,13 +3359,13 @@ export class SidataImportRepository {
     const golonganData = {
       golonganRefId: mappedData.golonganId ?? null,
       siasnGolonganId,
-      golonganNama: row.namaGolongan,
+      golonganNama: golonganAkhirNama,
       pangkatNama: row.namaRuang,
       ruangNama: row.namaRuang,
       siasnGolonganAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
       golonganAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
       siasnGolonganAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
-      golonganAkhirNama: row.namaGolongan,
+      golonganAkhirNama,
       tmtGolongan: row.tmtGolongan,
       mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
       mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
@@ -3449,6 +3451,8 @@ export class SidataImportRepository {
     tipePegawai: string | null,
     raw: Record<string, unknown>,
   ): Prisma.InputJsonValue {
+    const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
+
     return {
       identity: {
         nip: row.nip,
@@ -3485,7 +3489,7 @@ export class SidataImportRepository {
         golAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
         golAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
         golAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
-        golAkhirNama: row.namaGolongan,
+        golAkhirNama: golonganAkhirNama,
         tmtGolongan: row.tmtGolongan?.toISOString() ?? null,
         mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
         mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
@@ -3526,7 +3530,7 @@ export class SidataImportRepository {
       golAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
       golAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
       golAkhirId: this.rawString(raw, ['gol_akhir_id', 'golongan_akhir_id']),
-      golAkhirNama: row.namaGolongan,
+      golAkhirNama: this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan,
       tmtGolongan: row.tmtGolongan?.toISOString() ?? null,
       mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
       mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,

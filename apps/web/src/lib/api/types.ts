@@ -43,6 +43,14 @@ export type AsnRecord = {
   unitKerja: UnitKerjaSummary | null;
   jabatanNama: string | null;
   golonganNama: string | null;
+  jenisJabatanNama: string | null;
+  tmtJabatan: string | null;
+  tmtGolongan: string | null;
+  masaKerjaGolongan: string | null;
+  pendidikanNama: string | null;
+  pendidikanTingkatNama: string | null;
+  tahunLulus: number | null;
+  usia: number | null;
   jenisAsn: string | null;
   statusAsn: string | null;
   tanggalLahir: string | null;

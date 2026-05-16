@@ -65,7 +65,7 @@ export class SidataController {
     @Query() query: SidataAsnQueryDto,
     @CurrentUser() user: AuthUser,
   ) {
-    const result = await this.sidataService.exportAsnCsv(query, user);
+    const result = await this.sidataService.exportAsnExcel(query, user);
     return new StreamableFile(result.stream, {
       type: result.mimeType,
       disposition: `attachment; filename="${result.fileName}"`,

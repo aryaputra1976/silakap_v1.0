@@ -18,9 +18,9 @@ import { DmsModule } from './dms/dms.module';
 @Module({
   imports: [
     ThrottlerModule.forRoot([{
-      name: 'upload',
+      name: 'default',
       ttl: 60_000,
-      limit: 10,
+      limit: 120,
     }]),
     PrismaModule,
     AnalyticsModule,

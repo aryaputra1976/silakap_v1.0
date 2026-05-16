@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, extname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { Prisma } from '@prisma/client';
+import * as XLSX from 'xlsx';
 import { AuthUser } from '../auth/auth.types';
 import {
   AsnAssignmentHistoryRecord,
@@ -25,8 +26,6 @@ import {
   UnitTreeNode,
 } from './sidata.types';
 import {
-  buildCsvFileName,
-  createCsvStream,
   CsvExportResult,
   formatCsvDate,
   formatCsvDateTime,
@@ -58,6 +57,14 @@ type AsnResponse = {
   unitKerja: AsnUnitKerja | null;
   jabatanNama: string | null;
   golonganNama: string | null;
+  jenisJabatanNama: string | null;
+  tmtJabatan: string | null;
+  tmtGolongan: string | null;
+  masaKerjaGolongan: string | null;
+  pendidikanNama: string | null;
+  pendidikanTingkatNama: string | null;
+  tahunLulus: number | null;
+  usia: number | null;
   jenisAsn: string | null;
   statusAsn: string | null;
   tanggalLahir: string | null;
@@ -205,7 +212,7 @@ export class SidataService {
     if (dto.nama !== undefined) {
       data.namaSearch = this.normalizeSearchText(dto.nama);
     }
-    this.assignOptionalString(data, 'jenisAsnNama', dto.jenisAsn);
+    this.assignOptionalString(data, 'tipePegawai', dto.jenisAsn);
     this.assignOptionalString(data, 'statusAsn', dto.statusAsn);
     this.assignOptionalString(data, 'unitKerjaId', dto.unitKerjaId);
     this.assignOptionalString(data, 'jabatanRefId', dto.jabatanRefId);
@@ -312,20 +319,68 @@ export class SidataService {
     };
   }
 
-  async exportAsnCsv(
+  async exportAsnExcel(
     query: SidataAsnQueryDto,
     user: AuthUser,
   ): Promise<CsvExportResult> {
     const filters = this.normalizeAsnFilters(query, user);
+    const rows: unknown[][] = [];
+
+    for await (const row of this.generateAsnExportRows(filters)) {
+      rows.push(row);
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 34 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 34 },
+      { wch: 42 },
+      { wch: 36 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 20 },
+    ];
+
+    for (const column of ['A', 'B', 'C']) {
+      for (let rowIndex = 2; rowIndex <= rows.length; rowIndex += 1) {
+        const cell = worksheet[`${column}${rowIndex}`];
+        if (cell) {
+          cell.t = 's';
+          cell.z = '@';
+        }
+      }
+    }
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'ASN');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer;
 
     return {
-      stream: createCsvStream(this.generateAsnCsvRows(filters)),
-      mimeType: 'text/csv; charset=utf-8',
-      fileName: buildCsvFileName('sidata-asn'),
+      stream: Readable.from([buffer]),
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileName: this.buildExcelFileName('sidata-asn'),
     };
   }
 
-  private async *generateAsnCsvRows(
+  private async *generateAsnExportRows(
     filters: NormalizedAsnFilters,
   ): AsyncGenerator<unknown[]> {
     yield [
@@ -356,12 +411,12 @@ export class SidataService {
       'Synced At',
     ];
 
-    let cursorId: string | undefined;
+    let skip = 0;
 
     while (true) {
       const page = await this.sidataRepository.findAsnExportPage({
         filters,
-        cursorId,
+        skip,
         take: SidataService.CSV_PAGE_SIZE,
       });
 
@@ -375,7 +430,7 @@ export class SidataService {
           asn.nipLama,
           asn.nik,
           asn.nama,
-          asn.jenisAsnNama,
+          asn.tipePegawai ?? asn.jenisAsnNama,
           asn.statusAsn,
           asn.kedudukanHukumNama,
           asn.unitKerja?.kode,
@@ -383,7 +438,7 @@ export class SidataService {
           asn.jabatanNama,
           asn.jenisJabatanNama,
           formatCsvDate(asn.tmtJabatan),
-          asn.golonganNama,
+          this.getGolonganAkhirNama(asn),
           formatCsvDate(asn.tmtGolongan),
           asn.siasnProfile?.tempatLahirNama,
           formatCsvDate(asn.siasnProfile?.tanggalLahir),
@@ -399,8 +454,17 @@ export class SidataService {
         ];
       }
 
-      cursorId = page.at(-1)?.id;
+      skip += page.length;
     }
+  }
+
+  private buildExcelFileName(prefix: string): string {
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}Z$/, 'Z');
+
+    return `${prefix}-${timestamp}.xlsx`;
   }
 
   private getAccessScope(user: AuthUser): SidataAccessScope {
@@ -521,6 +585,108 @@ export class SidataService {
     };
   }
 
+  private getGolonganAkhirNama(asn: AsnRecord): string | null {
+    const latestGolongan = asn.golonganHistory[0];
+    const rawData = asn.siasnProfile?.rawData;
+    const raw =
+      rawData && typeof rawData === 'object' && !Array.isArray(rawData)
+        ? rawData as Record<string, unknown>
+        : {};
+
+    return (
+      this.formatGolonganSiasnKode(
+        latestGolongan?.siasnGolonganAkhirId
+        || this.pickJsonText(raw, ['gol_akhir_id', 'golongan_akhir_id', 'Gol Akhir ID', 'Golongan Akhir ID'])
+        || asn.siasnGolonganId,
+      )
+      || latestGolongan?.golonganAkhirNama?.trim()
+      || this.pickJsonText(raw, ['gol_akhir_nama', 'golongan_akhir_nama', 'Gol Akhir Nama', 'Golongan Akhir Nama'])
+      || latestGolongan?.golonganNama?.trim()
+      || asn.golonganNama
+    );
+  }
+
+  private formatGolonganSiasnKode(value: string | null | undefined): string | null {
+    const code = value?.trim();
+    if (!code) return null;
+
+    const map: Record<string, string> = {
+      '11': 'I/a',
+      '12': 'I/b',
+      '13': 'I/c',
+      '14': 'I/d',
+      '21': 'II/a',
+      '22': 'II/b',
+      '23': 'II/c',
+      '24': 'II/d',
+      '31': 'III/a',
+      '32': 'III/b',
+      '33': 'III/c',
+      '34': 'III/d',
+      '41': 'IV/a',
+      '42': 'IV/b',
+      '43': 'IV/c',
+      '44': 'IV/d',
+      '45': 'IV/e',
+    };
+
+    return map[code] ?? null;
+  }
+
+  private formatMasaKerja(asn: AsnRecord): string | null {
+    const latestGolongan = asn.golonganHistory[0];
+    if (latestGolongan?.mkTahun !== null && latestGolongan?.mkTahun !== undefined) {
+      const bulan = latestGolongan.mkBulan ?? 0;
+      return `${latestGolongan.mkTahun} tahun ${bulan} bulan`;
+    }
+
+    const tmt = asn.siasnProfile?.tmtPns ?? asn.tmtGolongan ?? asn.tmtJabatan;
+    if (!tmt) return null;
+
+    const now = new Date();
+    let years = now.getFullYear() - tmt.getFullYear();
+    let months = now.getMonth() - tmt.getMonth();
+    if (now.getDate() < tmt.getDate()) {
+      months -= 1;
+    }
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+
+    return years >= 0 ? `${years} tahun ${months} bulan` : null;
+  }
+
+  private calculateAge(birthDate: Date | null | undefined): number | null {
+    if (!birthDate) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birthDate.getFullYear();
+    const monthDelta = now.getMonth() - birthDate.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < birthDate.getDate())) {
+      age -= 1;
+    }
+    return age >= 0 ? age : null;
+  }
+
+  private pickJsonText(value: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const direct = value[key];
+      if (direct !== null && direct !== undefined) {
+        const text = String(direct).trim();
+        if (text) return text;
+      }
+
+      const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+      const normalized = value[normalizedKey];
+      if (normalized !== null && normalized !== undefined) {
+        const text = String(normalized).trim();
+        if (text) return text;
+      }
+    }
+
+    return null;
+  }
+
   private toAsnResponse(asn: AsnRecord): AsnResponse {
     return {
       id: asn.id,
@@ -532,8 +698,16 @@ export class SidataService {
       unitKerjaId: asn.unitKerjaId,
       unitKerja: asn.unitKerja,
       jabatanNama: asn.jabatanNama,
-      golonganNama: asn.golonganNama,
-      jenisAsn: asn.jenisAsnNama,
+      golonganNama: this.getGolonganAkhirNama(asn),
+      jenisJabatanNama: asn.jenisJabatanNama,
+      tmtJabatan: asn.tmtJabatan?.toISOString() ?? null,
+      tmtGolongan: asn.tmtGolongan?.toISOString() ?? null,
+      masaKerjaGolongan: this.formatMasaKerja(asn),
+      pendidikanNama: asn.pendidikanHistory[0]?.pendidikanNama ?? null,
+      pendidikanTingkatNama: asn.pendidikanHistory[0]?.tingkatPendidikanNama ?? null,
+      tahunLulus: asn.pendidikanHistory[0]?.tahunLulus ?? null,
+      usia: this.calculateAge(asn.siasnProfile?.tanggalLahir),
+      jenisAsn: asn.tipePegawai ?? asn.jenisAsnNama,
       statusAsn: asn.statusAsn,
       tanggalLahir: asn.siasnProfile?.tanggalLahir?.toISOString() ?? null,
       tmtPensiun: asn.tmtPensiun?.toISOString() ?? null,
@@ -570,7 +744,9 @@ export class SidataService {
       type: 'GOLONGAN',
       golonganRefId: item.golonganRefId,
       siasnGolonganId: item.siasnGolonganId,
-      golonganNama: item.golonganNama,
+      golonganNama: this.formatGolonganSiasnKode(item.siasnGolonganAkhirId)
+        ?? item.golonganAkhirNama
+        ?? item.golonganNama,
       pangkatNama: item.pangkatNama,
       ruangNama: item.ruangNama,
       tmtGolongan: item.tmtGolongan?.toISOString() ?? null,

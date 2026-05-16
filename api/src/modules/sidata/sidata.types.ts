@@ -10,7 +10,7 @@ export const SIDATA_STATUS_ASN_VALUES = [
 
 export type SidataStatusAsn = (typeof SIDATA_STATUS_ASN_VALUES)[number];
 
-export const SIDATA_JENIS_ASN_VALUES = ['PNS', 'PPPK'] as const;
+export const SIDATA_JENIS_ASN_VALUES = ['PNS', 'PPPK', 'PPPK_PARUH_WAKTU'] as const;
 
 export type SidataJenisAsn = (typeof SIDATA_JENIS_ASN_VALUES)[number];
 
