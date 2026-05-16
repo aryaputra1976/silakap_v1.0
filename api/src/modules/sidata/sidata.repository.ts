@@ -171,6 +171,19 @@ type OrderedAsnIdRow = {
   id: string;
 };
 
+export type SidataAsnDocumentAuditAction =
+  | 'SIDATA_ASN_DOCUMENT_UPLOAD'
+  | 'SIDATA_ASN_DOCUMENT_DOWNLOAD'
+  | 'SIDATA_ASN_DOCUMENT_DELETE';
+
+export type CreateSidataAsnDocumentAuditLogParams = {
+  action: SidataAsnDocumentAuditAction;
+  userId: string | null;
+  asnId: string;
+  documentId: string;
+  metadata?: Prisma.InputJsonValue;
+};
+
 @Injectable()
 export class SidataRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -341,6 +354,33 @@ export class SidataRepository {
       where: { id },
       data: { deletedAt: new Date() },
       select: asnDocumentSelect,
+    });
+  }
+
+  async createAsnDocumentAuditLog(
+    params: CreateSidataAsnDocumentAuditLogParams,
+  ): Promise<void> {
+    const metadata: Prisma.InputJsonObject = {
+      asnId: params.asnId,
+      documentId: params.documentId,
+    };
+
+    if (
+      params.metadata
+      && typeof params.metadata === 'object'
+      && !Array.isArray(params.metadata)
+    ) {
+      Object.assign(metadata, params.metadata);
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        performedBy: params.userId,
+        action: params.action,
+        entityType: 'SIDATA_ASN_DOCUMENT',
+        entityId: params.documentId,
+        afterData: metadata,
+      },
     });
   }
 

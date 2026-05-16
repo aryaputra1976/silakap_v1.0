@@ -14,6 +14,7 @@ import {
   AsnRecord,
   SidataRepository,
   UnitKerjaRecord,
+  type SidataAsnDocumentAuditAction,
 } from './sidata.repository';
 import {
   NormalizedAsnFilters,
@@ -281,6 +282,16 @@ export class SidataService {
       `uploadAsnDocument asnId=${asn.id} documentId=${document.id} actor=${params.user.id} mime=${file.mimetype} size=${file.size}`,
     );
 
+    await this.auditAsnDocumentAction({
+      action: 'SIDATA_ASN_DOCUMENT_UPLOAD',
+      user: params.user,
+      asnId: asn.id,
+      document,
+      extra: {
+        storagePath: document.storagePath,
+      },
+    });
+
     return this.toAsnDocumentResponse(document);
   }
 
@@ -291,8 +302,19 @@ export class SidataService {
   ): Promise<AsnDocumentDownload> {
     const asn = await this.sidataRepository.findAsnById(asnId.trim());
     this.assertAsnAccessible(asn, user);
+
     const document = await this.sidataRepository.findAsnDocumentById(documentId.trim());
-    if (!document || document.asnId !== asn.id) throw new NotFoundException('Dokumen ASN tidak ditemukan');
+
+    if (!document || document.asnId !== asn.id) {
+      throw new NotFoundException('Dokumen ASN tidak ditemukan');
+    }
+
+    await this.auditAsnDocumentAction({
+      action: 'SIDATA_ASN_DOCUMENT_DOWNLOAD',
+      user,
+      asnId: asn.id,
+      document,
+    });
 
     return {
       stream: createReadStream(resolve(process.cwd(), document.storagePath)),
@@ -307,11 +329,31 @@ export class SidataService {
     user: AuthUser,
   ): Promise<AsnDocumentResponse> {
     this.ensureCanMaintainAsn(user);
+
     const asn = await this.sidataRepository.findAsnById(asnId.trim());
     this.assertAsnAccessible(asn, user);
+
     const document = await this.sidataRepository.findAsnDocumentById(documentId.trim());
-    if (!document || document.asnId !== asn.id) throw new NotFoundException('Dokumen ASN tidak ditemukan');
-    return this.toAsnDocumentResponse(await this.sidataRepository.softDeleteAsnDocument(document.id));
+
+    if (!document || document.asnId !== asn.id) {
+      throw new NotFoundException('Dokumen ASN tidak ditemukan');
+    }
+
+    const deleted = await this.sidataRepository.softDeleteAsnDocument(document.id);
+
+    await this.auditAsnDocumentAction({
+      action: 'SIDATA_ASN_DOCUMENT_DELETE',
+      user,
+      asnId: asn.id,
+      document: deleted,
+      extra: {
+        previousFileName: document.fileName,
+        previousOriginalFileName: document.originalFileName,
+        previousChecksum: document.checksum,
+      },
+    });
+
+    return this.toAsnDocumentResponse(deleted);
   }
 
   private validateAsnDocumentFile(
@@ -439,6 +481,38 @@ export class SidataService {
 
   private isAllowedAsnDocumentExtension(value: string): boolean {
     return SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS.some((item) => item === value);
+  }
+
+  private async auditAsnDocumentAction(params: {
+    action: SidataAsnDocumentAuditAction;
+    user: AuthUser;
+    asnId: string;
+    document: AsnDocumentRecord;
+    extra?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.sidataRepository
+      .createAsnDocumentAuditLog({
+        action: params.action,
+        userId: params.user.id,
+        asnId: params.asnId,
+        documentId: params.document.id,
+        metadata: {
+          documentType: params.document.documentType,
+          fileName: params.document.fileName,
+          originalFileName: params.document.originalFileName,
+          mimeType: params.document.mimeType,
+          fileSize: params.document.fileSize,
+          checksum: params.document.checksum,
+          version: params.document.version,
+          ...params.extra,
+        },
+      })
+      .catch((caught: unknown) => {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        this.logger.warn(
+          `Failed creating SIDATA ASN document audit log action=${params.action} documentId=${params.document.id}: ${message}`,
+        );
+      });
   }
 
   async findAsnHistory(id: string, user: AuthUser): Promise<AsnHistoryResponse> {
