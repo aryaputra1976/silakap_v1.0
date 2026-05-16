@@ -14,7 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api/client';
+import { sidataImportApi } from '@/lib/api/sidata-import';
 import {
   buildImportAggregate,
   getBatchFileName,
@@ -128,10 +128,11 @@ export function SidataImportRiwayatPage() {
   async function loadBatches() {
     setLoading(true);
     setError('');
+
     try {
       const [asnResponse, referenceResponse] = await Promise.all([
-        apiClient.get<SidataBatchListResponse>('/sidata/import/asn-batches'),
-        apiClient.get<SidataBatchListResponse>('/sidata/import/reference-batches'),
+        sidataImportApi.listAsnBatches(),
+        sidataImportApi.listReferenceBatches(),
       ]);
 
       const merged = mergeImportBatches(asnResponse, referenceResponse);
@@ -153,12 +154,13 @@ export function SidataImportRiwayatPage() {
   async function loadSummary(batch: SidataImportBatchWithKind) {
     setLoadingSummary(true);
     setSummaryError('');
-    const endpoint =
-      batch.kind === 'ASN'
-        ? `/sidata/import/asn-batches/${batch.id}/summary`
-        : `/sidata/import/reference-batches/${batch.id}/summary`;
+
     try {
-      const result = await apiClient.get<SidataImportSummary>(endpoint);
+      const result =
+        batch.kind === 'ASN'
+          ? await sidataImportApi.getAsnBatchSummary(batch.id)
+          : await sidataImportApi.getReferenceBatchSummary(batch.id);
+
       setSummary(result);
     } catch (caught) {
       setSummary(null);

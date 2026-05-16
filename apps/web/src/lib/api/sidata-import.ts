@@ -5,12 +5,19 @@ export type SiasnImportBatch = {
   source: string;
   importType: string;
   fileName: string | null;
+  originalFileName?: string | null;
+  referenceType?: string | null;
+  jenisJabatan?: string | null;
   status: string;
   totalRows: number;
   validRows: number;
   invalidRows: number;
   duplicateRows: number;
   warningRows: number;
+  mappedRows?: number | null;
+  needsReviewRows?: number | null;
+  unmappedRows?: number | null;
+  committedRows?: number | null;
   importedById: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -52,7 +59,7 @@ export type SiasnImportIssueRow = {
   statusAsnNama: string | null;
   mappingStatus: string;
   validationStatus: string;
-  validationErrors: unknown;
+  validationErrors: string[] | string | null;
   matchedAsnId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -203,6 +210,23 @@ export type ReconciliationResponse = {
   total: number;
 };
 
+export type AuditLogRow = {
+  id: string;
+  action: string;
+  batchId: string | null;
+  batchType: string | null;
+  actorId: string | null;
+  metadata: unknown;
+  createdAt: string;
+};
+
+export type PaginatedAuditLogs = {
+  items: AuditLogRow[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
 type IssueQueryParams = {
   page?: number;
   limit?: number;
@@ -217,7 +241,19 @@ type ReconciliationQueryParams = {
   type?: ReconciliationType | '';
 };
 
+type AuditLogQueryParams = {
+  page?: number;
+  limit?: number;
+  action?: string;
+  batchId?: string;
+  batchType?: string;
+};
+
 export const sidataImportApi = {
+  // ─────────────────────────────────────────────
+  // ASN Upload & Batch
+  // ─────────────────────────────────────────────
+
   uploadAsnFile(file: File, tipePegawai: string): Promise<SiasnAsnUploadResult> {
     const form = new FormData();
     form.append('file', file);
@@ -249,26 +285,19 @@ export const sidataImportApi = {
     return apiClient.post<ImportJobResult>(`/sidata/import/asn-batches/${id}/commit`);
   },
 
+  cancelAsnBatch(id: string): Promise<{ batchId: string; status: string }> {
+    return apiClient.post(`/sidata/import/asn-batches/${id}/cancel`);
+  },
+
   extractReferences(id: string): Promise<ExtractReferencesResult> {
     return apiClient.post<ExtractReferencesResult>(
       `/sidata/import/asn-batches/${id}/extract-references`,
     );
   },
 
-  getAsnReconciliation(
-    id: string,
-    params?: ReconciliationQueryParams,
-  ): Promise<ReconciliationResponse> {
-    return apiClient.get<ReconciliationResponse>(
-      `/sidata/import/asn-batches/${id}/reconciliation`,
-      {
-        page: params?.page,
-        limit: params?.limit,
-        q: params?.q,
-        type: params?.type || undefined,
-      },
-    );
-  },
+  // ─────────────────────────────────────────────
+  // ASN Issues
+  // ─────────────────────────────────────────────
 
   getAsnIssues(id: string, params?: IssueQueryParams): Promise<PaginatedIssues> {
     return apiClient.get<PaginatedIssues>(`/sidata/import/asn-batches/${id}/issues`, {
@@ -276,6 +305,22 @@ export const sidataImportApi = {
       limit: params?.limit,
       q: params?.q,
       status: params?.status,
+    });
+  },
+
+  getAsnNeedsReview(id: string, params?: IssueQueryParams): Promise<PaginatedIssues> {
+    return apiClient.get<PaginatedIssues>(`/sidata/import/asn-batches/${id}/needs-review`, {
+      page: params?.page,
+      limit: params?.limit,
+      q: params?.q,
+    });
+  },
+
+  getAsnInvalid(id: string, params?: IssueQueryParams): Promise<PaginatedIssues> {
+    return apiClient.get<PaginatedIssues>(`/sidata/import/asn-batches/${id}/invalid`, {
+      page: params?.page,
+      limit: params?.limit,
+      q: params?.q,
     });
   },
 
@@ -301,23 +346,52 @@ export const sidataImportApi = {
     );
   },
 
-  getAsnNeedsReview(id: string, params?: IssueQueryParams): Promise<PaginatedIssues> {
-    return apiClient.get<PaginatedIssues>(`/sidata/import/asn-batches/${id}/needs-review`, {
-      page: params?.page,
-      limit: params?.limit,
-      q: params?.q,
-    });
+  // ─────────────────────────────────────────────
+  // Reconciliation
+  // ─────────────────────────────────────────────
+
+  getAsnReconciliation(
+    id: string,
+    params?: ReconciliationQueryParams,
+  ): Promise<ReconciliationResponse> {
+    return apiClient.get<ReconciliationResponse>(
+      `/sidata/import/asn-batches/${id}/reconciliation`,
+      {
+        page: params?.page,
+        limit: params?.limit,
+        q: params?.q,
+        type: params?.type || undefined,
+      },
+    );
   },
 
-  getAsnInvalid(id: string, params?: IssueQueryParams): Promise<PaginatedIssues> {
-    return apiClient.get<PaginatedIssues>(`/sidata/import/asn-batches/${id}/invalid`, {
-      page: params?.page,
-      limit: params?.limit,
-      q: params?.q,
-    });
+  // ─────────────────────────────────────────────
+  // Reference Batch
+  // ─────────────────────────────────────────────
+
+  listReferenceBatches(): Promise<SiasnImportBatch[]> {
+    return apiClient.get<SiasnImportBatch[]>('/sidata/import/reference-batches');
   },
 
-  cancelAsnBatch(id: string): Promise<{ batchId: string; status: string }> {
-    return apiClient.post(`/sidata/import/asn-batches/${id}/cancel`);
+  getReferenceBatch(id: string): Promise<SiasnImportBatch> {
+    return apiClient.get<SiasnImportBatch>(`/sidata/import/reference-batches/${id}`);
+  },
+
+  getReferenceBatchSummary(id: string): Promise<SiasnImportSummary> {
+    return apiClient.get<SiasnImportSummary>(`/sidata/import/reference-batches/${id}/summary`);
+  },
+
+  // ─────────────────────────────────────────────
+  // Audit Logs
+  // ─────────────────────────────────────────────
+
+  listAuditLogs(params?: AuditLogQueryParams): Promise<PaginatedAuditLogs> {
+    return apiClient.get<PaginatedAuditLogs>('/sidata/import/audit-logs', {
+      page: params?.page,
+      limit: params?.limit,
+      action: params?.action,
+      batchId: params?.batchId,
+      batchType: params?.batchType,
+    });
   },
 };

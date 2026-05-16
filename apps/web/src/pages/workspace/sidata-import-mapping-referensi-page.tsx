@@ -19,7 +19,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api/client';
+import { sidataImportApi } from '@/lib/api/sidata-import';
 import { sidataApi, type SidataUnitKerja } from '@/lib/api/sidata';
 import {
   getBatchFileName,
@@ -227,10 +227,13 @@ export function SidataImportMappingReferensiPage() {
   async function loadBatches() {
     setLoadingBatches(true);
     setBatchError('');
+
     try {
-      const response = await apiClient.get<SidataBatchListResponse>('/sidata/import/asn-batches');
-      const normalized = normalizeList(response).sort(sortByCreatedAtDesc);
+      const response = await sidataImportApi.listAsnBatches();
+      const normalized = [...response].sort(sortByCreatedAtDesc);
+
       setBatches(normalized);
+
       if (selectedBatch) {
         const updated = normalized.find((item) => item.id === selectedBatch.id);
         setSelectedBatch(updated ?? null);
@@ -245,10 +248,9 @@ export function SidataImportMappingReferensiPage() {
   async function loadSummary(batchId: string) {
     setLoadingSummary(true);
     setSummaryError('');
+
     try {
-      const result = await apiClient.get<SidataImportSummary>(
-        `/sidata/import/asn-batches/${batchId}/summary`,
-      );
+      const result = await sidataImportApi.getAsnBatchSummary(batchId);
       setSummary(result);
       setIssuePage(1);
       await loadIssues(batchId, issueTab, 1, issueQ);
@@ -263,18 +265,22 @@ export function SidataImportMappingReferensiPage() {
   async function loadIssues(batchId: string, tab: IssueTab, page: number, query: string) {
     setLoadingIssues(true);
     setIssuesError('');
-    const endpoint =
-      tab === 'issues'
-        ? `/sidata/import/asn-batches/${batchId}/issues`
-        : `/sidata/import/asn-batches/${batchId}/${tab}`;
-    const params: Record<string, string | number | undefined> = {
+
+    const params = {
       page,
       limit: ISSUE_LIMIT,
       q: query || undefined,
     };
+
     try {
-      const response = await apiClient.get<SidataIssueListResponse>(endpoint, params);
-      setIssues(normalizeList(response));
+      const response =
+        tab === 'issues'
+          ? await sidataImportApi.getAsnIssues(batchId, params)
+          : tab === 'needs-review'
+            ? await sidataImportApi.getAsnNeedsReview(batchId, params)
+            : await sidataImportApi.getAsnInvalid(batchId, params);
+
+      setIssues(response.items);
       setIssueTotal(getPaginationMeta(response).total);
     } catch (caught) {
       setIssues([]);
@@ -290,25 +296,30 @@ export function SidataImportMappingReferensiPage() {
       toast.error('Pilih batch ASN terlebih dahulu.');
       return;
     }
+
     if (action === 'commit' && !isCommitSafe(summary)) {
       toast.error(`Commit belum aman: ${getCommitBlockReason(summary)}.`);
       return;
     }
+
     if (action === 'commit') {
       const confirmed = window.confirm(
         `Commit batch ${shortId(selectedBatch.id)} ke data ASN utama? Pastikan semua issue sudah diselesaikan.`,
       );
+
       if (!confirmed) return;
     }
+
     setActionLoading(action);
-    const endpoint =
-      action === 'map'
-        ? `/sidata/import/asn-batches/${selectedBatch.id}/map`
-        : action === 'remap'
-          ? `/sidata/import/asn-batches/${selectedBatch.id}/remap`
-          : `/sidata/import/asn-batches/${selectedBatch.id}/commit`;
+
     try {
-      const result = await apiClient.post<SidataActionResult>(endpoint);
+      const result: SidataActionResult =
+        action === 'map'
+          ? await sidataImportApi.mapAsnBatch(selectedBatch.id)
+          : action === 'remap'
+            ? await sidataImportApi.remapAsnBatch(selectedBatch.id)
+            : await sidataImportApi.commitAsnBatch(selectedBatch.id);
+
       toast.success(
         result.message ??
           (action === 'map'
@@ -317,6 +328,7 @@ export function SidataImportMappingReferensiPage() {
               ? 'Remap ASN berhasil dijalankan.'
               : 'Commit ASN berhasil dijalankan.'),
       );
+
       await loadBatches();
       await loadSummary(selectedBatch.id);
     } catch (caught) {
@@ -384,14 +396,16 @@ export function SidataImportMappingReferensiPage() {
     }
 
     setSavingResolution(true);
+
     try {
-      await apiClient.post(
-        `/sidata/import/asn-batches/${selectedBatch.id}/issues/${resolvingIssue.id}/resolve-unit-kerja`,
-        { unitKerjaId: selectedUnitKerjaId },
-      );
+      await sidataImportApi.resolveUnitKerjaMapping(selectedBatch.id, resolvingIssue.id, {
+        unitKerjaId: selectedUnitKerjaId,
+      });
+
       toast.success('Mapping unit kerja disimpan.');
       setResolvingIssue(null);
       setSelectedUnitKerjaId('');
+
       await Promise.all([
         loadSummary(selectedBatch.id),
         loadIssues(selectedBatch.id, issueTab, issuePage, issueQ),
@@ -418,15 +432,13 @@ export function SidataImportMappingReferensiPage() {
           : undefined;
 
     setExportingIssues(true);
+
     try {
-      await apiClient.download(
-        `/sidata/import/asn-batches/${selectedBatch.id}/export-issues`,
-        `sidata-asn-issues-${shortId(selectedBatch.id)}-${new Date().toISOString().slice(0, 10)}.csv`,
-        {
-          q: issueQ || undefined,
-          status,
-        },
-      );
+      await sidataImportApi.exportAsnIssuesCsv(selectedBatch.id, {
+        q: issueQ || undefined,
+        status,
+      });
+
       toast.success('Export issue ASN berhasil dibuat.');
     } catch (caught) {
       toast.error(getErrorMessage(caught, 'Gagal export issue ASN'));
