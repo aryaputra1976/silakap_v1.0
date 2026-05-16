@@ -285,6 +285,7 @@ export type ParsedSiasnAsnRow = {
   kedudukanHukum: string | null;
   noSk: string | null;
   tanggalSk: Date | null;
+  dateParseErrors: string[];
   rawData: Record<string, unknown>;
 };
 

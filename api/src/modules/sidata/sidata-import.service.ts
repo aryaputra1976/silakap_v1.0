@@ -1349,44 +1349,57 @@ export class SidataImportService implements OnModuleInit {
       console.warn('[parseSiasnAsnExcel] Header tersedia:', headers.join(' | '));
     }
 
-    return rawRows.map((row, index) => ({
-      rowNumber: index + 2,
-      nip: this.pickString(row, hNip),
-      nipLama: this.pickString(row, hNipLama),
-      nama: this.pickString(row, hNama),
-      namaJabatan: this.pickString(row, hNamaJabatan),
-      jenisJabatan: this.pickString(row, hJenisJabatan),
-      kdJabatan: this.pickString(row, hKdJabatan),
-      kdJabatanSiasn: this.pickString(row, hKdJabatanSiasn),
-      tmtJabatan: this.pickDate(row, hTmtJabatan),
-      namaGolongan: this.pickString(row, hNamaGolongan),
-      namaRuang: this.pickString(row, hNamaRuang),
-      kdGolongan: this.pickString(row, hKdGolongan),
-      kdGolonganSiasn: this.pickString(row, hKdGolonganSiasn),
-      tmtGolongan: this.pickDate(row, hTmtGolongan),
-      masaKerjaGolongan: this.pickString(row, hMasaKerjaGol),
-      masaKerjaSeluruh: this.pickString(row, hMasaKerjaSeluruh),
-      namaUnorEselon1: this.pickString(row, hEselon1),
-      namaUnorEselon2: this.pickString(row, hEselon2),
-      namaUnorEselon3: this.pickString(row, hEselon3),
-      namaUnorEselon4: this.pickString(row, hEselon4),
-      kdUnor: this.pickString(row, hKdUnor),
-      tempatLahir: this.pickString(row, hTempatLahir),
-      tanggalLahir: this.pickDate(row, hTanggalLahir),
-      jenisKelamin: this.pickString(row, hJenisKelamin),
-      agama: this.pickString(row, hAgama),
-      statusKawin: this.pickString(row, hStatusKawin),
-      pendidikanTerakhir: this.pickString(row, hPendidikan),
-      namaSekolah: this.pickString(row, hNamaSekolah),
-      tmtPns: this.pickDate(row, hTmtPns),
-      tmtPensiun: this.pickDate(row, hTmtPensiun),
-      statusKepegawaian: this.pickString(row, hStatusKepeg),
-      jenisAsn: this.pickString(row, hJenisAsn),
-      kedudukanHukum: this.pickString(row, hKedudukanHukum),
-      noSk: this.pickString(row, hNoSk),
-      tanggalSk: this.pickDate(row, hTanggalSk),
-      rawData: this.cleanRawData(row),
-    }));
+    return rawRows.map((row, index) => {
+      const rowNumber = index + 2;
+      const dateParseErrors: string[] = [];
+      const pickDate = (header: string | null, fieldName: string): Date | null => {
+        const parsed = this.pickDate(row, header, fieldName, rowNumber);
+        if (header && parsed === null && this.hasDateCellValue(row[header])) {
+          dateParseErrors.push(`${fieldName} tidak valid`);
+        }
+        return parsed;
+      };
+
+      return {
+        rowNumber,
+        nip: this.pickString(row, hNip),
+        nipLama: this.pickString(row, hNipLama),
+        nama: this.pickString(row, hNama),
+        namaJabatan: this.pickString(row, hNamaJabatan),
+        jenisJabatan: this.pickString(row, hJenisJabatan),
+        kdJabatan: this.pickString(row, hKdJabatan),
+        kdJabatanSiasn: this.pickString(row, hKdJabatanSiasn),
+        tmtJabatan: pickDate(hTmtJabatan, 'TMT jabatan'),
+        namaGolongan: this.pickString(row, hNamaGolongan),
+        namaRuang: this.pickString(row, hNamaRuang),
+        kdGolongan: this.pickString(row, hKdGolongan),
+        kdGolonganSiasn: this.pickString(row, hKdGolonganSiasn),
+        tmtGolongan: pickDate(hTmtGolongan, 'TMT golongan'),
+        masaKerjaGolongan: this.pickString(row, hMasaKerjaGol),
+        masaKerjaSeluruh: this.pickString(row, hMasaKerjaSeluruh),
+        namaUnorEselon1: this.pickString(row, hEselon1),
+        namaUnorEselon2: this.pickString(row, hEselon2),
+        namaUnorEselon3: this.pickString(row, hEselon3),
+        namaUnorEselon4: this.pickString(row, hEselon4),
+        kdUnor: this.pickString(row, hKdUnor),
+        tempatLahir: this.pickString(row, hTempatLahir),
+        tanggalLahir: pickDate(hTanggalLahir, 'Tanggal lahir'),
+        jenisKelamin: this.pickString(row, hJenisKelamin),
+        agama: this.pickString(row, hAgama),
+        statusKawin: this.pickString(row, hStatusKawin),
+        pendidikanTerakhir: this.pickString(row, hPendidikan),
+        namaSekolah: this.pickString(row, hNamaSekolah),
+        tmtPns: pickDate(hTmtPns, 'TMT PNS'),
+        tmtPensiun: pickDate(hTmtPensiun, 'TMT pensiun'),
+        statusKepegawaian: this.pickString(row, hStatusKepeg),
+        jenisAsn: this.pickString(row, hJenisAsn),
+        kedudukanHukum: this.pickString(row, hKedudukanHukum),
+        noSk: this.pickString(row, hNoSk),
+        tanggalSk: pickDate(hTanggalSk, 'Tanggal SK'),
+        dateParseErrors,
+        rawData: this.cleanRawData(row),
+      };
+    });
   }
 
   private validateSiasnAsnRows(rows: ParsedSiasnAsnRow[]): ValidatedSiasnAsnRow[] {
@@ -1418,6 +1431,28 @@ export class SidataImportService implements OnModuleInit {
         seen.add(uniqueKey);
       }
 
+      if (row.dateParseErrors.includes('Tanggal lahir tidak valid')) {
+        validationErrors.push('Tanggal lahir tidak valid');
+      }
+
+      if (row.tanggalLahir) {
+        const now = new Date();
+        const today = this.dateOnlyUtc(
+          now.getUTCFullYear(),
+          now.getUTCMonth() + 1,
+          now.getUTCDate(),
+        );
+        const minimumBirthDate = this.dateOnlyUtc(1900, 1, 1);
+
+        if (row.tanggalLahir.getTime() > today.getTime()) {
+          validationErrors.push('Tanggal lahir tidak boleh lebih besar dari hari ini');
+        }
+
+        if (row.tanggalLahir.getTime() < minimumBirthDate.getTime()) {
+          validationErrors.push('Tanggal lahir di luar rentang wajar');
+        }
+      }
+
       let validationStatus: SidataValidationStatus = SIDATA_VALIDATION_STATUS.VALID;
 
       if (validationErrors.some((msg) => msg.includes('wajib') || msg.includes('harus'))) {
@@ -1435,23 +1470,128 @@ export class SidataImportService implements OnModuleInit {
     return this.toNullableString(row[header]);
   }
 
-  private pickDate(row: Record<string, unknown>, header: string | null): Date | null {
+  private pickDate(
+    row: Record<string, unknown>,
+    header: string | null,
+    fieldName = 'Tanggal',
+    rowNumber = 0,
+  ): Date | null {
     if (!header) return null;
-    return this.toNullableDate(row[header]);
+    return this.toNullableDate(row[header], fieldName, rowNumber);
   }
 
-  private toNullableDate(value: unknown): Date | null {
-    if (value === null || value === undefined) return null;
+  private toNullableDate(value: unknown, fieldName = 'Tanggal', rowNumber = 0): Date | null {
+    return this.parseExcelDateOnly(value, fieldName, rowNumber);
+  }
+
+  private parseExcelDateOnly(value: unknown, fieldName: string, rowNumber: number): Date | null {
+    void fieldName;
+    void rowNumber;
+
+    if (!this.hasDateCellValue(value)) return null;
 
     if (value instanceof Date) {
-      return isNaN(value.getTime()) ? null : value;
+      if (Number.isNaN(value.getTime())) return null;
+      return this.dateOnlyUtc(value.getFullYear(), value.getMonth() + 1, value.getDate());
     }
 
-    const str = String(value).trim();
-    if (!str) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const excelEpoch = Date.UTC(1899, 11, 30, 12, 0, 0);
+      const date = new Date(excelEpoch + Math.trunc(value) * 86_400_000);
+      return this.dateOnlyUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    }
 
-    const parsed = new Date(str);
-    return isNaN(parsed.getTime()) ? null : parsed;
+    if (typeof value !== 'string') return null;
+
+    const normalized = value.trim();
+    if (!normalized) return null;
+
+    if (/^\d+(\.\d+)?$/.test(normalized)) {
+      return this.parseExcelDateOnly(Number(normalized), fieldName, rowNumber);
+    }
+
+    const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/.exec(normalized);
+    if (iso) {
+      return this.buildDateFromParts(iso[1], iso[2], iso[3]);
+    }
+
+    const dayFirst = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(normalized);
+    if (dayFirst) {
+      const year = dayFirst[3].length === 2 ? `20${dayFirst[3]}` : dayFirst[3];
+      return this.buildDateFromParts(year, dayFirst[2], dayFirst[1]);
+    }
+
+    return this.parseIndonesianDateString(normalized);
+  }
+
+  private dateOnlyUtc(year: number, month: number, day: number): Date {
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  }
+
+  private isValidDateParts(year: number, month: number, day: number): boolean {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+
+    const date = this.dateOnlyUtc(year, month, day);
+    return (
+      date.getUTCFullYear() === year
+      && date.getUTCMonth() === month - 1
+      && date.getUTCDate() === day
+    );
+  }
+
+  private parseIndonesianDateString(value: string): Date | null {
+    const match = /^(\d{1,2})\s+([A-Za-zÀ-ÿ.]+)\s+(\d{4})$/i.exec(value.replace(/,/g, ' '));
+    if (!match) return null;
+
+    const monthName = match[2].toLowerCase().replace(/\./g, '');
+    const monthMap: Record<string, number> = {
+      januari: 1,
+      jan: 1,
+      februari: 2,
+      feb: 2,
+      maret: 3,
+      mar: 3,
+      april: 4,
+      apr: 4,
+      mei: 5,
+      juni: 6,
+      jun: 6,
+      juli: 7,
+      jul: 7,
+      agustus: 8,
+      agu: 8,
+      agt: 8,
+      aug: 8,
+      september: 9,
+      sep: 9,
+      oktober: 10,
+      okt: 10,
+      oct: 10,
+      november: 11,
+      nov: 11,
+      desember: 12,
+      des: 12,
+      dec: 12,
+    };
+
+    const month = monthMap[monthName];
+    if (!month) return null;
+
+    return this.buildDateFromParts(match[3], String(month), match[1]);
+  }
+
+  private buildDateFromParts(yearValue: string, monthValue: string, dayValue: string): Date | null {
+    const year = Number.parseInt(yearValue, 10);
+    const month = Number.parseInt(monthValue, 10);
+    const day = Number.parseInt(dayValue, 10);
+    return this.isValidDateParts(year, month, day) ? this.dateOnlyUtc(year, month, day) : null;
+  }
+
+  private hasDateCellValue(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    return true;
   }
 
   async enqueueMapSiasnAsnBatch(batchId: string): Promise<SidataImportJobResponse> {
@@ -1512,7 +1652,10 @@ export class SidataImportService implements OnModuleInit {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`commitSiasnAsnBatch failed batchId=${batch.id}: ${message}`);
-      if (message !== 'BATCH_ALREADY_PROCESSING_OR_COMMITTED') {
+      if (
+        message !== 'BATCH_ALREADY_PROCESSING_OR_COMMITTED'
+        && message !== 'Batch belum aman untuk commit: masih ada invalid/needs review/unmapped rows.'
+      ) {
         await this.sidataImportRepository.markAsnBatchFailed({ batchId: batch.id, errorMessage: message }).catch(() => undefined);
         await this.sidataImportRepository.createImportAuditLog({
           action: SIDATA_IMPORT_AUDIT_ACTION.COMMIT_ASN,
@@ -1680,10 +1823,12 @@ export class SidataImportService implements OnModuleInit {
       job.error = message;
       job.finishedAt = new Date();
       this.asnJobs.set(jobId, job);
-      await this.sidataImportRepository.markAsnBatchFailed({
-        batchId: job.batchId,
-        errorMessage: message,
-      }).catch(() => undefined);
+      if (message !== 'Batch belum aman untuk commit: masih ada invalid/needs review/unmapped rows.') {
+        await this.sidataImportRepository.markAsnBatchFailed({
+          batchId: job.batchId,
+          errorMessage: message,
+        }).catch(() => undefined);
+      }
       await this.publishAsnJobNotification(job, false).catch(() => undefined);
       this.logger.error(`SIDATA ASN background job failed jobId=${jobId} action=${job.action} batchId=${job.batchId}: ${message}`);
     }

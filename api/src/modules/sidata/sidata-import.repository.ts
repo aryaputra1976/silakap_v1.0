@@ -2892,6 +2892,37 @@ export class SidataImportRepository {
       select: asnImportStagingSelect,
     });
 
+    const unsafeRows = stagingRows.reduce(
+      (summary, row) => {
+        if (row.validationStatus === SIDATA_VALIDATION_STATUS.INVALID || !row.nip || !row.nama) {
+          summary.invalidRows += 1;
+        }
+        if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW) {
+          summary.needsReviewRows += 1;
+        } else if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.UNMAPPED || row.mappingStatus !== SIDATA_ASN_MAP_STATUS.MAPPED) {
+          summary.unmappedRows += 1;
+        }
+        return summary;
+      },
+      { invalidRows: 0, needsReviewRows: 0, unmappedRows: 0 },
+    );
+
+    if (
+      unsafeRows.invalidRows > 0
+      || unsafeRows.needsReviewRows > 0
+      || unsafeRows.unmappedRows > 0
+    ) {
+      await this.prisma.sidataAsnImportBatch.update({
+        where: { id: params.batchId },
+        data: {
+          status: SIDATA_IMPORT_STATUS.VALIDATED,
+          finishedAt: new Date(),
+          errorMessage: 'Batch belum aman untuk commit: masih ada invalid/needs review/unmapped rows.',
+        },
+      });
+      throw new Error('Batch belum aman untuk commit: masih ada invalid/needs review/unmapped rows.');
+    }
+
     let eligibleRows = 0;
     let committedRows = 0;
     let createdRows = 0;
@@ -2986,8 +3017,16 @@ export class SidataImportRepository {
 
       if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.NEEDS_REVIEW) {
         needsReviewRows += 1;
+        skippedRows += 1;
+        continue;
       } else if (row.mappingStatus === SIDATA_ASN_MAP_STATUS.UNMAPPED) {
         unmappedRows += 1;
+        skippedRows += 1;
+        continue;
+      } else if (row.mappingStatus !== SIDATA_ASN_MAP_STATUS.MAPPED) {
+        unmappedRows += 1;
+        skippedRows += 1;
+        continue;
       }
 
       eligibleRows += 1;
@@ -3590,7 +3629,7 @@ export class SidataImportRepository {
   }
 
   private stableStringify(value: unknown): string {
-    if (value instanceof Date) return JSON.stringify(value.toISOString());
+    if (value instanceof Date) return JSON.stringify(this.formatDateOnlyForChecksum(value));
     if (value === null || typeof value !== 'object') return JSON.stringify(value);
     if (Array.isArray(value)) return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
 
@@ -3599,6 +3638,13 @@ export class SidataImportRepository {
       .sort()
       .map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`)
       .join(',')}}`;
+  }
+
+  private formatDateOnlyForChecksum(value: Date): string {
+    const year = value.getUTCFullYear();
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private chunkArray<T>(items: T[], size: number): T[][] {
@@ -3629,9 +3675,96 @@ export class SidataImportRepository {
 
   private rawDate(raw: Record<string, unknown>, candidates: string[]): Date | null {
     const value = this.rawString(raw, candidates);
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    return this.parseDateOnly(value);
+  }
+
+  private parseDateOnly(value: unknown): Date | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null;
+      return this.dateOnlyUtc(value.getFullYear(), value.getMonth() + 1, value.getDate());
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const excelEpoch = Date.UTC(1899, 11, 30, 12, 0, 0);
+      const date = new Date(excelEpoch + Math.trunc(value) * 86_400_000);
+      return this.dateOnlyUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    }
+    if (typeof value !== 'string') return null;
+
+    const normalized = value.trim();
+    if (!normalized) return null;
+    if (/^\d+(\.\d+)?$/.test(normalized)) return this.parseDateOnly(Number(normalized));
+
+    const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/.exec(normalized);
+    if (iso) return this.buildDateFromParts(iso[1], iso[2], iso[3]);
+
+    const dayFirst = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(normalized);
+    if (dayFirst) {
+      const year = dayFirst[3].length === 2 ? `20${dayFirst[3]}` : dayFirst[3];
+      return this.buildDateFromParts(year, dayFirst[2], dayFirst[1]);
+    }
+
+    return this.parseIndonesianDateString(normalized);
+  }
+
+  private dateOnlyUtc(year: number, month: number, day: number): Date {
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  }
+
+  private buildDateFromParts(yearValue: string, monthValue: string, dayValue: string): Date | null {
+    const year = Number.parseInt(yearValue, 10);
+    const month = Number.parseInt(monthValue, 10);
+    const day = Number.parseInt(dayValue, 10);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    const date = this.dateOnlyUtc(year, month, day);
+    return date.getUTCFullYear() === year
+      && date.getUTCMonth() === month - 1
+      && date.getUTCDate() === day
+      ? date
+      : null;
+  }
+
+  private parseIndonesianDateString(value: string): Date | null {
+    const match = /^(\d{1,2})\s+([A-Za-zÀ-ÿ.]+)\s+(\d{4})$/i.exec(value.replace(/,/g, ' '));
+    if (!match) return null;
+
+    const monthName = match[2].toLowerCase().replace(/\./g, '');
+    const monthMap: Record<string, number> = {
+      januari: 1,
+      jan: 1,
+      februari: 2,
+      feb: 2,
+      maret: 3,
+      mar: 3,
+      april: 4,
+      apr: 4,
+      mei: 5,
+      juni: 6,
+      jun: 6,
+      juli: 7,
+      jul: 7,
+      agustus: 8,
+      agu: 8,
+      agt: 8,
+      aug: 8,
+      september: 9,
+      sep: 9,
+      oktober: 10,
+      okt: 10,
+      oct: 10,
+      november: 11,
+      nov: 11,
+      desember: 12,
+      des: 12,
+      dec: 12,
+    };
+
+    const month = monthMap[monthName];
+    if (!month) return null;
+
+    return this.buildDateFromParts(match[3], String(month), match[1]);
   }
 
   private parseMasaKerja(value: string | null | undefined): { tahun: number | null; bulan: number | null } {

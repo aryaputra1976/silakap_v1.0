@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import {
+  AlertTriangle,
   Ban,
   CheckCircle2,
   Database,
@@ -56,23 +57,30 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
     label: 'PNS',
     description: 'Pegawai Negeri Sipil',
     activeClass: 'border-blue-600 bg-blue-600 text-white',
-    inactiveClass: 'border-border bg-white text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700',
+    inactiveClass:
+      'border-border bg-white text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700',
   },
   {
     value: 'PPPK',
     label: 'PPPK',
     description: 'Pegawai Pemerintah dengan Perjanjian Kerja',
     activeClass: 'border-violet-600 bg-violet-600 text-white',
-    inactiveClass: 'border-border bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700',
+    inactiveClass:
+      'border-border bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700',
   },
   {
     value: 'PPPK_PARUH_WAKTU',
     label: 'PPPK Paruh Waktu',
     description: 'PPPK dengan jam kerja paruh waktu',
     activeClass: 'border-orange-500 bg-orange-500 text-white',
-    inactiveClass: 'border-border bg-white text-zinc-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700',
+    inactiveClass:
+      'border-border bg-white text-zinc-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700',
   },
 ];
+
+const BLOCKED_COMMIT_STATUSES = ['PROCESSING', 'COMMITTED', 'FAILED', 'CANCELLED'];
+
+const PAGE_SIZE = 20;
 
 function getTipePegawaiLabel(importType: string): string {
   if (importType === 'SIASN_ASN_PNS') return 'PNS';
@@ -88,7 +96,65 @@ function getTipePegawaiBadgeClass(importType: string): string {
   return 'bg-zinc-100 text-zinc-700';
 }
 
-const PAGE_SIZE = 20;
+function normalizeStatus(value: string | null | undefined): string {
+  return value?.trim().toUpperCase() ?? '';
+}
+
+function isAsnCommitSafe(summary: SiasnImportSummary | null): boolean {
+  if (!summary) return false;
+
+  const status = normalizeStatus(summary.status);
+
+  return (
+    summary.mappedRows > 0 &&
+    summary.invalidRows === 0 &&
+    summary.needsReviewRows === 0 &&
+    summary.unmappedRows === 0 &&
+    !BLOCKED_COMMIT_STATUSES.includes(status)
+  );
+}
+
+function getAsnCommitBlockReason(summary: SiasnImportSummary | null): string {
+  if (!summary) {
+    return 'Ringkasan batch belum tersedia.';
+  }
+
+  const status = normalizeStatus(summary.status);
+
+  if (status === 'PROCESSING') {
+    return 'Batch sedang diproses. Tunggu proses selesai sebelum commit.';
+  }
+
+  if (status === 'COMMITTED') {
+    return 'Batch sudah pernah dicommit ke database.';
+  }
+
+  if (status === 'FAILED') {
+    return 'Batch berstatus gagal dan tidak dapat dicommit.';
+  }
+
+  if (status === 'CANCELLED') {
+    return 'Batch sudah dibatalkan dan tidak dapat dicommit.';
+  }
+
+  if (summary.mappedRows <= 0) {
+    return 'Belum ada baris yang berhasil termapping. Jalankan Map Referensi terlebih dahulu.';
+  }
+
+  if (summary.invalidRows > 0) {
+    return `Masih ada ${summary.invalidRows} baris invalid yang harus diperbaiki.`;
+  }
+
+  if (summary.needsReviewRows > 0) {
+    return `Masih ada ${summary.needsReviewRows} baris yang perlu review manual.`;
+  }
+
+  if (summary.unmappedRows > 0) {
+    return `Masih ada ${summary.unmappedRows} baris yang belum termapping.`;
+  }
+
+  return 'Batch belum memenuhi syarat quality gate untuk commit.';
+}
 
 export function SidataImportSiasnPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +193,7 @@ export function SidataImportSiasnPage() {
       setIssues(null);
       return;
     }
+
     void loadSummary(selectedId);
     void loadIssues(selectedId, activeTab, 1, '');
     setIssuesPage(1);
@@ -142,15 +209,17 @@ export function SidataImportSiasnPage() {
 
   async function silentRefreshSummary() {
     if (!selectedId) return;
+
     try {
       const [freshSummary, freshBatches] = await Promise.all([
         sidataImportApi.getAsnBatchSummary(selectedId),
         sidataImportApi.listAsnBatches(),
       ]);
+
       setSummary(freshSummary);
       setBatches(freshBatches);
     } catch {
-      // silent
+      // Silent polling refresh.
     }
   }
 
@@ -158,13 +227,18 @@ export function SidataImportSiasnPage() {
 
   useEffect(() => {
     if (summaryStatus !== 'PROCESSING') return;
-    const timer = setInterval(() => { void asnPollRef.current?.(); }, 4_000);
+
+    const timer = setInterval(() => {
+      void asnPollRef.current?.();
+    }, 4_000);
+
     return () => clearInterval(timer);
   }, [summaryStatus]);
 
   async function loadBatches() {
     setBatchesLoading(true);
     setBatchesError(null);
+
     try {
       const data = await sidataImportApi.listAsnBatches();
       setBatches(data);
@@ -177,6 +251,7 @@ export function SidataImportSiasnPage() {
 
   async function loadSummary(id: string) {
     setSummaryLoading(true);
+
     try {
       const data = await sidataImportApi.getAsnBatchSummary(id);
       setSummary(data);
@@ -189,6 +264,7 @@ export function SidataImportSiasnPage() {
 
   async function loadIssues(id: string, tab: IssueTab, page: number, search: string) {
     setIssuesLoading(true);
+
     try {
       const params = { page, limit: PAGE_SIZE, q: search || undefined };
       const data =
@@ -197,6 +273,7 @@ export function SidataImportSiasnPage() {
           : tab === 'invalid'
             ? await sidataImportApi.getAsnInvalid(id, params)
             : await sidataImportApi.getAsnIssues(id, params);
+
       setIssues(data);
     } catch {
       setIssues(null);
@@ -207,14 +284,19 @@ export function SidataImportSiasnPage() {
 
   async function handleUpload() {
     if (!selectedFile || !tipePegawai) return;
+
     setUploading(true);
+
     try {
       const result = await sidataImportApi.uploadAsnFile(selectedFile, tipePegawai);
+
       toast.success(
         `Upload berhasil — ${result.totalRows} baris, ${result.validRows} valid, ${result.invalidRows} invalid`,
       );
+
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+
       await loadBatches();
       setSelectedId(result.batchId);
     } catch (err) {
@@ -226,16 +308,14 @@ export function SidataImportSiasnPage() {
 
   async function handleMap() {
     if (!selectedId) return;
+
     setMapping(true);
+
     try {
       const result = await sidataImportApi.mapAsnBatch(selectedId);
+
       toast.success(result.message ?? 'Mapping ASN diproses di background.');
-      await Promise.all([loadSummary(selectedId), loadBatches()]);
-      void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
-      return;
-      toast.success(
-        `Mapping selesai — ${result.mappedRows} mapped, ${result.needsReviewRows} perlu review, ${result.unmappedRows} unmapped`,
-      );
+
       await Promise.all([loadSummary(selectedId), loadBatches()]);
       void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
     } catch (err) {
@@ -247,16 +327,14 @@ export function SidataImportSiasnPage() {
 
   async function handleRemap() {
     if (!selectedId) return;
+
     setMapping(true);
+
     try {
       const result = await sidataImportApi.remapAsnBatch(selectedId);
+
       toast.success(result.message ?? 'Remap ASN diproses di background.');
-      await Promise.all([loadSummary(selectedId), loadBatches()]);
-      void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
-      return;
-      toast.success(
-        `Remap selesai — ${result.mappedRows} mapped, ${result.needsReviewRows} perlu review`,
-      );
+
       await Promise.all([loadSummary(selectedId), loadBatches()]);
       void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
     } catch (err) {
@@ -268,10 +346,13 @@ export function SidataImportSiasnPage() {
 
   async function handleExtractReferences() {
     if (!selectedId) return;
+
     setExtracting(true);
+
     try {
       const result = await sidataImportApi.extractReferences(selectedId);
       const { extracted, totalExtracted } = result;
+
       toast.success(
         `Ekstrak referensi selesai — ${totalExtracted} data baru: Agama ${extracted.agama}, Golongan ${extracted.golongan}, Jenis Jabatan ${extracted.jenisJabatan}, Jenis ASN ${extracted.jenisAsn}, dan lainnya.`,
       );
@@ -283,17 +364,28 @@ export function SidataImportSiasnPage() {
   }
 
   async function handleCommit() {
-    if (!selectedId) return;
+    if (!selectedId || !summary) return;
+
+    if (!isAsnCommitSafe(summary)) {
+      toast.error(`Commit belum aman: ${getAsnCommitBlockReason(summary)}`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Commit batch ${selectedId.slice(0, 8)}… ke database utama ASN? Pastikan data sudah direview dan siap disinkronkan.`,
+    );
+
+    if (!confirmed) return;
+
     setCommitting(true);
+
     try {
       const result = await sidataImportApi.commitAsnBatch(selectedId);
+
       toast.success(result.message ?? 'Commit ASN diproses di background.');
+
       await Promise.all([loadSummary(selectedId), loadBatches()]);
-      return;
-      toast.success(
-        `Commit selesai — ${result.committedRows} berhasil (${result.createdRows} baru, ${result.updatedRows} diperbarui)`,
-      );
-      await Promise.all([loadSummary(selectedId), loadBatches()]);
+      void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal commit batch');
     } finally {
@@ -303,14 +395,20 @@ export function SidataImportSiasnPage() {
 
   async function handleCancel() {
     if (!selectedId) return;
+
     const confirmed = window.confirm(
       'Batalkan batch import ini? Data staging akan dihapus dan batch tidak dapat dilanjutkan.',
     );
+
     if (!confirmed) return;
+
     setCancelling(true);
+
     try {
       await sidataImportApi.cancelAsnBatch(selectedId);
+
       toast.success('Batch ASN berhasil dibatalkan.');
+
       await Promise.all([loadSummary(selectedId), loadBatches()]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal membatalkan batch');
@@ -328,28 +426,32 @@ export function SidataImportSiasnPage() {
   function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();
     setIssuesPage(1);
+
     if (selectedId) {
       void loadIssues(selectedId, activeTab, 1, issuesSearch);
     }
   }
 
   const blockedStatuses = ['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'];
-  const canMap = summary ? !blockedStatuses.includes(summary.status) : false;
-  const canRemap = summary ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(summary.status) && summary.mappedRows > 0 : false;
-  const canCommit =
-    summary
-      ? summary.mappedRows > 0 && !['PROCESSING', 'COMMITTED', 'FAILED', 'CANCELLED'].includes(summary.status)
-      : false;
+  const canMap = summary ? !blockedStatuses.includes(normalizeStatus(summary.status)) : false;
+  const canRemap = summary
+    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(normalizeStatus(summary.status)) &&
+      summary.mappedRows > 0
+    : false;
+  const canCommit = isAsnCommitSafe(summary);
 
   const canExtract = summary
-    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(summary.status)
+    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(normalizeStatus(summary.status))
     : false;
 
   const canCancel = summary
-    ? !['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'].includes(summary.status)
+    ? !['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'].includes(
+        normalizeStatus(summary.status),
+      )
     : false;
 
   const isBusy = mapping || committing || cancelling || uploading || extracting;
+  const showQualityGateWarning = summary && !isAsnCommitSafe(summary);
 
   return (
     <div className="space-y-6">
@@ -381,7 +483,9 @@ export function SidataImportSiasnPage() {
                   )}
                 >
                   {opt.label}
-                  <span className="ml-1.5 text-xs font-normal opacity-75">— {opt.description}</span>
+                  <span className="ml-1.5 text-xs font-normal opacity-75">
+                    — {opt.description}
+                  </span>
                 </button>
               ))}
             </div>
@@ -431,11 +535,15 @@ export function SidataImportSiasnPage() {
           </div>
 
           {selectedFile && !tipePegawai && (
-            <p className="text-xs text-amber-600">Pilih jenis ASN (PNS / PPPK / PPPK Paruh Waktu) sebelum upload.</p>
+            <p className="text-xs text-amber-600">
+              Pilih jenis ASN (PNS / PPPK / PPPK Paruh Waktu) sebelum upload.
+            </p>
           )}
+
           {selectedFile && tipePegawai && (
             <p className="text-xs text-muted-foreground">
-              {selectedFile.name} — {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · Jenis: <strong>{getTipePegawaiLabel('SIASN_ASN_' + tipePegawai)}</strong>
+              {selectedFile.name} — {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · Jenis:{' '}
+              <strong>{getTipePegawaiLabel(`SIASN_ASN_${tipePegawai}`)}</strong>
             </p>
           )}
         </div>
@@ -445,7 +553,12 @@ export function SidataImportSiasnPage() {
       <SectionCard
         title="Riwayat Batch Import"
         actions={
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => void loadBatches()} disabled={batchesLoading}>
+          <ActionButton
+            variant="ghost"
+            icon={RefreshCw}
+            onClick={() => void loadBatches()}
+            disabled={batchesLoading}
+          >
             Refresh
           </ActionButton>
         }
@@ -467,7 +580,9 @@ export function SidataImportSiasnPage() {
                   <button
                     className={cn(
                       'font-mono text-xs underline transition-colors',
-                      selectedId === item.id ? 'text-zinc-900' : 'text-sky-700 hover:text-sky-900',
+                      selectedId === item.id
+                        ? 'text-zinc-900'
+                        : 'text-sky-700 hover:text-sky-900',
                     )}
                     onClick={() => setSelectedId(selectedId === item.id ? null : item.id)}
                   >
@@ -480,7 +595,12 @@ export function SidataImportSiasnPage() {
                 key: 'tipe',
                 header: 'Jenis ASN',
                 render: (item) => (
-                  <span className={cn('rounded px-2 py-0.5 text-xs font-semibold', getTipePegawaiBadgeClass(item.importType))}>
+                  <span
+                    className={cn(
+                      'rounded px-2 py-0.5 text-xs font-semibold',
+                      getTipePegawaiBadgeClass(item.importType),
+                    )}
+                  >
                     {getTipePegawaiLabel(item.importType)}
                   </span>
                 ),
@@ -489,7 +609,9 @@ export function SidataImportSiasnPage() {
               {
                 key: 'fileName',
                 header: 'File',
-                render: (item) => <span className="text-xs text-zinc-700">{item.fileName ?? '—'}</span>,
+                render: (item) => (
+                  <span className="text-xs text-zinc-700">{item.fileName ?? '—'}</span>
+                ),
               },
               {
                 key: 'status',
@@ -537,6 +659,7 @@ export function SidataImportSiasnPage() {
                         Memproses…
                       </span>
                     )}
+
                     {canExtract && (
                       <ActionButton
                         variant="secondary"
@@ -547,6 +670,7 @@ export function SidataImportSiasnPage() {
                         {extracting ? 'Mengekstrak…' : 'Ekstrak Referensi'}
                       </ActionButton>
                     )}
+
                     {canMap && (
                       <ActionButton
                         icon={mapping ? Loader2 : Network}
@@ -556,6 +680,7 @@ export function SidataImportSiasnPage() {
                         {mapping ? 'Mapping…' : 'Map Referensi'}
                       </ActionButton>
                     )}
+
                     {canRemap && (
                       <ActionButton
                         variant="secondary"
@@ -566,6 +691,11 @@ export function SidataImportSiasnPage() {
                         {mapping ? 'Remapping…' : 'Remap Ulang'}
                       </ActionButton>
                     )}
+
+                    {summary.mappedRows > 0 && !canCommit && (
+                      <StatusBadge value="Commit Belum Aman" tone="warning" />
+                    )}
+
                     {canCommit && (
                       <ActionButton
                         icon={committing ? Loader2 : Database}
@@ -575,6 +705,7 @@ export function SidataImportSiasnPage() {
                         {committing ? 'Committing…' : 'Commit ke Database'}
                       </ActionButton>
                     )}
+
                     {canCancel && (
                       <ActionButton
                         variant="secondary"
@@ -585,6 +716,7 @@ export function SidataImportSiasnPage() {
                         {cancelling ? 'Membatalkan…' : 'Batalkan'}
                       </ActionButton>
                     )}
+
                     {summary.status === 'COMMITTED' && (
                       <span className="inline-flex items-center gap-1.5 text-sm text-emerald-700">
                         <CheckCircle2 className="size-4" />
@@ -594,6 +726,35 @@ export function SidataImportSiasnPage() {
                   </div>
                 }
               >
+                {showQualityGateWarning ? (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <div>
+                        <div className="font-semibold">Quality gate belum terpenuhi</div>
+                        <div className="mt-1">{getAsnCommitBlockReason(summary)}</div>
+                        <div className="mt-2 text-xs text-amber-800">
+                          Selesaikan invalid, needs review, dan unmapped terlebih dahulu sebelum
+                          commit ke database utama ASN.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                      <div>
+                        <div className="font-semibold">Quality gate aman</div>
+                        <div className="mt-1">
+                          Batch sudah termapping dan tidak memiliki invalid, needs review, atau
+                          unmapped.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <StatCard label="Total Baris" value={summary.totalRows} />
                   <StatCard label="Valid" value={summary.validRows} tone="success" />
@@ -652,7 +813,9 @@ export function SidataImportSiasnPage() {
                           key: 'rowNumber',
                           header: '#',
                           render: (item) => (
-                            <span className="font-mono text-xs text-zinc-500">{item.rowNumber}</span>
+                            <span className="font-mono text-xs text-zinc-500">
+                              {item.rowNumber}
+                            </span>
                           ),
                           className: 'w-12',
                         },
@@ -708,16 +871,20 @@ export function SidataImportSiasnPage() {
                             const errors = Array.isArray(item.validationErrors)
                               ? (item.validationErrors as string[])
                               : [];
+
                             if (errors.length === 0) {
                               return <span className="text-xs text-zinc-400">—</span>;
                             }
+
                             return (
                               <ul className="space-y-0.5 text-xs text-rose-700">
-                                {errors.slice(0, 3).map((e, i) => (
-                                  <li key={i}>• {e}</li>
+                                {errors.slice(0, 3).map((error, index) => (
+                                  <li key={`${item.id}-${index}`}>• {error}</li>
                                 ))}
                                 {errors.length > 3 && (
-                                  <li className="text-zinc-500">+{errors.length - 3} lainnya</li>
+                                  <li className="text-zinc-500">
+                                    +{errors.length - 3} lainnya
+                                  </li>
                                 )}
                               </ul>
                             );
