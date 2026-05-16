@@ -29,6 +29,42 @@ export const SIDATA_ALL_ACCESS_ROLES = [
   'REVIEWER_MAPPING',
 ] as const;
 
+export const SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+export const SIDATA_ASN_DOCUMENT_ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const;
+
+export type SidataAsnDocumentAllowedMimeType =
+  (typeof SIDATA_ASN_DOCUMENT_ALLOWED_MIME_TYPES)[number];
+
+export const SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS = [
+  '.pdf',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.docx',
+  '.xlsx',
+] as const;
+
+export type SidataAsnDocumentAllowedExtension =
+  (typeof SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS)[number];
+
+export const SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME: Record<
+  SidataAsnDocumentAllowedMimeType,
+  SidataAsnDocumentAllowedExtension[]
+> = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+};
+
 export type SidataAccessScope = 'ALL' | 'UNIT';
 
 export class SidataAsnQueryDto {

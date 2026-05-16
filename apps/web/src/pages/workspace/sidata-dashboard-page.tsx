@@ -13,8 +13,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api/client';
-import type { AsnRecord, PaginatedResult } from '@/lib/api/types';
+import { sidataApi } from '@/lib/api/sidata';
+import { sidataImportApi } from '@/lib/api/sidata-import';
 import {
   buildImportAggregate,
   getBatchFileName,
@@ -23,7 +23,6 @@ import {
   mergeImportBatches,
   shortId,
   toNumber,
-  type SidataBatchListResponse,
   type SidataImportBatchWithKind,
 } from '@/lib/sidata';
 import {
@@ -38,8 +37,6 @@ import {
   StatusBadge,
   formatDateTime,
 } from '@/components/workspace/ui';
-
-type AsnListResponse = PaginatedResult<AsnRecord>;
 
 export function SidataDashboardPage() {
   const navigate = useNavigate();
@@ -60,11 +57,12 @@ export function SidataDashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     setError('');
+
     try {
       const [asnResponse, asnBatchResponse, referenceBatchResponse] = await Promise.all([
-        apiClient.get<AsnListResponse>('/sidata/asn', { page: 1, limit: 1 }),
-        apiClient.get<SidataBatchListResponse>('/sidata/import/asn-batches'),
-        apiClient.get<SidataBatchListResponse>('/sidata/import/reference-batches'),
+        sidataApi.getAsnList({ page: 1, limit: 1 }),
+        sidataImportApi.listAsnBatches(),
+        sidataImportApi.listReferenceBatches(),
       ]);
 
       setAsnTotal(asnResponse.total);
@@ -112,7 +110,6 @@ export function SidataDashboardPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Users}
@@ -171,7 +168,6 @@ export function SidataDashboardPage() {
         />
       </div>
 
-      {/* Quality detail + quick actions */}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
         <SectionCard
           title="Kualitas Import SIDATA"
@@ -248,26 +244,45 @@ export function SidataDashboardPage() {
           description="Shortcut operasional untuk admin data BKPSDM."
         >
           <div className="grid gap-3">
-            <ActionButton icon={Database} onClick={() => navigate('/sidata/asn')} variant="secondary">
+            <ActionButton
+              icon={Database}
+              onClick={() => navigate('/sidata/asn')}
+              variant="secondary"
+            >
               Buka Profil ASN
             </ActionButton>
-            <ActionButton icon={FileSpreadsheet} onClick={() => navigate('/sidata/import/siasn')} variant="secondary">
+            <ActionButton
+              icon={FileSpreadsheet}
+              onClick={() => navigate('/sidata/import/siasn')}
+              variant="secondary"
+            >
               Import Data SIASN
             </ActionButton>
-            <ActionButton icon={Layers3} onClick={() => navigate('/sidata/import/referensi')} variant="secondary">
+            <ActionButton
+              icon={Layers3}
+              onClick={() => navigate('/sidata/import/referensi')}
+              variant="secondary"
+            >
               Import Referensi
             </ActionButton>
-            <ActionButton icon={ShieldCheck} onClick={() => navigate('/sidata/import/mapping-referensi')} variant="secondary">
+            <ActionButton
+              icon={ShieldCheck}
+              onClick={() => navigate('/sidata/import/mapping-referensi')}
+              variant="secondary"
+            >
               Review Mapping
             </ActionButton>
-            <ActionButton icon={FolderSync} onClick={() => navigate('/sidata/import/riwayat')} variant="secondary">
+            <ActionButton
+              icon={FolderSync}
+              onClick={() => navigate('/sidata/import/riwayat')}
+              variant="secondary"
+            >
               Riwayat Import
             </ActionButton>
           </div>
         </SectionCard>
       </div>
 
-      {/* Recent batches */}
       <SectionCard
         title="Batch Import Terbaru"
         description="Daftar batch import terakhir untuk pemantauan cepat."

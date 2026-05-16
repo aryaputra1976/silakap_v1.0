@@ -21,7 +21,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { SidataService } from './sidata.service';
-import { SidataAsnDocumentUploadDto, SidataAsnQueryDto, SidataUpdateAsnDto } from './sidata.types';
+import {
+  SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
+  SidataAsnDocumentUploadDto,
+  SidataAsnQueryDto,
+  SidataUpdateAsnDto,
+} from './sidata.types';
 
 type SidataUploadedDocumentFile = {
   originalname: string;
@@ -91,7 +96,13 @@ export class SidataController {
   }
 
   @Post('asn/:id/documents')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
+      },
+    }),
+  )
   async uploadAsnDocument(
     @Param('id') id: string,
     @Body() body: SidataAsnDocumentUploadDto,

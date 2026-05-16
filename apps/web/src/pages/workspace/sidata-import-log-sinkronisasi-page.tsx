@@ -15,8 +15,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api/client';
-import type { PaginatedResult } from '@/lib/api/types';
+import { sidataImportApi, type AuditLogRow } from '@/lib/api/sidata-import';
 import { getErrorMessage, shortId } from '@/lib/sidata';
 import {
   ActionButton,
@@ -34,19 +33,8 @@ import {
   Toolbar,
 } from '@/components/workspace/ui';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type SidataImportAuditLog = {
-  id: string;
-  batchId: string | null;
-  batchType: string | null;
-  action: string;
-  actorId: string | null;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-};
-
 type BatchTypeFilter = '' | 'ASN' | 'REFERENCE';
+
 type ActionFilter =
   | ''
   | 'UPLOAD_REFERENCE'
@@ -55,9 +43,13 @@ type ActionFilter =
   | 'MAP_ASN'
   | 'COMMIT_ASN'
   | 'REMAP_ASN'
-  | 'VIEW_ISSUES';
+  | 'VIEW_ISSUES'
+  | 'CANCEL_BATCH';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+type ActionTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
+type BatchTypeTone = 'info' | 'dark' | 'neutral';
+
+const LIMIT = 20;
 
 const BATCH_TYPE_OPTIONS: Array<{ value: BatchTypeFilter; label: string }> = [
   { value: '', label: 'Semua jenis' },
@@ -71,20 +63,17 @@ const ACTION_OPTIONS: Array<{ value: ActionFilter; label: string }> = [
   { value: 'COMMIT_REFERENCE', label: 'COMMIT_REFERENCE' },
   { value: 'UPLOAD_ASN', label: 'UPLOAD_ASN' },
   { value: 'MAP_ASN', label: 'MAP_ASN' },
-  { value: 'COMMIT_ASN', label: 'COMMIT_ASN' },
   { value: 'REMAP_ASN', label: 'REMAP_ASN' },
+  { value: 'COMMIT_ASN', label: 'COMMIT_ASN' },
   { value: 'VIEW_ISSUES', label: 'VIEW_ISSUES' },
+  { value: 'CANCEL_BATCH', label: 'CANCEL_BATCH' },
 ];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-type ActionTone = 'info' | 'success' | 'warning' | 'neutral';
-type BatchTypeTone = 'info' | 'dark' | 'neutral';
 
 function actionTone(action: string): ActionTone {
   if (action.startsWith('UPLOAD')) return 'info';
   if (action.startsWith('COMMIT')) return 'success';
   if (action === 'MAP_ASN' || action === 'REMAP_ASN') return 'warning';
+  if (action === 'CANCEL_BATCH') return 'danger';
   return 'neutral';
 }
 
@@ -94,29 +83,47 @@ function batchTypeTone(batchType: string | null): BatchTypeTone {
   return 'neutral';
 }
 
-function metadataPreview(metadata: Record<string, unknown> | null): string {
-  if (!metadata) return '-';
-  const keys = Object.keys(metadata).length;
-  return keys === 0 ? '-' : `${keys} key${keys > 1 ? 's' : ''}`;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function metadataPreview(metadata: unknown): string {
+  if (!metadata) return '-';
+
+  if (isRecord(metadata)) {
+    const keys = Object.keys(metadata).length;
+    return keys === 0 ? '-' : `${keys} key${keys > 1 ? 's' : ''}`;
+  }
+
+  if (Array.isArray(metadata)) {
+    return `${metadata.length} item${metadata.length > 1 ? 's' : ''}`;
+  }
+
+  return String(metadata);
+}
+
+function stringifyMetadata(metadata: unknown): string {
+  if (!metadata) return '';
+
+  try {
+    return JSON.stringify(metadata, null, 2);
+  } catch {
+    return String(metadata);
+  }
+}
 
 export function SidataImportLogSinkronisasiPage() {
-  const [logs, setLogs] = useState<SidataImportAuditLog[]>([]);
+  const [logs, setLogs] = useState<AuditLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const limit = 20;
-  const [selectedLog, setSelectedLog] = useState<SidataImportAuditLog | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLogRow | null>(null);
 
-  // form state (updated as user types/selects)
   const [batchId, setBatchId] = useState('');
   const [batchType, setBatchType] = useState<BatchTypeFilter>('');
   const [action, setAction] = useState<ActionFilter>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // active state (applied to API call)
   const [activeBatchId, setActiveBatchId] = useState('');
   const [activeBatchType, setActiveBatchType] = useState<BatchTypeFilter>('');
   const [activeAction, setActiveAction] = useState<ActionFilter>('');
@@ -132,36 +139,50 @@ export function SidataImportLogSinkronisasiPage() {
   }, [page, activeBatchId, activeBatchType, activeAction, activeDateFrom, activeDateTo]);
 
   const stats = useMemo(() => {
-    const asnLogs = logs.filter((l) => l.batchType === 'ASN').length;
-    const referenceLogs = logs.filter((l) => l.batchType === 'REFERENCE').length;
-    const commitActions = logs.filter((l) => l.action.startsWith('COMMIT')).length;
-    const uploadActions = logs.filter((l) => l.action.startsWith('UPLOAD')).length;
+    const asnLogs = logs.filter((item) => item.batchType === 'ASN').length;
+    const referenceLogs = logs.filter((item) => item.batchType === 'REFERENCE').length;
+    const commitActions = logs.filter((item) => item.action.startsWith('COMMIT')).length;
+    const uploadActions = logs.filter((item) => item.action.startsWith('UPLOAD')).length;
     const mappingActions = logs.filter(
-      (l) => l.action === 'MAP_ASN' || l.action === 'REMAP_ASN',
+      (item) => item.action === 'MAP_ASN' || item.action === 'REMAP_ASN',
     ).length;
-    const viewIssues = logs.filter((l) => l.action === 'VIEW_ISSUES').length;
-    return { asnLogs, referenceLogs, commitActions, uploadActions, mappingActions, viewIssues };
+    const viewIssues = logs.filter((item) => item.action === 'VIEW_ISSUES').length;
+
+    return {
+      asnLogs,
+      referenceLogs,
+      commitActions,
+      uploadActions,
+      mappingActions,
+      viewIssues,
+    };
   }, [logs]);
 
   async function loadLogs() {
     setLoading(true);
     setError('');
+
     try {
-      const result = await apiClient.get<PaginatedResult<SidataImportAuditLog>>(
-        '/sidata/import/audit-logs',
-        {
-          batchId: activeBatchId || undefined,
-          batchType: activeBatchType || undefined,
-          action: activeAction || undefined,
-          dateFrom: activeDateFrom || undefined,
-          dateTo: activeDateTo || undefined,
-          page,
-          limit,
-        },
-      );
+      const result = await sidataImportApi.listAuditLogs({
+        batchId: activeBatchId || undefined,
+        batchType: activeBatchType || undefined,
+        action: activeAction || undefined,
+        dateFrom: activeDateFrom || undefined,
+        dateTo: activeDateTo || undefined,
+        page,
+        limit: LIMIT,
+      });
+
       setLogs(result.items);
       setTotal(result.total);
+
+      if (selectedLog) {
+        const stillExists = result.items.some((item) => item.id === selectedLog.id);
+        if (!stillExists) setSelectedLog(null);
+      }
     } catch (caught) {
+      setLogs([]);
+      setTotal(0);
       setError(getErrorMessage(caught, 'Gagal memuat log sinkronisasi'));
     } finally {
       setLoading(false);
@@ -169,11 +190,12 @@ export function SidataImportLogSinkronisasiPage() {
   }
 
   function handleSearch() {
-    setActiveBatchId(batchId);
+    setActiveBatchId(batchId.trim());
     setActiveBatchType(batchType);
     setActiveAction(action);
     setActiveDateFrom(dateFrom);
     setActiveDateTo(dateTo);
+    setSelectedLog(null);
     setPage(1);
   }
 
@@ -183,21 +205,23 @@ export function SidataImportLogSinkronisasiPage() {
     setAction('');
     setDateFrom('');
     setDateTo('');
+
     setActiveBatchId('');
     setActiveBatchType('');
     setActiveAction('');
     setActiveDateFrom('');
     setActiveDateTo('');
-    setPage(1);
+
     setSelectedLog(null);
+    setPage(1);
   }
 
-  function toggleSelectedLog(log: SidataImportAuditLog) {
-    setSelectedLog((prev) => (prev?.id === log.id ? null : log));
+  function toggleSelectedLog(log: AuditLogRow) {
+    setSelectedLog((current) => (current?.id === log.id ? null : log));
   }
 
   const canPrev = page > 1;
-  const canNext = page * limit < total;
+  const canNext = page * LIMIT < total;
 
   return (
     <div className="space-y-5">
@@ -291,31 +315,34 @@ export function SidataImportLogSinkronisasiPage() {
             className={inputClass}
             placeholder="Filter Batch ID…"
             value={batchId}
-            onChange={(e) => setBatchId(e.target.value)}
+            onChange={(event) => setBatchId(event.target.value)}
           />
+
           <select
             className={inputClass}
             value={batchType}
-            onChange={(e) => setBatchType(e.target.value as BatchTypeFilter)}
+            onChange={(event) => setBatchType(event.target.value as BatchTypeFilter)}
           >
-            {BATCH_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
+            {BATCH_TYPE_OPTIONS.map((option) => (
+              <option key={option.value || 'all'} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
+
           <select
             className={inputClass}
             value={action}
-            onChange={(e) => setAction(e.target.value as ActionFilter)}
+            onChange={(event) => setAction(event.target.value as ActionFilter)}
           >
-            {ACTION_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
+            {ACTION_OPTIONS.map((option) => (
+              <option key={option.value || 'all'} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
         </FilterBar>
+
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-zinc-600">Dari</label>
@@ -323,24 +350,28 @@ export function SidataImportLogSinkronisasiPage() {
               className={inputClass}
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(event) => setDateFrom(event.target.value)}
             />
           </div>
+
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-zinc-600">Sampai</label>
             <input
               className={inputClass}
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(event) => setDateTo(event.target.value)}
             />
           </div>
+
           <ActionButton icon={Search} onClick={handleSearch} variant="primary">
             Cari
           </ActionButton>
+
           <ActionButton icon={Filter} onClick={handleReset} variant="secondary">
             Reset
           </ActionButton>
+
           <ActionButton
             disabled={loading}
             icon={RefreshCcw}
@@ -444,19 +475,21 @@ export function SidataImportLogSinkronisasiPage() {
         <span className="text-sm text-muted-foreground">
           Total {total} log, halaman {page}
         </span>
+
         <div className="flex gap-2">
           <ActionButton
             disabled={!canPrev || loading}
             icon={ChevronLeft}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
             variant="secondary"
           >
             Sebelumnya
           </ActionButton>
+
           <ActionButton
             disabled={!canNext || loading}
             icon={ChevronRight}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage((current) => current + 1)}
             variant="secondary"
           >
             Berikutnya
@@ -483,6 +516,7 @@ export function SidataImportLogSinkronisasiPage() {
                   />
                 ) : null}
               </div>
+
               <ActionButton icon={X} onClick={() => setSelectedLog(null)} variant="secondary">
                 Tutup Detail
               </ActionButton>
@@ -497,6 +531,7 @@ export function SidataImportLogSinkronisasiPage() {
                   {selectedLog.id}
                 </div>
               </div>
+
               <div>
                 <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Action
@@ -505,6 +540,7 @@ export function SidataImportLogSinkronisasiPage() {
                   {selectedLog.action}
                 </div>
               </div>
+
               <div>
                 <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Batch Type
@@ -513,6 +549,7 @@ export function SidataImportLogSinkronisasiPage() {
                   {selectedLog.batchType ?? '-'}
                 </div>
               </div>
+
               <div>
                 <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Batch ID
@@ -521,6 +558,7 @@ export function SidataImportLogSinkronisasiPage() {
                   {selectedLog.batchId ?? '-'}
                 </div>
               </div>
+
               <div>
                 <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Actor ID
@@ -529,6 +567,7 @@ export function SidataImportLogSinkronisasiPage() {
                   {selectedLog.actorId ?? '-'}
                 </div>
               </div>
+
               <div>
                 <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Dibuat Pada
@@ -543,9 +582,10 @@ export function SidataImportLogSinkronisasiPage() {
               <div className="mb-2 text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                 Metadata
               </div>
+
               {selectedLog.metadata ? (
                 <pre className="w-full overflow-x-auto rounded-lg border border-border bg-zinc-900 p-4 text-xs leading-5 text-zinc-100">
-                  {JSON.stringify(selectedLog.metadata, null, 2)}
+                  {stringifyMetadata(selectedLog.metadata)}
                 </pre>
               ) : (
                 <div className="text-sm text-muted-foreground">Tidak ada metadata.</div>

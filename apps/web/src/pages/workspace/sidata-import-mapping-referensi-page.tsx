@@ -147,6 +147,7 @@ export function SidataImportMappingReferensiPage() {
   const [resolvingIssue, setResolvingIssue] = useState<SidataImportIssueRow | null>(null);
   const [selectedUnitKerjaId, setSelectedUnitKerjaId] = useState('');
   const [savingResolution, setSavingResolution] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   useEffect(() => {
     void loadBatches();
@@ -379,6 +380,7 @@ export function SidataImportMappingReferensiPage() {
   async function openUnitResolver(issue: SidataImportIssueRow) {
     setResolvingIssue(issue);
     setSelectedUnitKerjaId('');
+    setResolutionNote('');
     setUnitSearch(issue.unitOrganisasiNama ?? '');
     try {
       if (unitOptions.length === 0) {
@@ -400,11 +402,13 @@ export function SidataImportMappingReferensiPage() {
     try {
       await sidataImportApi.resolveUnitKerjaMapping(selectedBatch.id, resolvingIssue.id, {
         unitKerjaId: selectedUnitKerjaId,
+        note: resolutionNote.trim() || undefined,
       });
 
       toast.success('Mapping unit kerja disimpan.');
       setResolvingIssue(null);
       setSelectedUnitKerjaId('');
+      setResolutionNote('');
 
       await Promise.all([
         loadSummary(selectedBatch.id),
@@ -948,6 +952,21 @@ export function SidataImportMappingReferensiPage() {
                     </label>
                   ))
                 )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-[#073b3a]">
+                  Catatan Mapping
+                </label>
+                <textarea
+                  className={`${inputClass} min-h-24 resize-y py-3`}
+                  onChange={(event) => setResolutionNote(event.target.value)}
+                  placeholder="Contoh: Unit SIASN menggunakan nomenklatur lama, dipetakan ke unit kerja aktif yang sesuai."
+                  value={resolutionNote}
+                />
+                <p className="mt-1 text-xs text-[#687761]">
+                  Catatan ini membantu audit dan review ulang hasil mapping manual.
+                </p>
               </div>
             </div>
 

@@ -247,6 +247,8 @@ type AuditLogQueryParams = {
   action?: string;
   batchId?: string;
   batchType?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export const sidataImportApi = {
@@ -392,6 +394,8 @@ export const sidataImportApi = {
       action: params?.action,
       batchId: params?.batchId,
       batchType: params?.batchType,
+      dateFrom: params?.dateFrom,
+      dateTo: params?.dateTo,
     });
   },
 };

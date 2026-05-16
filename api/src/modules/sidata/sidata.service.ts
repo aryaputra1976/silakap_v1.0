@@ -19,6 +19,10 @@ import {
   NormalizedAsnFilters,
   SIDATA_ADMIN_ROLES,
   SIDATA_ALL_ACCESS_ROLES,
+  SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS,
+  SIDATA_ASN_DOCUMENT_ALLOWED_MIME_TYPES,
+  SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME,
+  SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
   SidataAsnDocumentUploadDto,
   SidataAccessScope,
   SidataAsnQueryDto,
@@ -244,31 +248,38 @@ export class SidataService {
     user: AuthUser;
   }): Promise<AsnDocumentResponse> {
     this.ensureCanMaintainAsn(params.user);
-    if (!params.file) throw new BadRequestException('File dokumen wajib diunggah');
-    if (!params.dto.documentType?.trim()) throw new BadRequestException('Jenis dokumen wajib diisi');
+
+    const file = this.validateAsnDocumentFile(params.file);
+    const documentType = this.normalizeAsnDocumentType(params.dto.documentType);
 
     const asn = await this.sidataRepository.findAsnById(params.asnId.trim());
     this.assertAsnAccessible(asn, params.user);
 
-    const checksum = createHash('sha256').update(params.file.buffer).digest('hex');
-    const extension = extname(params.file.originalname || '').slice(0, 20);
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    const extension = this.resolveAsnDocumentExtension(file);
+    const originalFileName = this.sanitizeOriginalFileName(file.originalname);
     const fileName = `${randomUUID()}${extension}`;
+
     const storageDir = resolve(process.cwd(), 'uploads', 'sidata', 'asn', asn.id);
     await mkdir(storageDir, { recursive: true });
-    await writeFile(resolve(storageDir, fileName), params.file.buffer);
+    await writeFile(resolve(storageDir, fileName), file.buffer);
 
     const document = await this.sidataRepository.createAsnDocument({
       id: randomUUID(),
       asnId: asn.id,
-      documentType: params.dto.documentType.trim().toUpperCase(),
+      documentType,
       fileName,
-      originalFileName: params.file.originalname,
+      originalFileName,
       storagePath: ['uploads', 'sidata', 'asn', asn.id, fileName].join('/'),
-      mimeType: params.file.mimetype,
-      fileSize: params.file.size,
+      mimeType: file.mimetype,
+      fileSize: file.size,
       checksum,
       uploadedBy: params.user.id,
     });
+
+    this.logger.log(
+      `uploadAsnDocument asnId=${asn.id} documentId=${document.id} actor=${params.user.id} mime=${file.mimetype} size=${file.size}`,
+    );
 
     return this.toAsnDocumentResponse(document);
   }
@@ -301,6 +312,133 @@ export class SidataService {
     const document = await this.sidataRepository.findAsnDocumentById(documentId.trim());
     if (!document || document.asnId !== asn.id) throw new NotFoundException('Dokumen ASN tidak ditemukan');
     return this.toAsnDocumentResponse(await this.sidataRepository.softDeleteAsnDocument(document.id));
+  }
+
+  private validateAsnDocumentFile(
+    file: UploadedSidataDocumentFile | undefined,
+  ): Required<UploadedSidataDocumentFile> {
+    if (!file) {
+      throw new BadRequestException('File dokumen wajib diunggah');
+    }
+
+    if (!Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+      throw new BadRequestException('File dokumen kosong atau tidak dapat dibaca');
+    }
+
+    const fileSize = file.size ?? file.buffer.length;
+
+    if (fileSize <= 0) {
+      throw new BadRequestException('File dokumen kosong');
+    }
+
+    if (fileSize > SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES) {
+      throw new BadRequestException(
+        `Ukuran file dokumen maksimal ${Math.floor(
+          SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES / 1024 / 1024,
+        )} MB`,
+      );
+    }
+
+    const mimeType = file.mimetype?.trim().toLowerCase();
+
+    if (!mimeType) {
+      throw new BadRequestException('Tipe file dokumen tidak dikenali');
+    }
+
+    if (!this.isAllowedAsnDocumentMimeType(mimeType)) {
+      throw new BadRequestException(
+        'Tipe file dokumen tidak diizinkan. Gunakan PDF, JPG, PNG, DOCX, atau XLSX.',
+      );
+    }
+
+    const extension = extname(file.originalname || '').toLowerCase();
+
+    if (!extension) {
+      throw new BadRequestException('Ekstensi file dokumen tidak ditemukan');
+    }
+
+    if (!this.isAllowedAsnDocumentExtension(extension)) {
+      throw new BadRequestException(
+        'Ekstensi file dokumen tidak diizinkan. Gunakan .pdf, .jpg, .jpeg, .png, .docx, atau .xlsx.',
+      );
+    }
+
+    const allowedExtensionsForMime = SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME[mimeType];
+
+    if (!(allowedExtensionsForMime as readonly string[]).includes(extension)) {
+      throw new BadRequestException(
+        'Ekstensi file tidak sesuai dengan tipe dokumen yang diunggah',
+      );
+    }
+
+    return {
+      originalname: file.originalname,
+      mimetype: mimeType,
+      size: fileSize,
+      buffer: file.buffer,
+    };
+  }
+
+  private normalizeAsnDocumentType(value: string | undefined): string {
+    const normalized = value?.trim().toUpperCase().replace(/\s+/g, '_');
+
+    if (!normalized) {
+      throw new BadRequestException('Jenis dokumen wajib diisi');
+    }
+
+    if (normalized.length > 100) {
+      throw new BadRequestException('Jenis dokumen maksimal 100 karakter');
+    }
+
+    if (!/^[A-Z0-9_./-]+$/.test(normalized)) {
+      throw new BadRequestException(
+        'Jenis dokumen hanya boleh berisi huruf, angka, titik, garis miring, strip, dan underscore',
+      );
+    }
+
+    return normalized;
+  }
+
+  private sanitizeOriginalFileName(value: string): string {
+    const baseName = basename(value || 'dokumen-asn');
+
+    const sanitized = baseName
+      .replace(/[^\w.\- ()]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!sanitized) {
+      return 'dokumen-asn';
+    }
+
+    return sanitized.slice(0, 180);
+  }
+
+  private resolveAsnDocumentExtension(
+    file: Required<UploadedSidataDocumentFile>,
+  ): string {
+    const originalExtension = extname(file.originalname || '').toLowerCase();
+    if (!this.isAllowedAsnDocumentMimeType(file.mimetype)) {
+      throw new BadRequestException('Tipe file dokumen tidak diizinkan.');
+    }
+
+    const allowedExtensions = SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME[file.mimetype];
+
+    if ((allowedExtensions as readonly string[]).includes(originalExtension)) {
+      return originalExtension;
+    }
+
+    return allowedExtensions[0];
+  }
+
+  private isAllowedAsnDocumentMimeType(
+    value: string,
+  ): value is keyof typeof SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME {
+    return SIDATA_ASN_DOCUMENT_ALLOWED_MIME_TYPES.some((item) => item === value);
+  }
+
+  private isAllowedAsnDocumentExtension(value: string): boolean {
+    return SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS.some((item) => item === value);
   }
 
   async findAsnHistory(id: string, user: AuthUser): Promise<AsnHistoryResponse> {
