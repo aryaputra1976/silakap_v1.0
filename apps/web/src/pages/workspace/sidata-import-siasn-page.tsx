@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   Ban,
   CheckCircle2,
-  Database,
   FileSpreadsheet,
+  GitCompareArrows,
   Loader2,
   Network,
   RefreshCw,
@@ -79,7 +81,6 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
 ];
 
 const BLOCKED_COMMIT_STATUSES = ['PROCESSING', 'COMMITTED', 'FAILED', 'CANCELLED'];
-
 const PAGE_SIZE = 20;
 
 function getTipePegawaiLabel(importType: string): string {
@@ -98,6 +99,10 @@ function getTipePegawaiBadgeClass(importType: string): string {
 
 function normalizeStatus(value: string | null | undefined): string {
   return value?.trim().toUpperCase() ?? '';
+}
+
+function isCommittedStatus(summary: SiasnImportSummary | null): boolean {
+  return normalizeStatus(summary?.status) === 'COMMITTED';
 }
 
 function isAsnCommitSafe(summary: SiasnImportSummary | null): boolean {
@@ -122,7 +127,7 @@ function getAsnCommitBlockReason(summary: SiasnImportSummary | null): string {
   const status = normalizeStatus(summary.status);
 
   if (status === 'PROCESSING') {
-    return 'Batch sedang diproses. Tunggu proses selesai sebelum commit.';
+    return 'Batch sedang diproses. Tunggu proses selesai sebelum tindak lanjut.';
   }
 
   if (status === 'COMMITTED') {
@@ -157,7 +162,9 @@ function getAsnCommitBlockReason(summary: SiasnImportSummary | null): string {
 }
 
 export function SidataImportSiasnPage() {
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [tipePegawai, setTipePegawai] = useState<TipePegawai | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -177,7 +184,6 @@ export function SidataImportSiasnPage() {
   const [issuesSearch, setIssuesSearch] = useState('');
 
   const [mapping, setMapping] = useState(false);
-  const [committing, setCommitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [extracting, setExtracting] = useState(false);
 
@@ -363,36 +369,6 @@ export function SidataImportSiasnPage() {
     }
   }
 
-  async function handleCommit() {
-    if (!selectedId || !summary) return;
-
-    if (!isAsnCommitSafe(summary)) {
-      toast.error(`Commit belum aman: ${getAsnCommitBlockReason(summary)}`);
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Commit batch ${selectedId.slice(0, 8)}… ke database utama ASN? Pastikan data sudah direview dan siap disinkronkan.`,
-    );
-
-    if (!confirmed) return;
-
-    setCommitting(true);
-
-    try {
-      const result = await sidataImportApi.commitAsnBatch(selectedId);
-
-      toast.success(result.message ?? 'Commit ASN diproses di background.');
-
-      await Promise.all([loadSummary(selectedId), loadBatches()]);
-      void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal commit batch');
-    } finally {
-      setCommitting(false);
-    }
-  }
-
   async function handleCancel() {
     if (!selectedId) return;
 
@@ -432,41 +408,48 @@ export function SidataImportSiasnPage() {
     }
   }
 
+  function openMappingReferensi() {
+    navigate('/sidata/import/mapping-referensi');
+  }
+
+  function openRekonsiliasi() {
+    navigate('/sidata/rekonsiliasi');
+  }
+
   const blockedStatuses = ['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'];
-  const canMap = summary ? !blockedStatuses.includes(normalizeStatus(summary.status)) : false;
+  const currentStatus = normalizeStatus(summary?.status);
+
+  const canMap = summary ? !blockedStatuses.includes(currentStatus) : false;
+
   const canRemap = summary
-    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(normalizeStatus(summary.status)) &&
-      summary.mappedRows > 0
+    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(currentStatus) && summary.mappedRows > 0
     : false;
-  const canCommit = isAsnCommitSafe(summary);
 
   const canExtract = summary
-    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(normalizeStatus(summary.status))
+    ? !['PROCESSING', 'CANCELLED', 'FAILED'].includes(currentStatus)
     : false;
 
   const canCancel = summary
-    ? !['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'].includes(
-        normalizeStatus(summary.status),
-      )
+    ? !['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'].includes(currentStatus)
     : false;
 
-  const isBusy = mapping || committing || cancelling || uploading || extracting;
-  const showQualityGateWarning = summary && !isAsnCommitSafe(summary);
+  const isBusy = mapping || cancelling || uploading || extracting;
+  const commitSafe = isAsnCommitSafe(summary);
+  const committed = isCommittedStatus(summary);
+  const showQualityGateWarning = Boolean(summary && !commitSafe && !committed);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Import SIASN"
-        description="Upload data ASN dari BKN SIASN, petakan ke referensi lokal, lalu commit ke database."
+        description="Upload data ASN dari BKN SIASN, petakan ke referensi lokal, lalu lanjutkan review dan commit melalui Mapping Referensi."
       />
 
-      {/* Upload section */}
       <SectionCard
         title="Upload Data ASN SIASN"
         description="Format: .xlsx (maks. 25 MB). Pilih jenis ASN sesuai file yang didownload dari SIASN."
       >
         <div className="flex flex-col gap-4">
-          {/* Tipe pegawai selector */}
           <div>
             <p className="mb-2 text-sm font-medium text-zinc-700">Jenis ASN</p>
             <div className="flex flex-wrap gap-2">
@@ -491,7 +474,6 @@ export function SidataImportSiasnPage() {
             </div>
           </div>
 
-          {/* File picker + upload */}
           <div className="flex flex-wrap items-center gap-3">
             <label
               className={cn(
@@ -549,7 +531,6 @@ export function SidataImportSiasnPage() {
         </div>
       </SectionCard>
 
-      {/* Batch history */}
       <SectionCard
         title="Riwayat Batch Import"
         actions={
@@ -632,7 +613,9 @@ export function SidataImportSiasnPage() {
               {
                 key: 'createdAt',
                 header: 'Diupload',
-                render: (item) => <span className="text-xs">{formatDateTime(item.createdAt)}</span>,
+                render: (item) => (
+                  <span className="text-xs">{formatDateTime(item.createdAt)}</span>
+                ),
                 className: 'w-36',
               },
             ]}
@@ -640,14 +623,12 @@ export function SidataImportSiasnPage() {
         )}
       </SectionCard>
 
-      {/* Batch detail */}
       {selectedId && (
         <>
           {summaryLoading ? (
             <LoadingState label="Memuat ringkasan batch…" />
           ) : summary ? (
             <>
-              {/* Summary + actions */}
               <SectionCard
                 title={`Ringkasan Batch — ${selectedId.slice(0, 8)}…`}
                 description={`${summary.importType} · ${summary.fileName ?? 'tanpa nama file'}`}
@@ -659,6 +640,22 @@ export function SidataImportSiasnPage() {
                         Memproses…
                       </span>
                     )}
+
+                    <ActionButton
+                      variant="secondary"
+                      icon={ArrowRight}
+                      onClick={openMappingReferensi}
+                    >
+                      Buka Mapping Referensi
+                    </ActionButton>
+
+                    <ActionButton
+                      variant="secondary"
+                      icon={GitCompareArrows}
+                      onClick={openRekonsiliasi}
+                    >
+                      Buka Rekonsiliasi
+                    </ActionButton>
 
                     {canExtract && (
                       <ActionButton
@@ -692,18 +689,8 @@ export function SidataImportSiasnPage() {
                       </ActionButton>
                     )}
 
-                    {summary.mappedRows > 0 && !canCommit && (
+                    {summary.mappedRows > 0 && !commitSafe && !committed && (
                       <StatusBadge value="Commit Belum Aman" tone="warning" />
-                    )}
-
-                    {canCommit && (
-                      <ActionButton
-                        icon={committing ? Loader2 : Database}
-                        onClick={() => void handleCommit()}
-                        disabled={isBusy}
-                      >
-                        {committing ? 'Committing…' : 'Commit ke Database'}
-                      </ActionButton>
                     )}
 
                     {canCancel && (
@@ -726,7 +713,33 @@ export function SidataImportSiasnPage() {
                   </div>
                 }
               >
-                {showQualityGateWarning ? (
+                <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                  <div className="flex items-start gap-3">
+                    <ArrowRight className="mt-0.5 size-4 shrink-0" />
+                    <div>
+                      <div className="font-semibold">Lanjutkan proses final di Mapping Referensi</div>
+                      <div className="mt-1">
+                        Review issue, resolve mapping unit kerja, export daftar masalah, dan commit
+                        final dilakukan melalui halaman Mapping Referensi agar quality gate tetap
+                        konsisten.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {committed ? (
+                  <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                      <div>
+                        <div className="font-semibold">Batch sudah dicommit</div>
+                        <div className="mt-1">
+                          Data dari batch ini sudah masuk ke database utama ASN.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : showQualityGateWarning ? (
                   <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -734,8 +747,8 @@ export function SidataImportSiasnPage() {
                         <div className="font-semibold">Quality gate belum terpenuhi</div>
                         <div className="mt-1">{getAsnCommitBlockReason(summary)}</div>
                         <div className="mt-2 text-xs text-amber-800">
-                          Selesaikan invalid, needs review, dan unmapped terlebih dahulu sebelum
-                          commit ke database utama ASN.
+                          Gunakan halaman Mapping Referensi untuk menyelesaikan invalid, needs
+                          review, dan unmapped sebelum commit final.
                         </div>
                       </div>
                     </div>
@@ -748,7 +761,7 @@ export function SidataImportSiasnPage() {
                         <div className="font-semibold">Quality gate aman</div>
                         <div className="mt-1">
                           Batch sudah termapping dan tidak memiliki invalid, needs review, atau
-                          unmapped.
+                          unmapped. Commit final tetap dilakukan melalui Mapping Referensi.
                         </div>
                       </div>
                     </div>
@@ -767,9 +780,7 @@ export function SidataImportSiasnPage() {
                 </div>
               </SectionCard>
 
-              {/* Issues */}
               <SectionCard title="Tinjauan Data">
-                {/* Tab bar */}
                 <div className="mb-4 flex gap-1 rounded-lg border border-border bg-zinc-50 p-1">
                   {ISSUE_TABS.map((tab) => (
                     <button
@@ -787,7 +798,6 @@ export function SidataImportSiasnPage() {
                   ))}
                 </div>
 
-                {/* Search */}
                 <form onSubmit={handleSearchSubmit} className="mb-4 flex gap-2">
                   <input
                     className={cn(inputClass, 'max-w-sm flex-1')}
@@ -893,7 +903,6 @@ export function SidataImportSiasnPage() {
                       ]}
                     />
 
-                    {/* Pagination */}
                     {issues.total > issues.limit && (
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                         <span>
