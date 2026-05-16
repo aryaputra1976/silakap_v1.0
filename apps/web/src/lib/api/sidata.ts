@@ -85,6 +85,56 @@ export type SidataAsnHistory = {
   golongan: SidataAsnGolonganHistory[];
 };
 
+export type SidataAsnQualityBreakdownItem = {
+  key: string;
+  label: string;
+  total: number;
+  percentage: number;
+};
+
+export type SidataAsnQualityDashboard = {
+  generatedAt: string;
+  scope: {
+    type: 'ALL' | 'UNIT';
+    unitKerjaId: string | null;
+  };
+  period: {
+    today: string;
+    bupUntil: string;
+    bupWindowMonths: number;
+  };
+  totals: {
+    totalAsn: number;
+    activeAsn: number;
+    inactiveAsn: number;
+    pns: number;
+    pppk: number;
+    pppkParuhWaktu: number;
+  };
+  completeness: {
+    withoutUnitKerja: number;
+    withoutJabatan: number;
+    withoutGolongan: number;
+    withoutNik: number;
+    withoutTanggalLahir: number;
+    withoutTmtPensiun: number;
+    withoutSiasnProfile: number;
+  };
+  retirement: {
+    bupNext12Months: number;
+    bupOverdueActive: number;
+  };
+  quality: {
+    completeCoreRows: number;
+    issueRows: number;
+    qualityScore: number;
+  };
+  breakdown: {
+    byStatusAsn: SidataAsnQualityBreakdownItem[];
+    byJenisAsn: SidataAsnQualityBreakdownItem[];
+  };
+};
+
 export const SIDATA_STATUS_ASN_OPTIONS = [
   { value: 'AKTIF', label: 'Aktif' },
   { value: 'PENSIUN', label: 'Pensiun' },
@@ -113,6 +163,10 @@ export const sidataApi = {
       page: query.page,
       limit: query.limit,
     });
+  },
+
+  getAsnQualityDashboard(): Promise<SidataAsnQualityDashboard> {
+    return apiClient.get<SidataAsnQualityDashboard>('/sidata/dashboard/quality');
   },
 
   getAsnById(id: string): Promise<AsnRecord> {
