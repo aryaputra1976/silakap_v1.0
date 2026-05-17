@@ -22,6 +22,23 @@ export type DmsDocumentCategory =
   | 'ARSIP_KEPEGAWAIAN'
   | 'LAINNYA';
 
+export type DmsAccessLevel =
+  | 'INTERNAL'
+  | 'TERBATAS'
+  | 'SANGAT_TERBATAS'
+  | 'PIMPINAN'
+  | 'AUDIT';
+
+export type DmsSubCategory =
+  | 'SOP_TAHAP_1'
+  | 'SOP_TAHAP_2'
+  | 'SOP_TAHAP_3'
+  | 'SOP_PENSIUN_PEMBERHENTIAN'
+  | 'SOP_MATRIKS'
+  | 'SK_PENSIUN'
+  | 'CHECKLIST_VERIFIKASI'
+  | 'LAPORAN_RHK';
+
 export const DMS_DOCUMENT_STATUSES: DmsDocumentStatus[] = [
   'DRAFT',
   'UPLOADED',
@@ -44,6 +61,25 @@ export const DMS_DOCUMENT_CATEGORIES: DmsDocumentCategory[] = [
   'DOKUMEN_KEBIJAKAN',
   'ARSIP_KEPEGAWAIAN',
   'LAINNYA',
+];
+
+export const DMS_ACCESS_LEVELS: DmsAccessLevel[] = [
+  'INTERNAL',
+  'TERBATAS',
+  'SANGAT_TERBATAS',
+  'PIMPINAN',
+  'AUDIT',
+];
+
+export const DMS_SUB_CATEGORIES: DmsSubCategory[] = [
+  'SOP_TAHAP_1',
+  'SOP_TAHAP_2',
+  'SOP_TAHAP_3',
+  'SOP_PENSIUN_PEMBERHENTIAN',
+  'SOP_MATRIKS',
+  'SK_PENSIUN',
+  'CHECKLIST_VERIFIKASI',
+  'LAPORAN_RHK',
 ];
 
 export interface DmsUnitKerja {
@@ -92,6 +128,9 @@ export interface DmsDocument {
   title: string;
   description: string | null;
   category: DmsDocumentCategory;
+  subCategory: DmsSubCategory | string | null;
+  tags: string[] | unknown[] | null;
+  accessLevel: DmsAccessLevel | string;
   status: DmsDocumentStatus;
 
   periodYear: number | null;
@@ -143,6 +182,8 @@ export interface DmsDocumentListResponse {
 export interface DmsDocumentListQuery {
   q?: string;
   category?: DmsDocumentCategory | '';
+  subCategory?: DmsSubCategory | string | '';
+  accessLevel?: DmsAccessLevel | '';
   status?: DmsDocumentStatus | '';
   unitKerjaId?: string;
   asnId?: string;
@@ -159,6 +200,9 @@ export interface CreateDmsDocumentPayload {
   title: string;
   description?: string;
   category?: DmsDocumentCategory;
+  subCategory?: DmsSubCategory | string;
+  tags?: string[];
+  accessLevel?: DmsAccessLevel | string;
   periodYear?: number;
   periodMonth?: number;
   periodQuarter?: number;
@@ -172,6 +216,9 @@ export interface UpdateDmsDocumentPayload {
   title?: string;
   description?: string;
   category?: DmsDocumentCategory;
+  subCategory?: DmsSubCategory | string;
+  tags?: string[];
+  accessLevel?: DmsAccessLevel | string;
   periodYear?: number;
   periodMonth?: number;
   periodQuarter?: number;
@@ -271,6 +318,8 @@ function cleanQuery(query: DmsDocumentListQuery): Record<string, string | number
   return {
     q: query.q,
     category: query.category || undefined,
+    subCategory: query.subCategory || undefined,
+    accessLevel: query.accessLevel || undefined,
     status: query.status || undefined,
     unitKerjaId: query.unitKerjaId,
     asnId: query.asnId,
@@ -441,4 +490,31 @@ export function dmsStatusLabel(status: DmsDocumentStatus | string) {
   };
 
   return labels[status as DmsDocumentStatus] ?? status;
+}
+
+export function dmsSubCategoryLabel(subCategory: string) {
+  const labels: Record<DmsSubCategory, string> = {
+    SOP_TAHAP_1: 'SOP Tahap 1',
+    SOP_TAHAP_2: 'SOP Tahap 2',
+    SOP_TAHAP_3: 'SOP Tahap 3',
+    SOP_PENSIUN_PEMBERHENTIAN: 'SOP Pensiun & Pemberhentian',
+    SOP_MATRIKS: 'Matriks SOP',
+    SK_PENSIUN: 'SK Pensiun',
+    CHECKLIST_VERIFIKASI: 'Checklist Verifikasi',
+    LAPORAN_RHK: 'Laporan RHK',
+  };
+
+  return labels[subCategory as DmsSubCategory] ?? subCategory.replace(/_/g, ' ');
+}
+
+export function dmsAccessLevelLabel(accessLevel: string) {
+  const labels: Record<DmsAccessLevel, string> = {
+    INTERNAL: 'Internal',
+    TERBATAS: 'Terbatas',
+    SANGAT_TERBATAS: 'Sangat Terbatas',
+    PIMPINAN: 'Pimpinan',
+    AUDIT: 'Audit',
+  };
+
+  return labels[accessLevel as DmsAccessLevel] ?? accessLevel.replace(/_/g, ' ');
 }

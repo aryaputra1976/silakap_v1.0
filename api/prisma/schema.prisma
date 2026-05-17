@@ -1016,6 +1016,9 @@ model DmsDocument {
   title       String              @db.VarChar(200)
   description String?             @db.Text
   category    DmsDocumentCategory @default(BUKTI_DUKUNG)
+  subCategory String?             @map("sub_category") @db.VarChar(120)
+  tags        Json?
+  accessLevel String              @default("INTERNAL") @map("access_level") @db.VarChar(40)
   status      DmsDocumentStatus   @default(DRAFT)
 
   periodYear    Int? @map("period_year")
@@ -1065,6 +1068,8 @@ model DmsDocument {
 
   @@index([title])
   @@index([category])
+  @@index([subCategory])
+  @@index([accessLevel])
   @@index([status])
   @@index([periodYear])
   @@index([periodMonth])

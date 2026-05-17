@@ -1,6 +1,11 @@
 import { Edit3, Save } from 'lucide-react';
 import { ActionButton, SectionCard } from '@/components/workspace/ui';
-import type { DmsDocument, DmsDocumentCategory } from '@/lib/api/dms';
+import {
+  dmsAccessLevelLabel,
+  dmsCategoryLabel,
+  dmsSubCategoryLabel,
+  type DmsDocument,
+} from '@/lib/api/dms';
 import {
   DmsMetadataForm,
   type DmsMetadataFormValue,
@@ -72,13 +77,24 @@ function DmsMetadataView({ document }: { document: DmsDocument }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Meta label="Judul" value={document.title} />
-      <Meta label="Kategori" value={formatCategory(document.category)} />
+      <Meta label="Kategori" value={dmsCategoryLabel(document.category)} />
+      <Meta
+        label="Subkategori"
+        value={document.subCategory ? dmsSubCategoryLabel(document.subCategory) : '-'}
+      />
+      <Meta
+        label="Level Akses"
+        value={dmsAccessLevelLabel(document.accessLevel ?? 'INTERNAL')}
+      />
       <Meta label="Status" value={document.status} />
       <Meta label="Tahun" value={document.periodYear?.toString() ?? '-'} />
       <Meta label="Bulan" value={document.periodMonth?.toString() ?? '-'} />
       <Meta label="Triwulan" value={document.periodQuarter?.toString() ?? '-'} />
       <div className="md:col-span-2">
         <Meta label="Deskripsi" value={document.description ?? '-'} />
+      </div>
+      <div className="md:col-span-2">
+        <Meta label="Tags" value={formatTags(document.tags)} />
       </div>
     </div>
   );
@@ -97,6 +113,10 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatCategory(category: DmsDocumentCategory) {
-  return category.replace(/_/g, ' ');
+function formatTags(tags: DmsDocument['tags']) {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    return '-';
+  }
+
+  return tags.map((item) => String(item)).join(', ');
 }

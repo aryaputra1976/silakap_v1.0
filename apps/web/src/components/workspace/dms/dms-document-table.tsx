@@ -4,8 +4,13 @@ import {
   DataTable,
   formatDateTime,
   formatFileSize,
+  StatusBadge,
 } from '@/components/workspace/ui';
-import type { DmsDocument } from '@/lib/api/dms';
+import {
+  dmsAccessLevelLabel,
+  dmsSubCategoryLabel,
+  type DmsDocument,
+} from '@/lib/api/dms';
 import { formatPeriod } from './shared/dms-formatters';
 import { canDownloadDocument } from './shared/dms-action-utils';
 import { DmsCategoryBadge } from './dms-category-badge';
@@ -47,6 +52,16 @@ export function DmsDocumentTable({
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <DmsCategoryBadge category={item.category} />
                     <DmsStatusBadge status={item.status} />
+                    {item.subCategory ? (
+                      <StatusBadge
+                        value={dmsSubCategoryLabel(item.subCategory)}
+                        tone="info"
+                      />
+                    ) : null}
+                    <StatusBadge
+                      value={dmsAccessLevelLabel(item.accessLevel)}
+                      tone={item.accessLevel === 'INTERNAL' ? 'neutral' : 'warning'}
+                    />
                   </div>
                 </div>
               </div>

@@ -1,10 +1,12 @@
 import { DmsDocumentCategory, DmsDocumentStatus } from '@prisma/client';
 import {
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
+import { DMS_ACCESS_LEVELS } from './create-dms-document.dto';
 
 export class DmsDocumentListQueryDto {
   @IsOptional()
@@ -15,6 +17,16 @@ export class DmsDocumentListQueryDto {
   @IsOptional()
   @IsEnum(DmsDocumentCategory)
   category?: DmsDocumentCategory;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subCategory?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(DMS_ACCESS_LEVELS)
+  accessLevel?: string;
 
   @IsOptional()
   @IsEnum(DmsDocumentStatus)

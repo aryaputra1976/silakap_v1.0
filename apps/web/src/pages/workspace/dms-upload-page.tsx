@@ -48,6 +48,11 @@ export function DmsUploadPage() {
         title: buildSopEvidenceDefaultTitle(context),
         description: buildSopEvidenceDescription(context),
         category: 'BUKTI_DUKUNG',
+        subCategory: 'LAPORAN_RHK',
+        accessLevel: 'INTERNAL',
+        tags: [sopCodeFromQuery, rhkCodeFromQuery, 'SOP', 'RHK']
+          .filter(Boolean)
+          .join(', '),
         periodYear: yearFromQuery || initialDmsMetadataForm.periodYear,
         periodMonth: monthFromQuery,
         periodQuarter: quarterFromQuery,
@@ -84,6 +89,13 @@ export function DmsUploadPage() {
           title: current.title || buildSopEvidenceDefaultTitle(context),
           description: current.description || buildSopEvidenceDescription(context),
           category: 'BUKTI_DUKUNG',
+          subCategory: current.subCategory || 'LAPORAN_RHK',
+          accessLevel: current.accessLevel || 'INTERNAL',
+          tags:
+            current.tags ||
+            [sopCodeFromQuery, rhkCodeFromQuery, 'SOP', 'RHK']
+              .filter(Boolean)
+              .join(', '),
           periodYear: current.periodYear || yearFromQuery,
           periodMonth: current.periodMonth || monthFromQuery,
           periodQuarter: current.periodQuarter || quarterFromQuery,

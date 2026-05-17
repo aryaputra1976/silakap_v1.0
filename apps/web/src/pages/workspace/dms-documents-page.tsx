@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
   dmsApi,
@@ -17,6 +17,8 @@ import { DmsDocumentsSection } from '@/components/workspace/dms/list/dms-documen
 const defaultFilter: DmsFilterValue = {
   q: '',
   category: '',
+  subCategory: '',
+  accessLevel: '',
   status: '',
   year: '',
   month: '',
@@ -24,10 +26,15 @@ const defaultFilter: DmsFilterValue = {
 
 export function DmsDocumentsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialFilter = useMemo(
+    () => buildFilterFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const [data, setData] = useState<DmsDocumentListResponse | null>(null);
-  const [filter, setFilter] = useState<DmsFilterValue>(defaultFilter);
-  const [appliedFilter, setAppliedFilter] = useState<DmsFilterValue>(defaultFilter);
+  const [filter, setFilter] = useState<DmsFilterValue>(initialFilter);
+  const [appliedFilter, setAppliedFilter] = useState<DmsFilterValue>(initialFilter);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState('');
   const [error, setError] = useState('');
@@ -81,9 +88,11 @@ export function DmsDocumentsPage() {
   }
 
   useEffect(() => {
-    void loadDocuments(defaultFilter);
+    setFilter(initialFilter);
+    setAppliedFilter(initialFilter);
+    void loadDocuments(initialFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialFilter]);
 
   const documents = data?.items ?? [];
 
@@ -129,6 +138,19 @@ export function DmsDocumentsPage() {
       />
     </div>
   );
+}
+
+function buildFilterFromSearchParams(searchParams: URLSearchParams): DmsFilterValue {
+  return {
+    ...defaultFilter,
+    q: searchParams.get('q') ?? '',
+    category: (searchParams.get('category') ?? '') as DmsFilterValue['category'],
+    subCategory: searchParams.get('subCategory') ?? '',
+    accessLevel: (searchParams.get('accessLevel') ?? '') as DmsFilterValue['accessLevel'],
+    status: (searchParams.get('status') ?? '') as DmsFilterValue['status'],
+    year: searchParams.get('year') ?? '',
+    month: searchParams.get('month') ?? '',
+  };
 }
 
 function buildSummary(

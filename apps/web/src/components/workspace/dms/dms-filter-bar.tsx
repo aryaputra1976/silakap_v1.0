@@ -6,10 +6,15 @@ import {
   Toolbar,
 } from '@/components/workspace/ui';
 import {
+  DMS_ACCESS_LEVELS,
   DMS_DOCUMENT_CATEGORIES,
   DMS_DOCUMENT_STATUSES,
+  DMS_SUB_CATEGORIES,
+  dmsAccessLevelLabel,
   dmsCategoryLabel,
   dmsStatusLabel,
+  dmsSubCategoryLabel,
+  type DmsAccessLevel,
   type DmsDocumentCategory,
   type DmsDocumentListQuery,
   type DmsDocumentStatus,
@@ -17,7 +22,7 @@ import {
 
 export type DmsFilterValue = Pick<
   DmsDocumentListQuery,
-  'q' | 'category' | 'status' | 'year' | 'month'
+  'q' | 'category' | 'subCategory' | 'accessLevel' | 'status' | 'year' | 'month'
 >;
 
 export function DmsFilterBar({
@@ -45,7 +50,7 @@ export function DmsFilterBar({
 
   return (
     <Toolbar>
-      <div className="grid w-full gap-3 lg:grid-cols-[1.4fr_1fr_1fr_0.7fr_0.7fr_auto]">
+      <div className="grid w-full gap-3 lg:grid-cols-4 xl:grid-cols-[1.4fr_1fr_1fr_0.95fr_0.9fr_0.7fr_0.7fr_auto]">
         <Field label="Pencarian">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
@@ -92,6 +97,38 @@ export function DmsFilterBar({
             {DMS_DOCUMENT_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {dmsStatusLabel(status)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Subkategori">
+          <select
+            className={`${inputClass} w-full`}
+            value={value.subCategory ?? ''}
+            onChange={(event) => update('subCategory', event.target.value)}
+          >
+            <option value="">Semua subkategori</option>
+            {DMS_SUB_CATEGORIES.map((subCategory) => (
+              <option key={subCategory} value={subCategory}>
+                {dmsSubCategoryLabel(subCategory)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Akses">
+          <select
+            className={`${inputClass} w-full`}
+            value={value.accessLevel ?? ''}
+            onChange={(event) =>
+              update('accessLevel', event.target.value as DmsAccessLevel | '')
+            }
+          >
+            <option value="">Semua akses</option>
+            {DMS_ACCESS_LEVELS.map((accessLevel) => (
+              <option key={accessLevel} value={accessLevel}>
+                {dmsAccessLevelLabel(accessLevel)}
               </option>
             ))}
           </select>

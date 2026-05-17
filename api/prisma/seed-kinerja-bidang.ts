@@ -78,6 +78,16 @@ async function main() {
           timeTarget: item.timeTarget,
         },
       });
+    } else {
+      await prisma.kinerjaBidangSopTarget.updateMany({
+        where: {
+          sopId: sop.id,
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
     }
   }
 

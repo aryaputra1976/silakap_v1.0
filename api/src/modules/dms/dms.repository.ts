@@ -72,6 +72,8 @@ export type DmsDocumentRecord = Prisma.DmsDocumentGetPayload<{
 export interface NormalizedDmsDocumentFilters {
   q?: string;
   category?: Prisma.EnumDmsDocumentCategoryFilter['equals'];
+  subCategory?: string;
+  accessLevel?: string;
   status?: Prisma.EnumDmsDocumentStatusFilter['equals'];
   unitKerjaId?: string;
   asnId?: string;
@@ -206,6 +208,14 @@ export class DmsRepository {
       where.category = filters.category;
     }
 
+    if (filters.subCategory) {
+      where.subCategory = filters.subCategory;
+    }
+
+    if (filters.accessLevel) {
+      where.accessLevel = filters.accessLevel;
+    }
+
     if (filters.status) {
       where.status = filters.status;
     }
@@ -246,6 +256,7 @@ export class DmsRepository {
       where.OR = [
         { title: { contains: filters.q } },
         { description: { contains: filters.q } },
+        { subCategory: { contains: filters.q } },
         { fileName: { contains: filters.q } },
         { originalFileName: { contains: filters.q } },
         { asn: { nama: { contains: filters.q } } },

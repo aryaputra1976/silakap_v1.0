@@ -1,7 +1,12 @@
 import { Field, inputClass } from '@/components/workspace/ui';
 import {
+  DMS_ACCESS_LEVELS,
   DMS_DOCUMENT_CATEGORIES,
+  DMS_SUB_CATEGORIES,
+  dmsAccessLevelLabel,
   dmsCategoryLabel,
+  dmsSubCategoryLabel,
+  type DmsAccessLevel,
   type DmsDocumentCategory,
 } from '@/lib/api/dms';
 
@@ -9,6 +14,9 @@ export interface DmsMetadataFormValue {
   title: string;
   description: string;
   category: DmsDocumentCategory;
+  subCategory: string;
+  tags: string;
+  accessLevel: DmsAccessLevel;
   periodYear: string;
   periodMonth: string;
   periodQuarter: string;
@@ -22,6 +30,9 @@ export const initialDmsMetadataForm: DmsMetadataFormValue = {
   title: '',
   description: '',
   category: 'BUKTI_DUKUNG',
+  subCategory: '',
+  tags: '',
+  accessLevel: 'INTERNAL',
   periodYear: String(new Date().getFullYear()),
   periodMonth: '',
   periodQuarter: '',
@@ -73,7 +84,7 @@ export function DmsMetadataForm({
         />
       </Field>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Field label="Kategori">
           <select
             className={inputClass}
@@ -86,6 +97,39 @@ export function DmsMetadataForm({
             {DMS_DOCUMENT_CATEGORIES.map((category) => (
               <option key={category} value={category}>
                 {dmsCategoryLabel(category)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Subkategori">
+          <select
+            className={inputClass}
+            disabled={disabled}
+            value={value.subCategory}
+            onChange={(event) => update('subCategory', event.target.value)}
+          >
+            <option value="">Tidak spesifik</option>
+            {DMS_SUB_CATEGORIES.map((subCategory) => (
+              <option key={subCategory} value={subCategory}>
+                {dmsSubCategoryLabel(subCategory)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Level Akses">
+          <select
+            className={inputClass}
+            disabled={disabled}
+            value={value.accessLevel}
+            onChange={(event) =>
+              update('accessLevel', event.target.value as DmsAccessLevel)
+            }
+          >
+            {DMS_ACCESS_LEVELS.map((accessLevel) => (
+              <option key={accessLevel} value={accessLevel}>
+                {dmsAccessLevelLabel(accessLevel)}
               </option>
             ))}
           </select>
@@ -135,6 +179,16 @@ export function DmsMetadataForm({
           </select>
         </Field>
       </div>
+
+      <Field label="Tags">
+        <input
+          className={inputClass}
+          disabled={disabled}
+          value={value.tags}
+          onChange={(event) => update('tags', event.target.value)}
+          placeholder="Pisahkan dengan koma, contoh: SOP, RHK 3, Pensiun"
+        />
+      </Field>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Unit Kerja ID Opsional">
@@ -188,6 +242,9 @@ export function toDmsCreatePayload(value: DmsMetadataFormValue) {
     title: value.title.trim(),
     description: normalizeOptional(value.description),
     category: value.category,
+    subCategory: normalizeOptional(value.subCategory),
+    tags: normalizeTags(value.tags),
+    accessLevel: value.accessLevel,
     periodYear: normalizeNumber(value.periodYear),
     periodMonth: normalizeNumber(value.periodMonth),
     periodQuarter: normalizeNumber(value.periodQuarter),
@@ -212,4 +269,13 @@ function normalizeNumber(value: string) {
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeTags(value: string) {
+  const tags = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item, index, items) => item && items.indexOf(item) === index);
+
+  return tags.length > 0 ? tags : undefined;
 }

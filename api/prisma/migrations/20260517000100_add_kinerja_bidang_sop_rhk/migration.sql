@@ -31,7 +31,7 @@ CREATE TABLE `kinerja_bidang_sop` (
   INDEX `kinerja_bidang_sop_sort_order_idx`(`sort_order`),
   INDEX `kinerja_bidang_sop_deleted_at_idx`(`deleted_at`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 CREATE TABLE `kinerja_bidang_sop_rhk` (
   `id` VARCHAR(36) NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE `kinerja_bidang_sop_rhk` (
   INDEX `kinerja_bidang_sop_rhk_sop_id_idx`(`sop_id`),
   INDEX `kinerja_bidang_sop_rhk_rhk_code_idx`(`rhk_code`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 CREATE TABLE `kinerja_bidang_sop_steps` (
   `id` VARCHAR(36) NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `kinerja_bidang_sop_steps` (
   INDEX `kinerja_bidang_sop_steps_sop_id_idx`(`sop_id`),
   INDEX `kinerja_bidang_sop_steps_step_number_idx`(`step_number`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 CREATE TABLE `kinerja_bidang_sop_targets` (
   `id` VARCHAR(36) NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE `kinerja_bidang_sop_targets` (
   INDEX `kinerja_bidang_sop_targets_year_idx`(`year`),
   INDEX `kinerja_bidang_sop_targets_deleted_at_idx`(`deleted_at`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 CREATE TABLE `kinerja_bidang_sop_realizations` (
   `id` VARCHAR(36) NOT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE `kinerja_bidang_sop_realizations` (
   INDEX `kinerja_bidang_sop_realizations_created_at_idx`(`created_at`),
   INDEX `kinerja_bidang_sop_realizations_deleted_at_idx`(`deleted_at`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 CREATE TABLE `kinerja_bidang_sop_evidence` (
   `id` VARCHAR(36) NOT NULL,
@@ -144,7 +144,7 @@ CREATE TABLE `kinerja_bidang_sop_evidence` (
   INDEX `kinerja_bidang_sop_evidence_dms_document_id_idx`(`dms_document_id`),
   INDEX `kinerja_bidang_sop_evidence_created_at_idx`(`created_at`),
   PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+);
 
 ALTER TABLE `kinerja_bidang_sop_rhk`
   ADD CONSTRAINT `kinerja_bidang_sop_rhk_sop_id_fkey`

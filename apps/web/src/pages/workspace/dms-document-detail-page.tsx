@@ -500,6 +500,15 @@ function toFormValue(document: DmsDocument): DmsMetadataFormValue {
     title: document.title,
     description: document.description ?? '',
     category: document.category as DmsDocumentCategory,
+    subCategory: document.subCategory ?? '',
+    tags: Array.isArray(document.tags) ? document.tags.join(', ') : '',
+    accessLevel:
+      document.accessLevel === 'TERBATAS' ||
+      document.accessLevel === 'SANGAT_TERBATAS' ||
+      document.accessLevel === 'PIMPINAN' ||
+      document.accessLevel === 'AUDIT'
+        ? document.accessLevel
+        : 'INTERNAL',
     periodYear: document.periodYear ? String(document.periodYear) : '',
     periodMonth: document.periodMonth ? String(document.periodMonth) : '',
     periodQuarter: document.periodQuarter ? String(document.periodQuarter) : '',

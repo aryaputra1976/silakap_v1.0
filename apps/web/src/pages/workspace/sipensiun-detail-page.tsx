@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '@/lib/api/client';
+import { SipensiunSopPanel } from '@/components/workspace/sipensiun/sipensiun-sop-panel';
+import { SipensiunLifecycle } from '@/components/workspace/sipensiun/sipensiun-lifecycle';
+import { SIPENSIUN_JENIS_LIST, sipensiunJenisLabel } from '@/lib/sipensiun/sipensiun-data';
 import type {
   ChecklistItem as ChecklistItemType,
   DocumentChecklist,
@@ -412,7 +415,7 @@ export function SipensiunDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={detail.siapCase.caseNumber}
-        description={`${detail.asn.nama} · ${detail.asn.nip} · ${detail.sipensiunDetail.jenisPensiun}`}
+        description={`${detail.asn.nama} · ${detail.asn.nip} · ${sipensiunJenisLabel(detail.sipensiunDetail.jenisPensiun)}`}
         meta={
           <div className="flex flex-wrap gap-2">
             <WorkflowBadge value={detail.siapCase.currentState} />
@@ -494,6 +497,23 @@ export function SipensiunDetailPage() {
           )}
         </SectionCard>
       </section>
+
+      {(() => {
+        const jenisPensiun = detail.sipensiunDetail.jenisPensiun;
+        const jenisConfig = SIPENSIUN_JENIS_LIST.find((item) =>
+          item.dbJenisPensiun.includes(jenisPensiun),
+        );
+        if (!jenisConfig) return null;
+        return (
+          <div className="grid gap-4 xl:grid-cols-2">
+            <SipensiunSopPanel jenisKey={jenisConfig.key} />
+            <SipensiunLifecycle
+              jenisKey={jenisConfig.key}
+              currentState={detail.siapCase.currentState}
+            />
+          </div>
+        );
+      })()}
 
       <SectionCard
         title="Data Surat"

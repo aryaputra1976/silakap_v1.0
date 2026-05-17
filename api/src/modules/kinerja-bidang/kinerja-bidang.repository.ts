@@ -181,6 +181,17 @@ export class KinerjaBidangRepository {
             updatedBy: userId,
           },
         });
+      } else {
+        await this.prisma.kinerjaBidangSopTarget.updateMany({
+          where: {
+            sopId: sop.id,
+            deletedAt: null,
+          },
+          data: {
+            deletedAt: new Date(),
+            updatedBy: userId,
+          },
+        });
       }
     }
   }

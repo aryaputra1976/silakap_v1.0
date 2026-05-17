@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DmsDocumentCategory, DmsDocumentStatus } from '@prisma/client';
+import { DmsDocumentCategory, DmsDocumentStatus, Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, isAbsolute, relative, resolve } from 'path';
@@ -17,6 +17,7 @@ import {
   isDmsEditableStatus,
 } from './constants/dms-status.constant';
 import { CreateDmsDocumentDto } from './dto/create-dms-document.dto';
+import { DMS_ACCESS_LEVELS } from './dto/create-dms-document.dto';
 import { DmsDocumentListQueryDto } from './dto/dms-document-list-query.dto';
 import { DmsRejectDto } from './dto/dms-reject.dto';
 import { DmsUploadDto } from './dto/dms-upload.dto';
@@ -69,6 +70,7 @@ const DMS_ADMIN_ROLES = [
 ];
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+const DEFAULT_DMS_ACCESS_LEVEL = 'INTERNAL';
 
 const ALLOWED_MIME_EXTENSIONS = {
   'application/pdf': 'pdf',
@@ -457,6 +459,8 @@ export class DmsService {
     const filters: NormalizedDmsDocumentFilters = {
       q: this.normalizeOptionalText(query.q),
       category: query.category,
+      subCategory: this.normalizeOptionalText(query.subCategory),
+      accessLevel: this.normalizeOptionalText(query.accessLevel),
       status: query.status,
       unitKerjaId: this.normalizeOptionalText(query.unitKerjaId),
       asnId: this.normalizeOptionalText(query.asnId),
@@ -506,6 +510,10 @@ export class DmsService {
         title: this.normalizeRequiredText(dto.title, 'Judul dokumen wajib diisi'),
         description: this.normalizeNullableText(dto.description),
         category: dto.category ?? DmsDocumentCategory.BUKTI_DUKUNG,
+        subCategory: this.normalizeNullableText(dto.subCategory),
+        tags: dto.tags === undefined ? undefined : this.normalizeTags(dto.tags),
+        accessLevel:
+        this.normalizeAccessLevel(dto.accessLevel) ?? DEFAULT_DMS_ACCESS_LEVEL,
         periodYear: dto.periodYear ?? null,
         periodMonth: dto.periodMonth ?? null,
         periodQuarter: dto.periodQuarter ?? null,
@@ -554,6 +562,15 @@ export class DmsService {
             ? undefined
             : this.normalizeNullableText(dto.description),
         category: dto.category,
+        subCategory:
+        dto.subCategory === undefined
+            ? undefined
+            : this.normalizeNullableText(dto.subCategory),
+        tags: dto.tags === undefined ? undefined : this.normalizeTags(dto.tags),
+        accessLevel:
+        dto.accessLevel === undefined
+            ? undefined
+            : this.normalizeAccessLevel(dto.accessLevel) ?? DEFAULT_DMS_ACCESS_LEVEL,
         periodYear: dto.periodYear === undefined ? undefined : dto.periodYear,
         periodMonth: dto.periodMonth === undefined ? undefined : dto.periodMonth,
         periodQuarter:
@@ -684,6 +701,30 @@ export class DmsService {
   private normalizeNullableText(value: string | undefined) {
     const normalized = value?.trim();
     return normalized ? normalized : null;
+  }
+
+  private normalizeTags(value: string[] | undefined) {
+    const normalized =
+      value
+        ?.map((item) => item.trim())
+        .filter((item, index, items) => item && items.indexOf(item) === index) ??
+      [];
+
+    return normalized.length > 0 ? normalized : Prisma.JsonNull;
+  }
+
+  private normalizeAccessLevel(value: string | undefined) {
+    const normalized = this.normalizeOptionalText(value);
+
+    if (!normalized) {
+      return undefined;
+    }
+
+    if (!DMS_ACCESS_LEVELS.includes(normalized as typeof DMS_ACCESS_LEVELS[number])) {
+      throw new BadRequestException('Level akses dokumen DMS tidak valid');
+    }
+
+    return normalized;
   }
   
   private normalizeOptionalNullableText(value: string | null | undefined) {

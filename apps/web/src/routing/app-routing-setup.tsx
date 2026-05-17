@@ -41,6 +41,17 @@ import { SopDocumentVerificationPage } from '@/pages/workspace/sop-document-veri
 import { SopRealizationPage } from '@/pages/workspace/sop-realization-page';
 import { SopRealizationDetailPage } from '@/pages/workspace/sop-realization-detail-page';
 import { SopReportPage } from '@/pages/workspace/sop-report-page';
+import { KinerjaBidangDashboardPage } from '@/pages/workspace/kinerja-bidang-dashboard-page';
+import { KinerjaBidangSopPage } from '@/pages/workspace/kinerja-bidang-sop-page';
+import { KinerjaBidangTargetsPage } from '@/pages/workspace/kinerja-bidang-targets-page';
+import { KinerjaBidangRealizationsPage } from '@/pages/workspace/kinerja-bidang-realizations-page';
+import { KinerjaBidangReportPage } from '@/pages/workspace/kinerja-bidang-report-page';
+import { LayananKepegawaianPage } from '@/pages/workspace/layanan-kepegawaian-page';
+import { LayananVerificationPage } from '@/pages/workspace/layanan-verification-page';
+import { LayananSlaPage } from '@/pages/workspace/layanan-sla-page';
+import { LayananDelayPage } from '@/pages/workspace/layanan-delay-page';
+import { LayananSatisfactionPage } from '@/pages/workspace/layanan-satisfaction-page';
+import { LayananReportPage } from '@/pages/workspace/layanan-report-page';
 
 export function AppRoutingSetup() {
   return (
@@ -52,10 +63,15 @@ export function AppRoutingSetup() {
           <Route path="/dashboard" element={<DashboardPage />} />
 
           {/* KINERJA BIDANG / SOP & RHK */}
-          <Route path="/kinerja-bidang" element={<SopDashboardPage />} />
-          <Route path="/kinerja-bidang/sop" element={<SopListPage />} />
+          <Route path="/kinerja-bidang" element={<KinerjaBidangDashboardPage />} />
+          <Route path="/kinerja-bidang/sop" element={<KinerjaBidangSopPage />} />
+          <Route path="/kinerja-bidang/targets" element={<KinerjaBidangTargetsPage />} />
+          <Route path="/kinerja-bidang/realizations" element={<KinerjaBidangRealizationsPage />} />
+          <Route path="/kinerja-bidang/report" element={<KinerjaBidangReportPage />} />
           <Route path="/kinerja-bidang/sop/map" element={<SopMapPage />} />
           <Route path="/kinerja-bidang/sop/:id" element={<SopDetailPage />} />
+          <Route path="/kinerja-bidang/dashboard-rhk" element={<SopDashboardPage />} />
+          <Route path="/kinerja-bidang/sop-list" element={<SopListPage />} />
           <Route path="/kinerja-bidang/monitoring" element={<SopMonitoringPage />} />
           <Route path="/kinerja-bidang/realisasi" element={<SopRealizationPage />} />
           <Route path="/kinerja-bidang/realisasi/:id" element={<SopRealizationDetailPage />} />
@@ -90,6 +106,14 @@ export function AppRoutingSetup() {
           {/* SIPENSIUN */}
           <Route path="/sipensiun" element={<SipensiunListPage />} />
           <Route path="/sipensiun/:id" element={<SipensiunDetailPage />} />
+
+          {/* LAYANAN KEPEGAWAIAN */}
+          <Route path="/layanan" element={<LayananKepegawaianPage />} />
+          <Route path="/layanan/verifikasi" element={<LayananVerificationPage />} />
+          <Route path="/layanan/sla" element={<LayananSlaPage />} />
+          <Route path="/layanan/keterlambatan" element={<LayananDelayPage />} />
+          <Route path="/layanan/kepuasan" element={<LayananSatisfactionPage />} />
+          <Route path="/layanan/laporan" element={<LayananReportPage />} />
 
           {/* SIAP */}
           <Route path="/siap/tasks" element={<SiapTasksPage />} />
