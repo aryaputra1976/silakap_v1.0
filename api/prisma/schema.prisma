@@ -104,6 +104,31 @@ enum DmsDocumentStatus {
   ARCHIVED
 }
 
+enum SopStage {
+  TAHAP_1
+  TAHAP_2
+  TAHAP_3
+}
+
+enum SopStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum SopTargetUnit {
+  LAPORAN
+  DOKUMEN
+}
+
+enum SopRealizationStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  REVISION_REQUIRED
+}
+
 model User {
   id           String        @id @default(uuid()) @db.VarChar(36)
   username     String        @unique @map("user") @db.VarChar(50)
@@ -1036,6 +1061,8 @@ model DmsDocument {
   submittedBy User? @relation("DmsDocumentSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   verifiedBy  User? @relation("DmsDocumentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
 
+  sopEvidenceLinks KinerjaBidangSopEvidence[]
+
   @@index([title])
   @@index([category])
   @@index([status])
@@ -1052,6 +1079,187 @@ model DmsDocument {
   @@index([createdAt])
   @@index([deletedAt])
   @@map("dms_documents")
+}
+
+model KinerjaBidangSop {
+  id               String    @id @default(uuid()) @db.VarChar(36)
+  code             String    @unique @db.VarChar(80)
+  title            String    @db.VarChar(250)
+  stage            SopStage
+  stageTitle       String    @map("stage_title") @db.VarChar(150)
+  shortDescription String    @map("short_description") @db.Text
+  objective        String?   @db.Text
+  scope            String?   @db.Text
+  legalBasis       Json?     @map("legal_basis")
+  outputs          Json?
+  evidenceExamples Json?     @map("evidence_examples")
+  status           SopStatus @default(ACTIVE)
+  isRhkPrimary     Boolean   @default(false) @map("is_rhk_primary")
+  sortOrder        Int       @default(0) @map("sort_order")
+
+  targetQuantity Int?          @map("target_quantity")
+  targetUnit     SopTargetUnit @default(LAPORAN) @map("target_unit")
+  qualityTarget  String?       @map("quality_target") @db.VarChar(80)
+  timeTarget     String?       @map("time_target") @db.VarChar(150)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  rhkMappings  KinerjaBidangSopRhk[]
+  steps        KinerjaBidangSopStep[]
+  targets      KinerjaBidangSopTarget[]
+  realizations KinerjaBidangSopRealization[]
+
+  @@index([code])
+  @@index([stage])
+  @@index([status])
+  @@index([isRhkPrimary])
+  @@index([sortOrder])
+  @@index([deletedAt])
+  @@map("kinerja_bidang_sop")
+}
+
+model KinerjaBidangSopRhk {
+  id      String @id @default(uuid()) @db.VarChar(36)
+  sopId   String @map("sop_id") @db.VarChar(36)
+  rhkCode String @map("rhk_code") @db.VarChar(30)
+
+  title       String? @db.VarChar(200)
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sop KinerjaBidangSop @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  @@unique([sopId, rhkCode])
+  @@index([sopId])
+  @@index([rhkCode])
+  @@map("kinerja_bidang_sop_rhk")
+}
+
+model KinerjaBidangSopStep {
+  id    String @id @default(uuid()) @db.VarChar(36)
+  sopId String @map("sop_id") @db.VarChar(36)
+
+  stepNumber Int     @map("step_number")
+  activity   String  @db.VarChar(250)
+  actor      String  @db.VarChar(150)
+  input      String  @db.Text
+  process    String  @db.Text
+  output     String  @db.Text
+  duration   String  @db.VarChar(120)
+  note       String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sop KinerjaBidangSop @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  @@unique([sopId, stepNumber])
+  @@index([sopId])
+  @@index([stepNumber])
+  @@map("kinerja_bidang_sop_steps")
+}
+
+model KinerjaBidangSopTarget {
+  id      String @id @default(uuid()) @db.VarChar(36)
+  sopId   String @map("sop_id") @db.VarChar(36)
+  rhkCode String @map("rhk_code") @db.VarChar(30)
+  year    Int
+
+  targetQuantity Int           @map("target_quantity")
+  targetUnit     SopTargetUnit @default(LAPORAN) @map("target_unit")
+  qualityTarget  String        @map("quality_target") @db.VarChar(80)
+  timeTarget     String        @map("time_target") @db.VarChar(150)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  sop          KinerjaBidangSop              @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  realizations KinerjaBidangSopRealization[]
+
+  @@unique([sopId, rhkCode, year])
+  @@index([sopId])
+  @@index([rhkCode])
+  @@index([year])
+  @@index([deletedAt])
+  @@map("kinerja_bidang_sop_targets")
+}
+
+model KinerjaBidangSopRealization {
+  id       String @id @default(uuid()) @db.VarChar(36)
+  targetId String @map("target_id") @db.VarChar(36)
+  sopId    String @map("sop_id") @db.VarChar(36)
+  rhkCode  String @map("rhk_code") @db.VarChar(30)
+
+  year    Int
+  month   Int?
+  quarter Int?
+
+  realizationQuantity Int                  @default(0) @map("realization_quantity")
+  qualityPercent      Float?               @map("quality_percent")
+  timeStatus          String?              @map("time_status") @db.VarChar(80)
+  status              SopRealizationStatus @default(DRAFT)
+
+  title       String  @db.VarChar(250)
+  description String? @db.Text
+  constraint  String? @db.Text
+  followUp    String? @map("follow_up") @db.Text
+  reviewNote  String? @map("review_note") @db.Text
+
+  submittedAt DateTime? @map("submitted_at")
+  reviewedAt  DateTime? @map("reviewed_at")
+  approvedAt  DateTime? @map("approved_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  target   KinerjaBidangSopTarget     @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  sop      KinerjaBidangSop           @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  evidence KinerjaBidangSopEvidence[]
+
+  @@index([targetId])
+  @@index([sopId])
+  @@index([rhkCode])
+  @@index([year])
+  @@index([month])
+  @@index([quarter])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("kinerja_bidang_sop_realizations")
+}
+
+model KinerjaBidangSopEvidence {
+  id            String @id @default(uuid()) @db.VarChar(36)
+  realizationId String @map("realization_id") @db.VarChar(36)
+  dmsDocumentId String @map("dms_document_id") @db.VarChar(36)
+
+  label       String? @db.VarChar(150)
+  description String? @db.Text
+  isPrimary   Boolean @default(false) @map("is_primary")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(36)
+
+  realization KinerjaBidangSopRealization @relation(fields: [realizationId], references: [id], onDelete: Cascade)
+  dmsDocument DmsDocument                  @relation(fields: [dmsDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([realizationId, dmsDocumentId])
+  @@index([realizationId])
+  @@index([dmsDocumentId])
+  @@index([createdAt])
+  @@map("kinerja_bidang_sop_evidence")
 }
 
 // ─── SIDATA Reference Tables ──────────────────────────────────────────────────

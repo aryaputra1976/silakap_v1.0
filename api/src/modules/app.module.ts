@@ -14,6 +14,7 @@ import { SipensiunModule } from './sipensiun/sipensiun.module';
 import { SlaModule } from './sla/sla.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { DmsModule } from './dms/dms.module';
+import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { DmsModule } from './dms/dms.module';
     SiarsipModule,
     SlaModule,
     DmsModule,
+    KinerjaBidangModule,
   ],
   controllers: [
     HealthController,

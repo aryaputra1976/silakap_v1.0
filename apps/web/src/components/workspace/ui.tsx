@@ -83,13 +83,13 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-[#d8e5d3] pb-5 md:flex-row md:items-end md:justify-between">
+    <div className="flex min-w-0 flex-col gap-4 border-b border-[#d8e5d3] pb-5 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
         {meta ? <div className="mb-2 flex flex-wrap gap-2">{meta}</div> : null}
         <h1 className="truncate text-2xl font-semibold tracking-normal text-[#102f2b]">{title}</h1>
         {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687967]">{description}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex max-w-full flex-wrap items-center gap-2 md:justify-end">{actions}</div> : null}
     </div>
   );
 }
@@ -108,17 +108,17 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40', className)}>
+    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40', className)}>
       {(title || description || actions) ? (
-        <div className="flex flex-col gap-3 border-b border-[#d8e5d3] bg-[#f5faf1] px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-col gap-3 border-b border-[#d8e5d3] bg-[#f5faf1] px-5 py-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             {title ? <h2 className="text-sm font-semibold uppercase tracking-normal text-[#173c36]">{title}</h2> : null}
             {description ? <p className="mt-1 text-sm text-[#6d7e68]">{description}</p> : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="flex max-w-full flex-wrap items-center gap-2 md:justify-end">{actions}</div> : null}
         </div>
       ) : null}
-      <div className="p-5">{children}</div>
+      <div className="min-w-0 max-w-full p-5">{children}</div>
     </section>
   );
 }
@@ -137,11 +137,11 @@ export function StatCard({
   tone?: Tone;
 }) {
   return (
-    <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-5 shadow-sm shadow-[#bfd0bb]/40">
+    <div className="min-w-0 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-5 shadow-sm shadow-[#bfd0bb]/40">
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">{label}</div>
-          <div className="mt-2 text-2xl font-semibold text-[#173c36]">{value}</div>
+          <div className="mt-2 break-words text-2xl font-semibold text-[#173c36]">{value}</div>
         </div>
         {Icon ? (
           <div className={cn('flex size-10 items-center justify-center rounded-lg border', toneClass[tone])}>
@@ -245,13 +245,13 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[780px] text-left text-sm">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40">
+      <div className="max-w-full overflow-x-auto">
+        <table className="w-full min-w-[720px] table-fixed text-left text-sm">
           <thead className="border-b border-[#d8e5d3] bg-[#eef7ec] text-xs font-semibold uppercase tracking-normal text-[#60735b]">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className={cn('px-4 py-3', column.className)}>
+                <th key={column.key} className={cn('break-words px-4 py-3', column.className)}>
                   {column.header}
                 </th>
               ))}
@@ -261,7 +261,7 @@ export function DataTable<T>({
             {items.map((item, index) => (
               <tr key={rowKey ? rowKey(item, index) : index} className="bg-[#fbfdf8] transition-colors hover:bg-[#f1f7ed]">
                 {columns.map((column) => (
-                  <td key={column.key} className={cn('px-4 py-3.5 align-top text-[#4e5f49]', column.className)}>
+                  <td key={column.key} className={cn('break-words px-4 py-3.5 align-top text-[#4e5f49]', column.className)}>
                     {column.render(item)}
                   </td>
                 ))}
@@ -456,7 +456,7 @@ export function DownloadButton({ onClick, disabled }: { onClick: () => void; dis
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-1.5 text-sm">
+    <label className="grid min-w-0 gap-1.5 text-sm">
       <span className="font-semibold text-zinc-800">{label}</span>
       {children}
     </label>
@@ -507,7 +507,7 @@ export function formatFileSize(value: number | null | undefined) {
 }
 
 export const inputClass =
-  'h-10 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-3 text-sm text-[#173c36] outline-none transition-colors placeholder:text-[#8a9a84] focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:bg-[#edf3e9] disabled:text-[#74806f]';
+  'h-10 w-full min-w-0 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-3 text-sm text-[#173c36] outline-none transition-colors placeholder:text-[#8a9a84] focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:bg-[#edf3e9] disabled:text-[#74806f]';
 
 export const buttonClass =
   'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#0f766e] bg-[#0f766e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0b5f58] focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55';

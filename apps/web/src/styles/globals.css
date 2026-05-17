@@ -173,3 +173,57 @@ html {
 
 /* SILAKAP Configs */
 @import './config.silakap.css';
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    color: #111827 !important;
+  }
+
+  .print-page section,
+  .print-page article,
+  .print-page div {
+    box-shadow: none !important;
+  }
+
+  .print-page section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-page table {
+    page-break-inside: auto;
+  }
+
+  .print-page tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .print-page a,
+  .print-page button {
+    color: #111827 !important;
+  }
+
+  .print-page .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  .print-page table {
+    min-width: 100% !important;
+    width: 100% !important;
+    font-size: 11px !important;
+  }
+
+  .print-page th,
+  .print-page td {
+    padding: 6px 8px !important;
+  }
+}

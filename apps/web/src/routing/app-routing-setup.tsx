@@ -32,6 +32,15 @@ import { DmsDocumentDetailPage } from '@/pages/workspace/dms-document-detail-pag
 import { DmsUploadPage } from '@/pages/workspace/dms-upload-page';
 import { DmsVerificationPage } from '@/pages/workspace/dms-verification-page';
 import { DmsReportsPage } from '@/pages/workspace/dms-reports-page';
+import { SopDashboardPage } from '@/pages/workspace/sop-dashboard-page';
+import { SopMapPage } from '@/pages/workspace/sop-map-page';
+import { SopListPage } from '@/pages/workspace/sop-list-page';
+import { SopDetailPage } from '@/pages/workspace/sop-detail-page';
+import { SopMonitoringPage } from '@/pages/workspace/sop-monitoring-page';
+import { SopDocumentVerificationPage } from '@/pages/workspace/sop-document-verification-page';
+import { SopRealizationPage } from '@/pages/workspace/sop-realization-page';
+import { SopRealizationDetailPage } from '@/pages/workspace/sop-realization-detail-page';
+import { SopReportPage } from '@/pages/workspace/sop-report-page';
 
 export function AppRoutingSetup() {
   return (
@@ -42,10 +51,21 @@ export function AppRoutingSetup() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
 
+          {/* KINERJA BIDANG / SOP & RHK */}
+          <Route path="/kinerja-bidang" element={<SopDashboardPage />} />
+          <Route path="/kinerja-bidang/sop" element={<SopListPage />} />
+          <Route path="/kinerja-bidang/sop/map" element={<SopMapPage />} />
+          <Route path="/kinerja-bidang/sop/:id" element={<SopDetailPage />} />
+          <Route path="/kinerja-bidang/monitoring" element={<SopMonitoringPage />} />
+          <Route path="/kinerja-bidang/realisasi" element={<SopRealizationPage />} />
+          <Route path="/kinerja-bidang/realisasi/:id" element={<SopRealizationDetailPage />} />
+          <Route path="/kinerja-bidang/laporan" element={<SopReportPage />} />
+
           {/* SIDATA ASN */}
           <Route path="/sidata/dashboard" element={<SidataDashboardPage />} />
           <Route path="/sidata/asn" element={<SidataAsnPage />} />
           <Route path="/sidata/asn/:id" element={<SidataAsnDetailPage />} />
+          <Route path="/sidata/dms-data-kepegawaian" element={<SopDocumentVerificationPage />} />
           <Route path="/sidata/validasi" element={<SidataValidasiPage />} />
           <Route path="/sidata/pemutakhiran" element={<SidataPemutakhiranPage />} />
           <Route path="/sidata/import/siasn" element={<SidataImportSiasnPage />} />

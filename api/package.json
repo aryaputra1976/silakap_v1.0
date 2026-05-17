@@ -11,6 +11,7 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-kinerja-bidang": "tsx prisma/seed-kinerja-bidang.ts",
     "db:seed-ref-jenis-jabatan": "tsx scripts/seed-ref-jenis-jabatan.ts",
     "db:extract-asn-references": "tsx scripts/extract-asn-references.ts",
     "db:remap-asn-batch": "tsx scripts/remap-asn-batch.ts",

@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Target,
   Users,
 } from 'lucide-react';
 import { MenuConfig } from '@/config/types';
@@ -56,11 +57,24 @@ export const MENU_SIDEBAR: MenuConfig = [
     ],
   },
   {
+    title: 'Kinerja Bidang',
+    icon: Target,
+    children: [
+      { title: 'Dashboard RHK', path: '/kinerja-bidang' },
+      { title: 'Peta SOP Bidang', path: '/kinerja-bidang/sop/map' },
+      { title: 'Daftar SOP', path: '/kinerja-bidang/sop' },
+      { title: 'Monitoring Realisasi', path: '/kinerja-bidang/monitoring' },
+      { title: 'Realisasi SOP/RHK', path: '/kinerja-bidang/realisasi' },
+      { title: 'Laporan Kinerja Bidang', path: '/kinerja-bidang/laporan' },
+    ],
+  },
+  {
     title: 'SIDATA ASN',
     icon: Database,
     children: [
       { title: 'Dashboard', path: '/sidata/dashboard' },
       { title: 'Profil ASN', path: '/sidata/asn' },
+      { title: 'Pengelolaan DMS & Data Kepegawaian', path: '/sidata/dms-data-kepegawaian' },
       { title: 'Validasi Data', path: '/sidata/validasi' },
       { title: 'Pemutakhiran Data', path: '/sidata/pemutakhiran' },
       {
