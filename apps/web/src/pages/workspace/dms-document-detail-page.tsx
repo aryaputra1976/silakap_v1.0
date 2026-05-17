@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Lock, RefreshCcw } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
   dmsApi,
+  dmsAccessLevelLabel,
+  dmsAccessLevelTone,
   type DmsAuditTimelineItem,
   type DmsDocument,
   type DmsDocumentCategory,
@@ -49,6 +51,7 @@ export function DmsDocumentDetailPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
   const [error, setError] = useState('');
+  const [isForbidden, setIsForbidden] = useState(false);
 
   async function loadAuditTimeline(targetDocumentId: string) {
     setAuditLoading(true);
@@ -78,6 +81,7 @@ export function DmsDocumentDetailPage() {
 
     setLoading(true);
     setError('');
+    setIsForbidden(false);
 
     try {
       const result = await dmsApi.getDocument(documentId);
@@ -85,11 +89,15 @@ export function DmsDocumentDetailPage() {
       setForm(toFormValue(result));
       await loadAuditTimeline(result.id);
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Gagal memuat detail dokumen DMS',
-      );
+      if (caught instanceof ApiError && caught.status === 403) {
+        setIsForbidden(true);
+      } else {
+        setError(
+          caught instanceof ApiError
+            ? caught.message
+            : 'Gagal memuat detail dokumen DMS',
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -358,6 +366,48 @@ export function DmsDocumentDetailPage() {
     return <LoadingState label="Memuat detail dokumen DMS" />;
   }
 
+  if (isForbidden) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title="Akses Ditolak"
+          description="Dokumen ini memiliki level akses terbatas yang tidak sesuai dengan peran Anda."
+          actions={
+            <ActionButton
+              icon={ArrowLeft}
+              onClick={() => navigate('/dms/documents')}
+              variant="secondary"
+            >
+              Kembali
+            </ActionButton>
+          }
+        />
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-rose-200 bg-rose-50 px-6 py-10 text-center">
+          <div className="flex size-14 items-center justify-center rounded-full border border-rose-200 bg-white">
+            <Lock className="size-6 text-rose-600" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-rose-800">
+              Dokumen ini tidak dapat diakses
+            </p>
+            <p className="mt-1 max-w-md text-sm text-rose-600">
+              Level akses dokumen ini (TERBATAS / SANGAT_TERBATAS / PIMPINAN / AUDIT)
+              memerlukan peran yang lebih tinggi. Hubungi administrator DMS jika Anda
+              memerlukan akses.
+            </p>
+          </div>
+          <ActionButton
+            icon={ArrowLeft}
+            onClick={() => navigate('/dms/documents')}
+            variant="secondary"
+          >
+            Kembali ke Daftar Dokumen
+          </ActionButton>
+        </div>
+      </div>
+    );
+  }
+
   if (!document) {
     return (
       <div className="space-y-5">
@@ -393,6 +443,10 @@ export function DmsDocumentDetailPage() {
           <>
             <DmsCategoryBadge category={document.category} />
             <DmsStatusBadge status={document.status} />
+            <StatusBadge
+              value={dmsAccessLevelLabel(document.accessLevel)}
+              tone={dmsAccessLevelTone(document.accessLevel)}
+            />
             {document.fileName ? (
               <StatusBadge value="FILE TERSEDIA" tone="success" />
             ) : (
@@ -422,6 +476,19 @@ export function DmsDocumentDetailPage() {
       />
 
       {error ? <ErrorAlert message={error} /> : null}
+
+      {(document.accessLevel === 'SANGAT_TERBATAS' ||
+        document.accessLevel === 'PIMPINAN' ||
+        document.accessLevel === 'AUDIT') && (
+        <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <strong>Dokumen Sensitif — {dmsAccessLevelLabel(document.accessLevel)}.</strong>{' '}
+            Akses ke dokumen ini terbatas. Pastikan penanganan sesuai dengan kebijakan keamanan
+            informasi BKPSDM. Jangan bagikan konten dokumen kepada pihak yang tidak berwenang.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_0.8fr]">
         <div className="space-y-5">

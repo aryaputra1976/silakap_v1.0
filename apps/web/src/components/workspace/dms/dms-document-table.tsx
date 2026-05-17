@@ -8,6 +8,7 @@ import {
 } from '@/components/workspace/ui';
 import {
   dmsAccessLevelLabel,
+  dmsAccessLevelTone,
   dmsSubCategoryLabel,
   type DmsDocument,
 } from '@/lib/api/dms';
@@ -60,7 +61,7 @@ export function DmsDocumentTable({
                     ) : null}
                     <StatusBadge
                       value={dmsAccessLevelLabel(item.accessLevel)}
-                      tone={item.accessLevel === 'INTERNAL' ? 'neutral' : 'warning'}
+                      tone={dmsAccessLevelTone(item.accessLevel)}
                     />
                   </div>
                 </div>

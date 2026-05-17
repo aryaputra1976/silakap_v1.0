@@ -34,6 +34,7 @@ import {
   getExecutiveRecommendation,
   getTodayLabel,
 } from '@/lib/sidata';
+import { SidataReportPanel } from '@/components/workspace/sidata/sidata-report-panel';
 import {
   ActionButton,
   DataTable,
@@ -540,6 +541,14 @@ export function SidataLaporanPage() {
             ]}
           />
         )}
+      </SectionCard>
+
+      {/* RHK 5 / RHK 6 Reporting */}
+      <SectionCard
+        title="Laporan RHK SIDATA"
+        description="Kaitkan data pemutakhiran dan sinkronisasi dengan realisasi RHK 5 (SIK) dan RHK 6 (DAT) di Kinerja Bidang."
+      >
+        <SidataReportPanel />
       </SectionCard>
     </div>
   );

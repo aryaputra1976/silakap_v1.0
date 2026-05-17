@@ -11,7 +11,11 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { basename, extname, isAbsolute, relative, resolve } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
-import { canAccessDmsDocument } from './constants/dms-permission.constant';
+import {
+  canAccessDmsDocument,
+  getAllowedAccessLevels,
+  canUserSeeAccessLevel,
+} from './constants/dms-permission.constant';
 import {
   isDmsDeletableStatus,
   isDmsEditableStatus,
@@ -460,7 +464,6 @@ export class DmsService {
       q: this.normalizeOptionalText(query.q),
       category: query.category,
       subCategory: this.normalizeOptionalText(query.subCategory),
-      accessLevel: this.normalizeOptionalText(query.accessLevel),
       status: query.status,
       unitKerjaId: this.normalizeOptionalText(query.unitKerjaId),
       asnId: this.normalizeOptionalText(query.asnId),
@@ -472,6 +475,19 @@ export class DmsService {
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000) ?? 1,
       limit: this.normalizePositiveNumber(query.limit, 10, 1, 100) ?? 10,
     };
+
+    // Compute which access levels this user may see
+    const allowedLevels = getAllowedAccessLevels(user);
+    const requestedLevel = this.normalizeOptionalText(query.accessLevel);
+
+    if (requestedLevel) {
+      // User filtered by a specific level: only show it if they're permitted
+      filters.allowedAccessLevels = canUserSeeAccessLevel(user, requestedLevel)
+        ? [requestedLevel]
+        : [];
+    } else {
+      filters.allowedAccessLevels = allowedLevels;
+    }
 
     if (!this.hasAnyRole(user, ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN'])) {
       if (

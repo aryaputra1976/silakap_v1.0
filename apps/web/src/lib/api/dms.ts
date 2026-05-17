@@ -518,3 +518,55 @@ export function dmsAccessLevelLabel(accessLevel: string) {
 
   return labels[accessLevel as DmsAccessLevel] ?? accessLevel.replace(/_/g, ' ');
 }
+
+export function dmsAccessLevelTone(
+  accessLevel: string,
+): 'neutral' | 'warning' | 'danger' | 'info' | 'dark' {
+  switch (accessLevel as DmsAccessLevel) {
+    case 'INTERNAL':
+      return 'neutral';
+    case 'TERBATAS':
+      return 'warning';
+    case 'SANGAT_TERBATAS':
+      return 'danger';
+    case 'PIMPINAN':
+      return 'info';
+    case 'AUDIT':
+      return 'dark';
+    default:
+      return 'neutral';
+  }
+}
+
+export function dmsAccessLevelDescription(accessLevel: string): string {
+  const descriptions: Record<DmsAccessLevel, string> = {
+    INTERNAL: 'Dapat diakses semua pengguna DMS yang telah login.',
+    TERBATAS: 'Hanya KABID, Analis Madya/Muda, Admin, dan Kepala Badan.',
+    SANGAT_TERBATAS: 'Hanya KABID, Admin BKPSDM, dan Kepala Badan.',
+    PIMPINAN: 'Hanya KABID, Admin BKPSDM, dan Kepala Badan.',
+    AUDIT: 'Hanya KABID, Admin BKPSDM, dan Kepala Badan (untuk keperluan audit).',
+  };
+
+  return descriptions[accessLevel as DmsAccessLevel] ?? 'Level akses dokumen ini.';
+}
+
+/** Returns the recommended accessLevel for a given subCategory. */
+export function getDefaultAccessLevelForSubCategory(
+  subCategory: string,
+): DmsAccessLevel {
+  switch (subCategory as DmsSubCategory) {
+    case 'SK_PENSIUN':
+    case 'SOP_PENSIUN_PEMBERHENTIAN':
+      return 'TERBATAS';
+    case 'CHECKLIST_VERIFIKASI':
+      return 'TERBATAS';
+    case 'LAPORAN_RHK':
+    case 'SOP_TAHAP_1':
+    case 'SOP_TAHAP_2':
+    case 'SOP_TAHAP_3':
+    case 'SOP_MATRIKS':
+      return 'INTERNAL';
+    default:
+      return 'INTERNAL';
+  }
+}

@@ -160,7 +160,7 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'SIANALITIK',
     icon: BarChart3,
-    path: '/dashboard?view=analytics',
+    path: '/sianalitik',
   },
   {
     title: 'Referensi SOP',

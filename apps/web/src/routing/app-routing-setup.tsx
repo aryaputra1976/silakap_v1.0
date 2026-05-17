@@ -52,6 +52,7 @@ import { LayananSlaPage } from '@/pages/workspace/layanan-sla-page';
 import { LayananDelayPage } from '@/pages/workspace/layanan-delay-page';
 import { LayananSatisfactionPage } from '@/pages/workspace/layanan-satisfaction-page';
 import { LayananReportPage } from '@/pages/workspace/layanan-report-page';
+import SianalitikPage from '@/pages/workspace/sianalitik-page';
 
 export function AppRoutingSetup() {
   return (
@@ -106,6 +107,9 @@ export function AppRoutingSetup() {
           {/* SIPENSIUN */}
           <Route path="/sipensiun" element={<SipensiunListPage />} />
           <Route path="/sipensiun/:id" element={<SipensiunDetailPage />} />
+
+          {/* SIANALITIK */}
+          <Route path="/sianalitik" element={<SianalitikPage />} />
 
           {/* LAYANAN KEPEGAWAIAN */}
           <Route path="/layanan" element={<LayananKepegawaianPage />} />

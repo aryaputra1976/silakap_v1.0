@@ -33,6 +33,9 @@ import {
   Toolbar,
   formatDateTime,
 } from '@/components/workspace/ui';
+import { SidataSopPanel } from '@/components/workspace/sidata/sidata-sop-panel';
+import { SidataDiscrepancyTable } from '@/components/workspace/sidata/sidata-discrepancy-table';
+import { SIDATA_SOP_LIST } from '@/lib/sidata/sidata-sop-data';
 
 type TypeFilter = '' | ReconciliationType;
 
@@ -430,6 +433,36 @@ export function SidataRekonsiliasiPage() {
           </div>
         ) : null}
       </SectionCard>
+
+      {/* Discrepancy summary for attention rows */}
+      {response && response.items.length > 0 && (
+        <SectionCard
+          title="Ringkasan Diskrepansi"
+          description="Baris dengan perbedaan data antara master SIDATA dan batch SIASN."
+        >
+          <SidataDiscrepancyTable
+            items={response.items.filter((r) => r.type !== 'SAME').slice(0, 10)}
+            empty="Tidak ada diskrepansi pada halaman ini"
+          />
+        </SectionCard>
+      )}
+
+      {/* SOP Reference */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Catatan Rekonsiliasi</p>
+          <p className="mt-1">
+            Rekonsiliasi membandingkan data batch SIASN dengan master SIDATA. Baris <em>DIFFERENT</em> menunjukkan
+            perubahan yang perlu dikonfirmasi sebelum commit. Baris <em>ONLY_IN_BATCH</em> adalah ASN baru dari SIASN.
+            Baris <em>ONLY_IN_MASTER</em> adalah ASN yang tidak lagi ada di data SIASN terbaru.
+          </p>
+        </div>
+        <SidataSopPanel
+          sops={SIDATA_SOP_LIST.filter((s) => s.key === 'DAT-002' || s.key === 'SIK-002')}
+          title="SOP Rekonsiliasi"
+          compact
+        />
+      </div>
     </div>
   );
 }

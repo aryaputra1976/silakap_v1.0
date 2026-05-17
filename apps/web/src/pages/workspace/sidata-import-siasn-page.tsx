@@ -33,6 +33,9 @@ import {
   type SiasnImportBatch,
   type SiasnImportSummary,
 } from '@/lib/api/sidata-import';
+import { SidataSopPanel } from '@/components/workspace/sidata/sidata-sop-panel';
+import { SidataSyncStatusPanel } from '@/components/workspace/sidata/sidata-sync-status-panel';
+import { SIDATA_SOP_LIST } from '@/lib/sidata/sidata-sop-data';
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -939,6 +942,15 @@ export function SidataImportSiasnPage() {
           ) : null}
         </>
       )}
+
+      {/* SOP SIK-002 + Sync Status */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <SidataSyncStatusPanel batches={batches} loading={batchesLoading} />
+        <SidataSopPanel
+          sops={SIDATA_SOP_LIST.filter((s) => s.key === 'SIK-002')}
+          title="SOP Sinkronisasi SIASN"
+        />
+      </div>
     </div>
   );
 }

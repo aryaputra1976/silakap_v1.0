@@ -1,11 +1,15 @@
+import { Shield } from 'lucide-react';
 import { Field, inputClass } from '@/components/workspace/ui';
 import {
   DMS_ACCESS_LEVELS,
   DMS_DOCUMENT_CATEGORIES,
   DMS_SUB_CATEGORIES,
+  dmsAccessLevelDescription,
   dmsAccessLevelLabel,
+  dmsAccessLevelTone,
   dmsCategoryLabel,
   dmsSubCategoryLabel,
+  getDefaultAccessLevelForSubCategory,
   type DmsAccessLevel,
   type DmsDocumentCategory,
 } from '@/lib/api/dms';
@@ -107,7 +111,17 @@ export function DmsMetadataForm({
             className={inputClass}
             disabled={disabled}
             value={value.subCategory}
-            onChange={(event) => update('subCategory', event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value;
+              const suggestedLevel = next
+                ? getDefaultAccessLevelForSubCategory(next)
+                : 'INTERNAL';
+              onChange({
+                ...value,
+                subCategory: next,
+                accessLevel: suggestedLevel,
+              });
+            }}
           >
             <option value="">Tidak spesifik</option>
             {DMS_SUB_CATEGORIES.map((subCategory) => (
@@ -133,6 +147,24 @@ export function DmsMetadataForm({
               </option>
             ))}
           </select>
+          {value.accessLevel && (
+            <div
+              className={`mt-1.5 flex items-start gap-1.5 rounded border px-2 py-1.5 text-xs ${
+                dmsAccessLevelTone(value.accessLevel) === 'danger'
+                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                  : dmsAccessLevelTone(value.accessLevel) === 'warning'
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : dmsAccessLevelTone(value.accessLevel) === 'info'
+                      ? 'border-[#9fd6dc] bg-[#e7f6f5] text-[#096672]'
+                      : dmsAccessLevelTone(value.accessLevel) === 'dark'
+                        ? 'border-[#103f3b] bg-[#1e4620] text-white'
+                        : 'border-[#d6e2d1] bg-[#f4f8ef] text-[#51614c]'
+              }`}
+            >
+              <Shield className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>{dmsAccessLevelDescription(value.accessLevel)}</span>
+            </div>
+          )}
         </Field>
 
         <Field label="Tahun">

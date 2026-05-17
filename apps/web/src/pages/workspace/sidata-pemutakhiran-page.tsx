@@ -45,6 +45,8 @@ import {
   StatusBadge,
   formatDateTime,
 } from '@/components/workspace/ui';
+import { SidataSopPanel } from '@/components/workspace/sidata/sidata-sop-panel';
+import { SIDATA_SOP_LIST } from '@/lib/sidata/sidata-sop-data';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -524,6 +526,12 @@ export function SidataPemutakhiranPage() {
               </ul>
             </div>
           </div>
+
+          {/* SOP Pemutakhiran */}
+          <SidataSopPanel
+            sops={SIDATA_SOP_LIST.filter((s) => s.key === 'DAT-002' || s.key === 'DAT-003')}
+            title="SOP Pemutakhiran Data ASN"
+          />
         </>
       )}
     </div>

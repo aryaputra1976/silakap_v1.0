@@ -73,7 +73,10 @@ export interface NormalizedDmsDocumentFilters {
   q?: string;
   category?: Prisma.EnumDmsDocumentCategoryFilter['equals'];
   subCategory?: string;
+  /** Replaced by allowedAccessLevels; kept for compatibility but not used in buildWhere. */
   accessLevel?: string;
+  /** Computed list of access levels the requesting user may see. Enforced as IN filter. */
+  allowedAccessLevels?: string[];
   status?: Prisma.EnumDmsDocumentStatusFilter['equals'];
   unitKerjaId?: string;
   asnId?: string;
@@ -212,8 +215,9 @@ export class DmsRepository {
       where.subCategory = filters.subCategory;
     }
 
-    if (filters.accessLevel) {
-      where.accessLevel = filters.accessLevel;
+    if (filters.allowedAccessLevels !== undefined) {
+      // Empty list means the user has no access at all — match nothing
+      where.accessLevel = { in: filters.allowedAccessLevels };
     }
 
     if (filters.status) {

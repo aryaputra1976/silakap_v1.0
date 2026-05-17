@@ -17,6 +17,8 @@ export const DMS_OWN_SCOPE_ROLES = [
   'ANALIS_PERTAMA',
   'PENELAAH',
   'PPPK',
+  // External OPD user — can upload persyaratan documents, sees only own uploads, INTERNAL level only
+  'OPD_OPERATOR',
 ] as const;
 
 export const DMS_VIEW_ROLES = [
@@ -52,11 +54,69 @@ export const DMS_ACCESS_ROLES = uniqueRoles([
   ...DMS_ADMIN_ROLES,
 ]);
 
+// ---------------------------------------------------------------------------
+// Access-level policy
+//
+// Role mapping notes (roles requested by sprint spec vs existing codebase):
+//   ADMIN_DMS    → ADMIN_BKPSDM  (closest DMS admin role)
+//   ADMIN_DATA   → ANALIS_MADYA  (senior analyst managing data)
+//   SEKRETARIS   → no existing match; omitted from TERBATAS & PIMPINAN
+//   AUDITOR      → no existing match; omitted from AUDIT & SANGAT_TERBATAS
+//   SUPER_ADMIN  → always has access (implicit via DMS_ALL_ACCESS_ROLES)
+//
+// Limitation: SEKRETARIS and AUDITOR roles do not exist in the codebase.
+// If these roles are added in the future, include them in the respective lists below.
+// ---------------------------------------------------------------------------
+
+export const DMS_ACCESS_LEVEL_ROLES: Readonly<Record<string, readonly string[]>> = {
+  // INTERNAL: all authenticated DMS users can view
+  INTERNAL: DMS_VIEW_ROLES,
+
+  // TERBATAS: senior analysts and above
+  // Maps: ADMIN_DMS→ADMIN_BKPSDM, ADMIN_DATA→ANALIS_MADYA; SEKRETARIS/AUDITOR omitted
+  TERBATAS: [
+    'SUPER_ADMIN',
+    'ADMIN_BKPSDM',
+    'KEPALA_BADAN',
+    'KABID',
+    'ANALIS_MADYA',
+    'ANALIS_MUDA',
+  ] as const,
+
+  // SANGAT_TERBATAS: leadership and DMS admin only
+  // Maps: ADMIN_DMS→ADMIN_BKPSDM; AUDITOR omitted
+  SANGAT_TERBATAS: [
+    'SUPER_ADMIN',
+    'ADMIN_BKPSDM',
+    'KEPALA_BADAN',
+    'KABID',
+  ] as const,
+
+  // PIMPINAN: leadership only
+  // Maps: SEKRETARIS omitted (no matching role)
+  PIMPINAN: [
+    'SUPER_ADMIN',
+    'ADMIN_BKPSDM',
+    'KEPALA_BADAN',
+    'KABID',
+  ] as const,
+
+  // AUDIT: audit-capable roles
+  // Maps: AUDITOR omitted (no matching role)
+  AUDIT: [
+    'SUPER_ADMIN',
+    'ADMIN_BKPSDM',
+    'KEPALA_BADAN',
+    'KABID',
+  ] as const,
+};
+
 export type DmsAccessScope = 'ALL' | 'UNIT' | 'OWN';
 
 export interface DmsDocumentAccessSubject {
   createdById: string | null;
   unitKerjaId: string | null;
+  accessLevel?: string | null;
 }
 
 export function getDmsAccessScope(user: AuthUser): DmsAccessScope {
@@ -94,10 +154,34 @@ export function canAdminDms(user: AuthUser): boolean {
   return hasAnyDmsRole(user, DMS_ADMIN_ROLES);
 }
 
+/** Returns true if the user's roles allow viewing documents at the given accessLevel. */
+export function canUserSeeAccessLevel(user: AuthUser, accessLevel: string): boolean {
+  const allowedRoles = DMS_ACCESS_LEVEL_ROLES[accessLevel];
+  if (!allowedRoles) {
+    // Unknown access level → treat as INTERNAL (most permissive)
+    return hasAnyDmsRole(user, DMS_VIEW_ROLES);
+  }
+  return hasAnyDmsRole(user, allowedRoles);
+}
+
+/** Returns the list of accessLevel values the user is permitted to see. */
+export function getAllowedAccessLevels(user: AuthUser): string[] {
+  return Object.keys(DMS_ACCESS_LEVEL_ROLES).filter((level) =>
+    canUserSeeAccessLevel(user, level),
+  );
+}
+
 export function canAccessDmsDocument(
   document: DmsDocumentAccessSubject,
   user: AuthUser,
 ): boolean {
+  // Access-level check first — takes precedence over scope
+  if (document.accessLevel) {
+    if (!canUserSeeAccessLevel(user, document.accessLevel)) {
+      return false;
+    }
+  }
+
   const scope = getDmsAccessScope(user);
 
   if (scope === 'ALL') {

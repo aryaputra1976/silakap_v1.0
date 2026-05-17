@@ -33,6 +33,8 @@ import {
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
+import { SidataSummaryCards } from '@/components/workspace/sidata/sidata-summary-cards';
+import { type SidataAsnQualityDashboard } from '@/lib/api/sidata';
 
 function JenisAsnBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-xs text-zinc-400">-</span>;
@@ -107,6 +109,8 @@ export function SidataAsnPage() {
   const [creatingId, setCreatingId] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  const [quality, setQuality] = useState<SidataAsnQualityDashboard | null>(null);
+
   const isMounted = useRef(true);
   const unitComboRef = useRef<HTMLDivElement | null>(null);
 
@@ -125,6 +129,18 @@ export function SidataAsnPage() {
     }, 650);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Load quality dashboard once on mount
+  useEffect(() => {
+    sidataApi
+      .getAsnQualityDashboard()
+      .then((result) => {
+        if (isMounted.current) setQuality(result);
+      })
+      .catch(() => {
+        // Non-critical; summary stays hidden on failure
+      });
+  }, []);
 
   // Load unit kerja tree once on mount
   useEffect(() => {
@@ -332,6 +348,8 @@ export function SidataAsnPage() {
       />
 
       {error ? <ErrorAlert message={error} /> : null}
+
+      {quality && <SidataSummaryCards quality={quality} />}
 
       <Toolbar>
         <FilterBar>
