@@ -6,6 +6,8 @@ import type { PaginatedResult } from '@/lib/api/types';
 import type {
   OpdSubmission,
   OpdSubmissionModuleKey,
+  OpdSubmissionSlaStatus,
+  OpdSubmissionSlaSummary,
   OpdSubmissionStatus,
   OpdSubmissionSummary,
 } from '@/lib/opd-submissions/types';
@@ -18,6 +20,7 @@ import {
   Toolbar,
 } from '@/components/workspace/ui';
 import { ServiceWorkbenchHeader } from '@/components/workspace/service-workbench/service-workbench-header';
+import { ServiceSlaSummaryPanel } from '@/components/workspace/service-workbench/service-sla-summary-panel';
 import { ServiceWorkbenchStatCards } from '@/components/workspace/service-workbench/service-workbench-stat-cards';
 import { ServiceWorkbenchTable } from '@/components/workspace/service-workbench/service-workbench-table';
 
@@ -43,13 +46,25 @@ const MODULE_OPTIONS: Array<{ value: OpdSubmissionModuleKey | ''; label: string 
     { value: 'DMS', label: 'DMS' },
   ];
 
+const SLA_OPTIONS: Array<{ value: OpdSubmissionSlaStatus | ''; label: string }> =
+  [
+    { value: '', label: 'Semua SLA' },
+    { value: 'ON_TRACK', label: 'On Track' },
+    { value: 'DUE_SOON', label: 'Due Soon' },
+    { value: 'OVERDUE', label: 'Overdue' },
+    { value: 'PAUSED_FOR_CORRECTION', label: 'Paused Correction' },
+    { value: 'COMPLETED', label: 'Completed' },
+  ];
+
 export function LayananWorkbenchPage() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<OpdSubmissionStatus | ''>('');
+  const [slaStatus, setSlaStatus] = useState<OpdSubmissionSlaStatus | ''>('');
   const [moduleKey, setModuleKey] = useState<OpdSubmissionModuleKey | ''>('');
   const [serviceType, setServiceType] = useState('');
   const [data, setData] = useState<PaginatedResult<OpdSubmission> | null>(null);
   const [summary, setSummary] = useState<OpdSubmissionSummary | null>(null);
+  const [slaSummary, setSlaSummary] = useState<OpdSubmissionSlaSummary | null>(null);
   const [verifiedCount, setVerifiedCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,6 +78,7 @@ export function LayananWorkbenchPage() {
     const query = {
       q,
       status,
+      slaStatus,
       moduleKey,
       serviceType: serviceType.trim() || undefined,
       page: 1,
@@ -72,15 +88,17 @@ export function LayananWorkbenchPage() {
     Promise.all([
       opdSubmissionsApi.fetchInternalOpdSubmissions(query),
       opdSubmissionsApi.fetchInternalOpdSubmissionSummary(query),
+      opdSubmissionsApi.fetchInternalSlaSummary(query),
       opdSubmissionsApi.fetchInternalOpdSubmissionSummary({
         ...query,
         status: 'VERIFIED',
       }),
     ])
-      .then(([submissions, nextSummary, verifiedSummary]) => {
+      .then(([submissions, nextSummary, nextSlaSummary, verifiedSummary]) => {
         if (active) {
           setData(submissions);
           setSummary(nextSummary);
+          setSlaSummary(nextSlaSummary);
           setVerifiedCount(verifiedSummary.totalPermohonan);
         }
       })
@@ -102,7 +120,7 @@ export function LayananWorkbenchPage() {
     return () => {
       active = false;
     };
-  }, [moduleKey, q, serviceType, status]);
+  }, [moduleKey, q, serviceType, slaStatus, status]);
 
   useEffect(() => load(), [load, refreshKey]);
 
@@ -120,6 +138,8 @@ export function LayananWorkbenchPage() {
         summary={summary}
         verifiedCount={verifiedCount}
       />
+
+      <ServiceSlaSummaryPanel summary={slaSummary} />
 
       <Toolbar>
         <FilterBar>
@@ -164,6 +184,19 @@ export function LayananWorkbenchPage() {
             value={serviceType}
             onChange={(event) => setServiceType(event.target.value)}
           />
+          <select
+            className={inputClass}
+            value={slaStatus}
+            onChange={(event) =>
+              setSlaStatus(event.target.value as OpdSubmissionSlaStatus | '')
+            }
+          >
+            {SLA_OPTIONS.map((option) => (
+              <option key={option.value || 'ALL'} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </FilterBar>
       </Toolbar>
 

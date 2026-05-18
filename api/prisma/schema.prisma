@@ -930,20 +930,56 @@ model OpdSubmission {
   createdById      String?   @map("created_by_id") @db.VarChar(36)
   updatedById      String?   @map("updated_by_id") @db.VarChar(36)
   assignedToId     String?   @map("assigned_to_id") @db.VarChar(36)
+  slaStartedAt     DateTime? @map("sla_started_at")
+  slaPausedAt      DateTime? @map("sla_paused_at")
+  slaResumedAt     DateTime? @map("sla_resumed_at")
+  slaStoppedAt     DateTime? @map("sla_stopped_at")
+  slaDueAt         DateTime? @map("sla_due_at")
+  slaTargetHours   Int?      @map("sla_target_hours")
+  slaElapsedHours  Int       @default(0) @map("sla_elapsed_hours")
+  slaPausedHours   Int       @default(0) @map("sla_paused_hours")
+  slaStatus        String?   @map("sla_status") @db.VarChar(40)
+  lastStatusChangedAt DateTime? @map("last_status_changed_at")
+  lastStatusChangedById String? @map("last_status_changed_by_id") @db.VarChar(36)
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   documents OpdSubmissionDocument[]
   auditLogs OpdSubmissionAuditLog[]
+  timelines OpdSubmissionTimeline[]
 
   @@index([opdUserId])
   @@index([opdUnitId])
   @@index([serviceType])
   @@index([moduleKey])
   @@index([status])
+  @@index([slaStatus])
+  @@index([slaDueAt])
   @@index([createdAt])
   @@index([submittedAt])
   @@map("opd_submissions")
+}
+
+model OpdSubmissionTimeline {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  submissionId   String   @map("submission_id") @db.VarChar(36)
+  fromStatus     String?  @map("from_status") @db.VarChar(40)
+  toStatus       String   @map("to_status") @db.VarChar(40)
+  action         String   @db.VarChar(100)
+  actorId        String?  @map("actor_id") @db.VarChar(36)
+  actorRole      String?  @map("actor_role") @db.VarChar(80)
+  note           String?  @db.Text
+  publicNote     String?  @map("public_note") @db.Text
+  isVisibleToOpd Boolean  @default(true) @map("is_visible_to_opd")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  submission OpdSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([toStatus])
+  @@index([action])
+  @@index([createdAt])
+  @@map("opd_submission_timelines")
 }
 
 model OpdSubmissionDocument {

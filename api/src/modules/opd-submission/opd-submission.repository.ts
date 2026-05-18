@@ -9,11 +9,16 @@ const submissionInclude = {
   auditLogs: {
     orderBy: { createdAt: 'desc' },
   },
+  timelines: {
+    orderBy: { createdAt: 'asc' },
+  },
 } satisfies Prisma.OpdSubmissionInclude;
 
 export type OpdSubmissionRecord = Prisma.OpdSubmissionGetPayload<{
   include: typeof submissionInclude;
 }>;
+
+export type OpdSubmissionTimelineRecord = Prisma.OpdSubmissionTimelineGetPayload<object>;
 
 export type OpdSubmissionListFilters = {
   q?: string;
@@ -22,6 +27,9 @@ export type OpdSubmissionListFilters = {
   serviceType?: string;
   opdUnitId?: string;
   opdUserId?: string;
+  slaStatus?: string;
+  from?: Date;
+  to?: Date;
   page: number;
   limit: number;
 };
@@ -67,6 +75,15 @@ export class OpdSubmissionRepository {
       where: { id },
       data,
       include: submissionInclude,
+    });
+  }
+
+  findSlaItems(filters: Omit<OpdSubmissionListFilters, 'page' | 'limit'>) {
+    return this.prisma.opdSubmission.findMany({
+      where: this.buildWhere({ ...filters, page: 1, limit: 1 }),
+      include: submissionInclude,
+      orderBy: [{ slaDueAt: 'asc' }, { updatedAt: 'desc' }],
+      take: 500,
     });
   }
 
@@ -123,6 +140,42 @@ export class OpdSubmissionRepository {
         actorRole: params.actorRole ?? null,
         note: params.note ?? null,
       },
+    });
+  }
+
+  async createTimeline(params: {
+    submissionId: string;
+    fromStatus?: string | null;
+    toStatus: string;
+    action: string;
+    actorId?: string | null;
+    actorRole?: string | null;
+    note?: string | null;
+    publicNote?: string | null;
+    isVisibleToOpd?: boolean;
+  }) {
+    return this.prisma.opdSubmissionTimeline.create({
+      data: {
+        submissionId: params.submissionId,
+        fromStatus: params.fromStatus ?? null,
+        toStatus: params.toStatus,
+        action: params.action,
+        actorId: params.actorId ?? null,
+        actorRole: params.actorRole ?? null,
+        note: params.note ?? null,
+        publicNote: params.publicNote ?? null,
+        isVisibleToOpd: params.isVisibleToOpd ?? true,
+      },
+    });
+  }
+
+  findTimeline(submissionId: string, visibleOnly: boolean) {
+    return this.prisma.opdSubmissionTimeline.findMany({
+      where: {
+        submissionId,
+        ...(visibleOnly ? { isVisibleToOpd: true } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
@@ -184,8 +237,17 @@ export class OpdSubmissionRepository {
       ...(filters.opdUserId ? { opdUserId: filters.opdUserId } : {}),
       ...(filters.opdUnitId ? { opdUnitId: filters.opdUnitId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.slaStatus ? { slaStatus: filters.slaStatus } : {}),
       ...(filters.moduleKey ? { moduleKey: filters.moduleKey } : {}),
       ...(filters.serviceType ? { serviceType: filters.serviceType } : {}),
+      ...((filters.from || filters.to)
+        ? {
+            createdAt: {
+              ...(filters.from ? { gte: filters.from } : {}),
+              ...(filters.to ? { lte: filters.to } : {}),
+            },
+          }
+        : {}),
       ...(q
         ? {
             OR: [

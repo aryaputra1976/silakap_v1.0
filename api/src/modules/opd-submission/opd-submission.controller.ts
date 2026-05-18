@@ -66,6 +66,12 @@ export class OpdSubmissionController {
     return ok(await this.service.getMySummary(query, user));
   }
 
+  @Get(':id/timeline')
+  @Roles('OPD')
+  async timelineMine(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return ok(await this.service.getMyTimeline(id, user));
+  }
+
   @Get(':id')
   @Roles('OPD')
   async getMine(@Param('id') id: string, @CurrentUser() user: AuthUser) {
@@ -198,6 +204,38 @@ export class InternalOpdSubmissionController {
     @CurrentUser() user: AuthUser,
   ) {
     return ok(await this.service.getInternalSummary(query, user));
+  }
+
+  @Get('sla/summary')
+  async slaSummary(
+    @Query() query: OpdSubmissionQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.getInternalSlaSummary(query, user));
+  }
+
+  @Get('sla/overdue')
+  async slaOverdue(
+    @Query() query: OpdSubmissionQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.getInternalSlaQueue(query, user, 'OVERDUE'));
+  }
+
+  @Get('sla/due-soon')
+  async slaDueSoon(
+    @Query() query: OpdSubmissionQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.getInternalSlaQueue(query, user, 'DUE_SOON'));
+  }
+
+  @Get(':id/timeline')
+  async timelineInternal(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.getInternalTimeline(id, user));
   }
 
   @Get(':id')

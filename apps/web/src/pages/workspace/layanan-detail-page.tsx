@@ -19,13 +19,18 @@ import {
   type ServiceDocumentAction,
 } from '@/components/workspace/service-workbench/service-document-panel';
 import { ServiceInternalDocumentPanel } from '@/components/workspace/service-workbench/service-internal-document-panel';
+import { ServiceSlaCard } from '@/components/workspace/service-workbench/service-sla-card';
 import { ServiceStatusBadge } from '@/components/workspace/service-workbench/service-status-badge';
+import { ServiceStatusTimeline } from '@/components/workspace/service-workbench/service-status-timeline';
 import { ServiceSubmissionDataCard } from '@/components/workspace/service-workbench/service-submission-data-card';
 import { ServiceVerificationNotePanel } from '@/components/workspace/service-workbench/service-verification-note-panel';
 import { ServiceWorkbenchHeader } from '@/components/workspace/service-workbench/service-workbench-header';
 import type { InternalSubmissionAction } from '@/lib/opd-submissions/internal-policy';
 import { getSopCodeForSubmission } from '@/lib/opd-submissions/sop-mapping';
-import type { OpdSubmission } from '@/lib/opd-submissions/types';
+import type {
+  OpdSubmission,
+  OpdSubmissionTimelineItem,
+} from '@/lib/opd-submissions/types';
 import { opdSubmissionStatusLabel } from '@/lib/opd-submissions/types';
 import { useAuth } from '@/lib/auth/session';
 import { getPrimaryRole } from '@/lib/rbac/roles';
@@ -35,6 +40,7 @@ export function LayananDetailPage() {
   const { user } = useAuth();
   const role = getPrimaryRole(user?.roles);
   const [submission, setSubmission] = useState<OpdSubmission | null>(null);
+  const [timeline, setTimeline] = useState<OpdSubmissionTimelineItem[]>([]);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingAction, setLoadingAction] =
@@ -52,10 +58,13 @@ export function LayananDetailPage() {
     setLoading(true);
     setError('');
 
-    opdSubmissionsApi
-      .fetchInternalOpdSubmission(id)
-      .then((result) => {
+    Promise.all([
+      opdSubmissionsApi.fetchInternalOpdSubmission(id),
+      opdSubmissionsApi.fetchInternalOpdSubmissionTimeline(id),
+    ])
+      .then(([result, timelineResult]) => {
         setSubmission(result);
+        setTimeline(timelineResult);
       })
       .catch((caught) => {
         setError(
@@ -235,6 +244,7 @@ export function LayananDetailPage() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <ServiceSubmissionDataCard submission={submission} />
+          <ServiceSlaCard submission={submission} />
           <ServiceDocumentPanel
             documents={submission.documents}
             loadingDocumentId={loadingDocumentId}
@@ -250,6 +260,7 @@ export function LayananDetailPage() {
             userRole={role}
           />
           <ServiceInternalDocumentPanel />
+          <ServiceStatusTimeline items={timeline} />
           <ServiceAuditTimeline auditLogs={submission.auditLogs} />
         </div>
 

@@ -16,8 +16,17 @@ import { SubmitOpdSubmissionDto } from './dto/submit-opd-submission.dto';
 import { UpdateOpdSubmissionDto } from './dto/update-opd-submission.dto';
 import { UploadSubmissionDocumentDto } from './dto/upload-submission-document.dto';
 import {
+  addHours,
+  calculateElapsedHours,
+  calculateSlaDueAt,
+  calculateSlaStatus,
+  diffHours,
+  getSlaTargetHours,
+} from './opd-sla.policy';
+import {
   OpdSubmissionRecord,
   OpdSubmissionRepository,
+  OpdSubmissionTimelineRecord,
 } from './opd-submission.repository';
 
 const OPD_ROLE = 'OPD';
@@ -128,6 +137,13 @@ export class OpdSubmissionService {
     });
   }
 
+  async getMyTimeline(id: string, user: AuthUser) {
+    this.ensureOpd(user);
+    const record = await this.getOwnedSubmission(id, user);
+    const timeline = await this.repo.findTimeline(record.id, true);
+    return timeline.map((item) => this.toTimelineResponse(item, false));
+  }
+
   async createDraft(
     dto: CreateOpdSubmissionDto,
     user: AuthUser,
@@ -151,6 +167,7 @@ export class OpdSubmissionService {
     });
 
     await this.writeAudit(created, 'CREATE_DRAFT', null, created, user, null, context);
+    await this.writeTimeline(created, null, 'DRAFT', 'CREATE_DRAFT', user, null, 'Draft pengajuan dibuat OPD');
     return this.toResponse(created, false);
   }
 
@@ -205,14 +222,27 @@ export class OpdSubmissionService {
 
     const submissionNumber = before.submissionNumber ?? await this.generateSubmissionNumber();
     const now = new Date();
+    const targetHours = getSlaTargetHours(before.moduleKey, before.serviceType);
+    const slaDueAt = calculateSlaDueAt(now, targetHours);
     const updated = await this.repo.update(before.id, {
       submissionNumber,
       status: 'SUBMITTED',
       submittedAt: now,
+      slaStartedAt: now,
+      slaDueAt,
+      slaTargetHours: targetHours,
+      slaElapsedHours: 0,
+      slaPausedHours: 0,
+      slaPausedAt: null,
+      slaStoppedAt: null,
+      slaStatus: 'ON_TRACK',
+      lastStatusChangedAt: now,
+      lastStatusChangedById: user.id,
       updatedById: user.id,
     });
 
     await this.writeAudit(updated, 'SUBMIT', before, updated, user, dto.note, context);
+    await this.writeTimeline(updated, before.status, 'SUBMITTED', 'SUBMIT', user, dto.note, 'Pengajuan dikirim OPD dan SLA mulai dihitung');
     return this.toResponse(updated, false);
   }
 
@@ -225,16 +255,22 @@ export class OpdSubmissionService {
     this.ensureOpd(user);
     const before = await this.getOwnedSubmission(id, user);
 
-    if (!['DRAFT', 'SUBMITTED', 'CORRECTION_SUBMITTED'].includes(before.status)) {
+    if (!['DRAFT', 'SUBMITTED'].includes(before.status)) {
       throw new BadRequestException('Pengajuan yang sudah diproses internal tidak dapat dibatalkan OPD');
     }
 
+    const now = new Date();
     const updated = await this.repo.update(before.id, {
       status: 'CANCELLED',
+      slaStoppedAt: now,
+      slaStatus: 'CANCELLED',
+      lastStatusChangedAt: now,
+      lastStatusChangedById: user.id,
       updatedById: user.id,
     });
 
     await this.writeAudit(updated, 'CANCEL', before, updated, user, dto.note, context);
+    await this.writeTimeline(updated, before.status, 'CANCELLED', 'CANCEL', user, dto.note, 'Pengajuan dibatalkan OPD');
     return this.toResponse(updated, false);
   }
 
@@ -360,19 +396,65 @@ export class OpdSubmissionService {
       throw new BadRequestException('Perbaikan hanya dapat dikirim saat status NEEDS_CORRECTION');
     }
 
+    const now = new Date();
+    const pausedDuration = before.slaPausedAt
+      ? diffHours(before.slaPausedAt, now)
+      : 0;
+    const nextPausedHours = (before.slaPausedHours ?? 0) + pausedDuration;
+    const nextDueAt = before.slaDueAt && pausedDuration > 0
+      ? addHours(before.slaDueAt, pausedDuration)
+      : before.slaDueAt;
     const updated = await this.repo.update(before.id, {
       status: 'CORRECTION_SUBMITTED',
       correctionNote: null,
+      slaPausedAt: null,
+      slaResumedAt: now,
+      slaPausedHours: nextPausedHours,
+      slaDueAt: nextDueAt,
+      slaStatus: calculateSlaStatus(
+        {
+          ...before,
+          status: 'CORRECTION_SUBMITTED',
+          slaPausedAt: null,
+          slaDueAt: nextDueAt,
+        },
+        now,
+      ),
+      lastStatusChangedAt: now,
+      lastStatusChangedById: user.id,
       updatedById: user.id,
     });
 
     await this.writeAudit(updated, 'CORRECTION_SUBMITTED', before, updated, user, dto.note, context);
+    await this.writeTimeline(updated, before.status, 'CORRECTION_SUBMITTED', 'CORRECTION_SUBMITTED', user, dto.note, 'Perbaikan berkas dikirim OPD dan SLA dilanjutkan');
     return this.toResponse(updated, false);
   }
 
   async listInternal(query: OpdSubmissionQueryDto, user: AuthUser) {
     this.ensureInternal(user);
     const filters = this.normalizeQuery(query);
+
+    if (query.slaStatus) {
+      const candidates = await this.repo.findSlaItems({
+        ...this.normalizeSummaryQuery(query),
+        slaStatus: undefined,
+      });
+      const filtered = this.filterByComputedSlaStatus(
+        candidates,
+        query.slaStatus,
+        new Date(),
+      );
+      const start = (filters.page - 1) * filters.limit;
+      const items = filtered.slice(start, start + filters.limit);
+
+      return {
+        items: items.map((item) => this.toResponse(item, true)),
+        page: filters.page,
+        limit: filters.limit,
+        total: filtered.length,
+      };
+    }
+
     const result = await this.repo.findMany(filters);
 
     return {
@@ -392,6 +474,84 @@ export class OpdSubmissionService {
   async getInternalSummary(query: OpdSubmissionQueryDto, user: AuthUser) {
     this.ensureInternal(user);
     return this.repo.getSummary(this.normalizeSummaryQuery(query));
+  }
+
+  async getInternalTimeline(id: string, user: AuthUser) {
+    this.ensureInternal(user);
+    const record = await this.getSubmission(id);
+    const timeline = await this.repo.findTimeline(record.id, false);
+    return timeline.map((item) => this.toTimelineResponse(item, true));
+  }
+
+  async getInternalSlaSummary(query: OpdSubmissionQueryDto, user: AuthUser) {
+    this.ensureInternal(user);
+    const items = await this.repo.findSlaItems(this.normalizeSummaryQuery(query));
+    const now = new Date();
+    const filtered = this.filterByComputedSlaStatus(items, query.slaStatus, now);
+    const completed = filtered.filter((item) =>
+      ['COMPLETED', 'REJECTED'].includes(item.status),
+    );
+    const elapsedTotal = filtered.reduce(
+      (sum, item) =>
+        sum +
+        calculateElapsedHours({
+          startedAt: item.slaStartedAt,
+          stoppedAt: item.slaStoppedAt,
+          pausedAt: item.slaPausedAt,
+          pausedHours: item.slaPausedHours,
+          now,
+        }),
+      0,
+    );
+    const byModuleMap = new Map<string, { total: number; overdue: number; dueSoon: number }>();
+
+    for (const item of filtered) {
+      const slaStatus = calculateSlaStatus(item, now);
+      const current = byModuleMap.get(item.moduleKey) ?? {
+        total: 0,
+        overdue: 0,
+        dueSoon: 0,
+      };
+      current.total += 1;
+      if (slaStatus === 'OVERDUE') current.overdue += 1;
+      if (slaStatus === 'DUE_SOON') current.dueSoon += 1;
+      byModuleMap.set(item.moduleKey, current);
+    }
+
+    return {
+      totalActive: filtered.filter((item) => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(item.status)).length,
+      onTrack: filtered.filter((item) => calculateSlaStatus(item, now) === 'ON_TRACK').length,
+      dueSoon: filtered.filter((item) => calculateSlaStatus(item, now) === 'DUE_SOON').length,
+      overdue: filtered.filter((item) => calculateSlaStatus(item, now) === 'OVERDUE').length,
+      pausedForCorrection: filtered.filter((item) => calculateSlaStatus(item, now) === 'PAUSED_FOR_CORRECTION').length,
+      completed: completed.length,
+      averageElapsedHours:
+        filtered.length > 0 ? Math.round(elapsedTotal / filtered.length) : 0,
+      byModule: [...byModuleMap.entries()].map(([moduleKey, value]) => ({
+        moduleKey,
+        ...value,
+      })),
+      topOverdue: filtered
+        .filter((item) => calculateSlaStatus(item, now) === 'OVERDUE')
+        .slice(0, 5)
+        .map((item) => this.toSlaQueueItem(item, now)),
+    };
+  }
+
+  async getInternalSlaQueue(
+    query: OpdSubmissionQueryDto,
+    user: AuthUser,
+    slaStatus: string,
+  ) {
+    this.ensureInternal(user);
+    const items = await this.repo.findSlaItems(this.normalizeSummaryQuery(query));
+    const now = new Date();
+    const filtered = this.filterByComputedSlaStatus(items, slaStatus, now);
+
+    return {
+      items: filtered.map((item) => this.toSlaQueueItem(item, now)),
+      total: filtered.length,
+    };
   }
 
   async receive(id: string, dto: InternalActionNoteDto, user: AuthUser, context?: AuditContext) {
@@ -425,7 +585,7 @@ export class OpdSubmissionService {
 
   async verify(id: string, dto: InternalActionNoteDto, user: AuthUser, context?: AuditContext) {
     this.ensureInternalAction(user, VERIFY_ROLES, 'memverifikasi pengajuan OPD');
-    return this.changeInternalStatus(id, 'VERIFY', ['IN_VERIFICATION', 'CORRECTION_SUBMITTED'], {
+    return this.changeInternalStatus(id, 'VERIFY', ['RECEIVED', 'IN_VERIFICATION', 'CORRECTION_SUBMITTED'], {
       status: 'VERIFIED',
       verifiedAt: new Date(),
       updatedById: user.id,
@@ -434,7 +594,7 @@ export class OpdSubmissionService {
 
   async reject(id: string, dto: InternalActionNoteDto, user: AuthUser, context?: AuditContext) {
     this.ensureInternalAction(user, VERIFY_ROLES, 'menolak pengajuan OPD');
-    return this.changeInternalStatus(id, 'REJECT', ['RECEIVED', 'IN_VERIFICATION', 'CORRECTION_SUBMITTED'], {
+    return this.changeInternalStatus(id, 'REJECT', ['SUBMITTED', 'RECEIVED', 'IN_VERIFICATION', 'NEEDS_CORRECTION', 'CORRECTION_SUBMITTED', 'VERIFIED'], {
       status: 'REJECTED',
       rejectedAt: new Date(),
       updatedById: user.id,
@@ -443,7 +603,7 @@ export class OpdSubmissionService {
 
   async complete(id: string, dto: InternalActionNoteDto, user: AuthUser, context?: AuditContext) {
     this.ensureInternalAction(user, FINAL_ROLES, 'menyelesaikan pengajuan OPD');
-    return this.changeInternalStatus(id, 'COMPLETE', ['VERIFIED'], {
+    return this.changeInternalStatus(id, 'COMPLETE', ['VERIFIED', 'IN_VERIFICATION'], {
       status: 'COMPLETED',
       completedAt: new Date(),
       updatedById: user.id,
@@ -617,9 +777,71 @@ export class OpdSubmissionService {
       throw new BadRequestException(`Status ${before.status} tidak valid untuk aksi ${action}`);
     }
 
-    const updated = await this.repo.update(before.id, data);
+    const toStatus = String(data.status ?? before.status);
+    const updated = await this.repo.update(before.id, {
+      ...data,
+      ...this.buildSlaPatch(before, toStatus, user),
+    });
     await this.writeAudit(updated, action, before, updated, user, note, context);
+    await this.writeTimeline(
+      updated,
+      before.status,
+      toStatus,
+      action,
+      user,
+      note,
+      this.publicTimelineNote(action, note),
+    );
     return this.toResponse(updated, true);
+  }
+
+  private buildSlaPatch(
+    before: OpdSubmissionRecord,
+    toStatus: string,
+    user: AuthUser,
+  ): Prisma.OpdSubmissionUncheckedUpdateInput {
+    const now = new Date();
+    const base: Prisma.OpdSubmissionUncheckedUpdateInput = {
+      lastStatusChangedAt: now,
+      lastStatusChangedById: user.id,
+    };
+
+    if (toStatus === 'NEEDS_CORRECTION') {
+      return {
+        ...base,
+        slaPausedAt: now,
+        slaElapsedHours: calculateElapsedHours({
+          startedAt: before.slaStartedAt,
+          pausedAt: now,
+          pausedHours: before.slaPausedHours,
+        }),
+        slaStatus: 'PAUSED_FOR_CORRECTION',
+      };
+    }
+
+    if (toStatus === 'COMPLETED' || toStatus === 'REJECTED') {
+      return {
+        ...base,
+        slaStoppedAt: now,
+        slaElapsedHours: calculateElapsedHours({
+          startedAt: before.slaStartedAt,
+          stoppedAt: now,
+          pausedHours: before.slaPausedHours,
+        }),
+        slaStatus: 'COMPLETED',
+      };
+    }
+
+    return {
+      ...base,
+      slaStatus: calculateSlaStatus(
+        {
+          ...before,
+          status: toStatus,
+        },
+        now,
+      ),
+    };
   }
 
   private async getOwnedSubmission(id: string, user: AuthUser) {
@@ -672,9 +894,12 @@ export class OpdSubmissionService {
     return {
       q: this.normalizeOptional(query.q),
       status: this.normalizeOptional(query.status),
+      slaStatus: this.normalizeOptional(query.slaStatus),
       moduleKey: query.moduleKey ? this.normalizeModuleKey(query.moduleKey) : undefined,
       serviceType: this.normalizeOptional(query.serviceType),
       opdUnitId: this.normalizeOptional(query.opdUnitId),
+      from: this.normalizeDate(query.from),
+      to: this.normalizeDate(query.to),
     };
   }
 
@@ -705,6 +930,16 @@ export class OpdSubmissionService {
     }
 
     return normalized;
+  }
+
+  private normalizeDate(value: string | undefined | null) {
+    const normalized = this.normalizeOptional(value);
+    if (!normalized) {
+      return undefined;
+    }
+
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? undefined : date;
   }
 
   private validateUploadedFile(file: UploadedOpdSubmissionFile | undefined) {
@@ -825,6 +1060,97 @@ export class OpdSubmissionService {
     });
   }
 
+  private async writeTimeline(
+    target: OpdSubmissionRecord,
+    fromStatus: string | null,
+    toStatus: string,
+    action: string,
+    user: AuthUser,
+    note?: string | null,
+    publicNote?: string | null,
+    isVisibleToOpd = true,
+  ) {
+    await this.repo.createTimeline({
+      submissionId: target.id,
+      fromStatus,
+      toStatus,
+      action,
+      actorId: user.id,
+      actorRole: this.primaryRole(user),
+      note: note ?? null,
+      publicNote: publicNote ?? note ?? null,
+      isVisibleToOpd,
+    });
+  }
+
+  private publicTimelineNote(action: string, note?: string | null) {
+    const notes: Record<string, string> = {
+      RECEIVE: 'Pengajuan diterima oleh PPIK',
+      START_VERIFICATION: 'Verifikasi pengajuan dimulai',
+      REQUEST_CORRECTION: note ?? 'PPIK meminta perbaikan berkas. SLA internal dijeda sampai OPD mengirim perbaikan.',
+      VERIFY: 'Pengajuan telah diverifikasi PPIK',
+      REJECT: note ?? 'Pengajuan ditolak PPIK',
+      COMPLETE: 'Pengajuan selesai diproses',
+    };
+
+    return notes[action] ?? note ?? null;
+  }
+
+  private filterByComputedSlaStatus(
+    items: OpdSubmissionRecord[],
+    requestedStatus: string | undefined,
+    now: Date,
+  ) {
+    if (!requestedStatus) {
+      return items;
+    }
+
+    return items.filter((item) => calculateSlaStatus(item, now) === requestedStatus);
+  }
+
+  private toSlaQueueItem(record: OpdSubmissionRecord, now: Date) {
+    const slaStatus = calculateSlaStatus(record, now);
+
+    return {
+      id: record.id,
+      submissionNumber: record.submissionNumber,
+      opdName: record.opdName,
+      moduleKey: record.moduleKey,
+      serviceType: record.serviceType,
+      title: record.title,
+      status: record.status,
+      slaStatus,
+      slaDueAt: record.slaDueAt?.toISOString() ?? null,
+      slaTargetHours: record.slaTargetHours,
+      slaElapsedHours: calculateElapsedHours({
+        startedAt: record.slaStartedAt,
+        stoppedAt: record.slaStoppedAt,
+        pausedAt: record.slaPausedAt,
+        pausedHours: record.slaPausedHours,
+        now,
+      }),
+    };
+  }
+
+  private toTimelineResponse(
+    item: OpdSubmissionTimelineRecord,
+    internal: boolean,
+  ) {
+    return {
+      id: item.id,
+      submissionId: item.submissionId,
+      fromStatus: item.fromStatus,
+      toStatus: item.toStatus,
+      action: item.action,
+      actorId: internal ? item.actorId : undefined,
+      actorRole: internal ? item.actorRole : undefined,
+      note: internal ? item.note : undefined,
+      publicNote: item.publicNote,
+      isVisibleToOpd: item.isVisibleToOpd,
+      createdAt: item.createdAt.toISOString(),
+    };
+  }
+
   private toAuditJson(record: OpdSubmissionRecord): Prisma.InputJsonValue {
     return {
       id: record.id,
@@ -844,6 +1170,15 @@ export class OpdSubmissionService {
       verifiedAt: record.verifiedAt?.toISOString() ?? null,
       completedAt: record.completedAt?.toISOString() ?? null,
       rejectedAt: record.rejectedAt?.toISOString() ?? null,
+      slaStartedAt: record.slaStartedAt?.toISOString() ?? null,
+      slaPausedAt: record.slaPausedAt?.toISOString() ?? null,
+      slaResumedAt: record.slaResumedAt?.toISOString() ?? null,
+      slaStoppedAt: record.slaStoppedAt?.toISOString() ?? null,
+      slaDueAt: record.slaDueAt?.toISOString() ?? null,
+      slaTargetHours: record.slaTargetHours,
+      slaElapsedHours: record.slaElapsedHours,
+      slaPausedHours: record.slaPausedHours,
+      slaStatus: record.slaStatus,
       documentCount: record.documents.length,
     };
   }
@@ -875,6 +1210,22 @@ export class OpdSubmissionService {
       verifiedAt: record.verifiedAt?.toISOString() ?? null,
       completedAt: record.completedAt?.toISOString() ?? null,
       rejectedAt: record.rejectedAt?.toISOString() ?? null,
+      slaStartedAt: record.slaStartedAt?.toISOString() ?? null,
+      slaPausedAt: record.slaPausedAt?.toISOString() ?? null,
+      slaResumedAt: record.slaResumedAt?.toISOString() ?? null,
+      slaStoppedAt: record.slaStoppedAt?.toISOString() ?? null,
+      slaDueAt: record.slaDueAt?.toISOString() ?? null,
+      slaTargetHours: record.slaTargetHours,
+      slaElapsedHours: calculateElapsedHours({
+        startedAt: record.slaStartedAt,
+        stoppedAt: record.slaStoppedAt,
+        pausedAt: record.slaPausedAt,
+        pausedHours: record.slaPausedHours,
+      }),
+      slaPausedHours: record.slaPausedHours,
+      slaStatus: calculateSlaStatus(record),
+      lastStatusChangedAt: record.lastStatusChangedAt?.toISOString() ?? null,
+      lastStatusChangedById: internal ? record.lastStatusChangedById : undefined,
       createdById: internal ? record.createdById : undefined,
       updatedById: internal ? record.updatedById : undefined,
       assignedToId: internal ? record.assignedToId : undefined,
@@ -909,6 +1260,9 @@ export class OpdSubmissionService {
         note: log.note,
         createdAt: log.createdAt.toISOString(),
       })),
+      timelines: record.timelines
+        .filter((item) => internal || item.isVisibleToOpd)
+        .map((item) => this.toTimelineResponse(item, internal)),
     };
   }
 }

@@ -4,8 +4,13 @@ import {
   DataTable,
   formatDate,
   secondaryButtonClass,
+  StatusBadge,
 } from '@/components/workspace/ui';
-import type { OpdSubmission } from '@/lib/opd-submissions/types';
+import {
+  getSlaRiskTone,
+  opdSubmissionSlaStatusLabel,
+  type OpdSubmission,
+} from '@/lib/opd-submissions/types';
 import { ServiceStatusBadge } from './service-status-badge';
 
 export function ServiceWorkbenchTable({
@@ -65,6 +70,17 @@ export function ServiceWorkbenchTable({
           header: 'Status',
           className: 'w-[150px]',
           render: (item) => <ServiceStatusBadge status={item.status} />,
+        },
+        {
+          key: 'sla',
+          header: 'SLA',
+          className: 'w-[150px]',
+          render: (item) => (
+            <StatusBadge
+              value={opdSubmissionSlaStatusLabel(item.slaStatus)}
+              tone={getSlaRiskTone(item.slaStatus)}
+            />
+          ),
         },
         {
           key: 'note',

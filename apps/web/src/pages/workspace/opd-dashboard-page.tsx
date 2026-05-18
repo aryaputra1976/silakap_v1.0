@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { SectionCard } from '@/components/workspace/ui';
+import { SectionCard, StatCard } from '@/components/workspace/ui';
+import { AlertTriangle, CheckCircle2, Clock3, RefreshCw } from 'lucide-react';
 import { ApiError } from '@/lib/api/client';
 import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdEmptyState } from '@/components/workspace/opd/opd-empty-state';
@@ -77,6 +78,37 @@ export function OpdDashboardPage() {
       ) : null}
 
       <OpdSummaryCards summary={summary} />
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <StatCard
+          label="Aktif"
+          value={summary.usulanAktif}
+          description="Sedang berjalan"
+          icon={Clock3}
+          tone="info"
+        />
+        <StatCard
+          label="Perlu Perbaikan"
+          value={summary.perluPerbaikan}
+          description="SLA dijeda"
+          icon={RefreshCw}
+          tone="warning"
+        />
+        <StatCard
+          label="Selesai"
+          value={summary.selesai}
+          description="Final"
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatCard
+          label="Mendekati Tenggat"
+          value={items.filter((item) => item.slaStatus === 'DUE_SOON').length}
+          description="Berdasarkan data terbaru"
+          icon={AlertTriangle}
+          tone="warning"
+        />
+      </div>
 
       <SectionCard
         title="Layanan OPD"

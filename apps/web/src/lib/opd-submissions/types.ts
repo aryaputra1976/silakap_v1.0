@@ -19,6 +19,15 @@ export type OpdSubmissionModuleKey =
   | 'SIDATA'
   | 'DMS';
 
+export type OpdSubmissionSlaStatus =
+  | 'NOT_STARTED'
+  | 'ON_TRACK'
+  | 'DUE_SOON'
+  | 'OVERDUE'
+  | 'PAUSED_FOR_CORRECTION'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
 export type OpdSubmissionDocument = {
   id: string;
   submissionId: string;
@@ -50,6 +59,20 @@ export type OpdSubmissionAuditLog = {
   createdAt: string;
 };
 
+export type OpdSubmissionTimelineItem = {
+  id: string;
+  submissionId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  action: string;
+  actorId?: string;
+  actorRole?: string;
+  note?: string;
+  publicNote: string | null;
+  isVisibleToOpd: boolean;
+  createdAt: string;
+};
+
 export type OpdSubmission = {
   id: string;
   submissionNumber: string | null;
@@ -69,6 +92,17 @@ export type OpdSubmission = {
   verifiedAt: string | null;
   completedAt: string | null;
   rejectedAt: string | null;
+  slaStartedAt: string | null;
+  slaPausedAt: string | null;
+  slaResumedAt: string | null;
+  slaStoppedAt: string | null;
+  slaDueAt: string | null;
+  slaTargetHours: number | null;
+  slaElapsedHours: number;
+  slaPausedHours: number;
+  slaStatus: OpdSubmissionSlaStatus;
+  lastStatusChangedAt: string | null;
+  lastStatusChangedById?: string;
   createdById?: string;
   updatedById?: string;
   assignedToId?: string;
@@ -76,6 +110,7 @@ export type OpdSubmission = {
   updatedAt: string;
   documents: OpdSubmissionDocument[];
   auditLogs: OpdSubmissionAuditLog[];
+  timelines: OpdSubmissionTimelineItem[];
 };
 
 export type OpdSubmissionSummary = {
@@ -90,9 +125,12 @@ export type OpdSubmissionSummary = {
 export type OpdSubmissionQuery = {
   q?: string;
   status?: OpdSubmissionStatus | '';
+  slaStatus?: OpdSubmissionSlaStatus | '';
   moduleKey?: OpdSubmissionModuleKey | '';
   serviceType?: string;
   opdUnitId?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 };
@@ -128,6 +166,44 @@ export type AddOpdSubmissionDocumentPayload = {
 };
 
 type StatusTone = Parameters<typeof StatusBadge>[0]['tone'];
+
+export type OpdSubmissionSlaByModule = {
+  moduleKey: string;
+  total: number;
+  overdue: number;
+  dueSoon: number;
+};
+
+export type OpdSubmissionSlaQueueItem = {
+  id: string;
+  submissionNumber: string | null;
+  opdName: string | null;
+  moduleKey: string;
+  serviceType: string;
+  title: string;
+  status: OpdSubmissionStatus | string;
+  slaStatus: OpdSubmissionSlaStatus;
+  slaDueAt: string | null;
+  slaTargetHours: number | null;
+  slaElapsedHours: number;
+};
+
+export type OpdSubmissionSlaSummary = {
+  totalActive: number;
+  onTrack: number;
+  dueSoon: number;
+  overdue: number;
+  pausedForCorrection: number;
+  completed: number;
+  averageElapsedHours: number;
+  byModule: OpdSubmissionSlaByModule[];
+  topOverdue: OpdSubmissionSlaQueueItem[];
+};
+
+export type OpdSubmissionSlaQueue = {
+  items: OpdSubmissionSlaQueueItem[];
+  total: number;
+};
 
 export type OpdSubmissionDocumentStatus =
   | 'TERUNGGAH'
@@ -225,4 +301,62 @@ export function canInternalVerifyDocument(role: AppRole, status: string) {
   ];
 
   return allowedRoles.includes(role) && status !== 'VERIFIED' && status !== 'REJECTED';
+}
+
+export function opdSubmissionSlaStatusLabel(
+  status: OpdSubmissionSlaStatus | string,
+) {
+  const labels: Record<OpdSubmissionSlaStatus, string> = {
+    NOT_STARTED: 'Belum Mulai',
+    ON_TRACK: 'Aman',
+    DUE_SOON: 'Mendekati Tenggat',
+    OVERDUE: 'Terlambat',
+    PAUSED_FOR_CORRECTION: 'Dijeda untuk Perbaikan',
+    COMPLETED: 'Selesai',
+    CANCELLED: 'Dibatalkan',
+  };
+
+  return labels[status as OpdSubmissionSlaStatus] ?? status;
+}
+
+export function getSlaRiskTone(status: OpdSubmissionSlaStatus | string): StatusTone {
+  switch (status as OpdSubmissionSlaStatus) {
+    case 'ON_TRACK':
+    case 'COMPLETED':
+      return 'success';
+    case 'DUE_SOON':
+    case 'PAUSED_FOR_CORRECTION':
+      return 'warning';
+    case 'OVERDUE':
+    case 'CANCELLED':
+      return 'danger';
+    case 'NOT_STARTED':
+    default:
+      return 'neutral';
+  }
+}
+
+export function formatSlaRemaining(
+  dueAt: string | null | undefined,
+  status: OpdSubmissionSlaStatus | string,
+) {
+  if (!dueAt) {
+    return '-';
+  }
+
+  if (status === 'PAUSED_FOR_CORRECTION') {
+    return 'SLA dijeda';
+  }
+
+  if (status === 'COMPLETED' || status === 'CANCELLED') {
+    return 'SLA berhenti';
+  }
+
+  const diffMs = new Date(dueAt).getTime() - Date.now();
+  const absHours = Math.ceil(Math.abs(diffMs) / (60 * 60 * 1000));
+  const days = Math.floor(absHours / 24);
+  const hours = absHours % 24;
+  const label = days > 0 ? `${days} hari ${hours} jam` : `${hours} jam`;
+
+  return diffMs < 0 ? `Lewat ${label}` : `Sisa ${label}`;
 }

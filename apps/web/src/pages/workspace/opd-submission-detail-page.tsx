@@ -8,11 +8,12 @@ import {
   LoadingState,
   SectionCard,
   StatusBadge,
-  Timeline,
 } from '@/components/workspace/ui';
 import { ApiError } from '@/lib/api/client';
 import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
+import { OpdSubmissionTimeline } from '@/components/workspace/opd/opd-submission-timeline';
+import { ServiceSlaCard } from '@/components/workspace/service-workbench/service-sla-card';
 import {
   canOpdSubmitCorrection,
   canOpdUploadDocument,
@@ -21,11 +22,14 @@ import {
   opdSubmissionStatusLabel,
   opdSubmissionStatusTone,
   type OpdSubmission,
+  type OpdSubmissionTimelineItem,
 } from '@/lib/opd-submissions/types';
 
 export function OpdSubmissionDetailPage() {
   const { id = '' } = useParams();
   const [submission, setSubmission] = useState<OpdSubmission | null>(null);
+  const [timeline, setTimeline] = useState<OpdSubmissionTimelineItem[]>([]);
+  const [timelineError, setTimelineError] = useState('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
@@ -36,14 +40,20 @@ export function OpdSubmissionDetailPage() {
     setError('');
 
     try {
-      const result = await opdSubmissionsApi.fetchMyOpdSubmission(id);
+      const [result, timelineResult] = await Promise.all([
+        opdSubmissionsApi.fetchMyOpdSubmission(id),
+        opdSubmissionsApi.fetchMyOpdSubmissionTimeline(id),
+      ]);
       setSubmission(result);
+      setTimeline(timelineResult);
+      setTimelineError('');
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
           : 'Gagal memuat detail pengajuan OPD',
       );
+      setTimelineError('Gagal memuat timeline status OPD.');
     } finally {
       setLoading(false);
     }
@@ -168,6 +178,15 @@ export function OpdSubmissionDetailPage() {
         </p>
       </SectionCard>
 
+      <ServiceSlaCard submission={submission} />
+
+      {submission.status === 'NEEDS_CORRECTION' ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Waktu perbaikan berkas oleh OPD tidak dihitung sebagai keterlambatan
+          internal PPIK. SLA dilanjutkan setelah perbaikan dikirim.
+        </div>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <SectionCard
           title="Dokumen"
@@ -225,17 +244,7 @@ export function OpdSubmissionDetailPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Status Tracking" description="Timeline ringkas OPD">
-          <Timeline
-            items={submission.auditLogs.map((log) => ({
-              id: log.id,
-              title: log.action,
-              description: log.note,
-              type: log.action,
-              timestamp: log.createdAt,
-            }))}
-          />
-        </SectionCard>
+        <OpdSubmissionTimeline items={timeline} error={timelineError} />
       </section>
     </div>
   );

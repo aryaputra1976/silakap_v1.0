@@ -14,6 +14,16 @@ export const OPD_SUBMISSION_STATUSES = [
   'CANCELLED',
 ] as const;
 
+export const OPD_SUBMISSION_SLA_STATUSES = [
+  'NOT_STARTED',
+  'ON_TRACK',
+  'DUE_SOON',
+  'OVERDUE',
+  'PAUSED_FOR_CORRECTION',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
 export class OpdSubmissionQueryDto {
   @IsOptional()
   @IsString()
@@ -36,6 +46,19 @@ export class OpdSubmissionQueryDto {
   @IsOptional()
   @IsString()
   opdUnitId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(OPD_SUBMISSION_SLA_STATUSES)
+  slaStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
 
   @IsOptional()
   @IsString()

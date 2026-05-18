@@ -6,7 +6,10 @@ import type {
   OpdActionNotePayload,
   OpdSubmission,
   OpdSubmissionQuery,
+  OpdSubmissionSlaQueue,
+  OpdSubmissionSlaSummary,
   OpdSubmissionSummary,
+  OpdSubmissionTimelineItem,
   RequestOpdCorrectionPayload,
   UpdateOpdSubmissionPayload,
 } from '@/lib/opd-submissions/types';
@@ -17,9 +20,12 @@ function cleanQuery(
   return {
     q: query.q,
     status: query.status || undefined,
+    slaStatus: query.slaStatus || undefined,
     moduleKey: query.moduleKey || undefined,
     serviceType: query.serviceType,
     opdUnitId: query.opdUnitId,
+    from: query.from,
+    to: query.to,
     page: query.page,
     limit: query.limit,
   };
@@ -35,6 +41,12 @@ export const opdSubmissionsApi = {
 
   fetchMyOpdSubmission(id: string) {
     return apiClient.get<OpdSubmission>(`/opd/submissions/${id}`);
+  },
+
+  fetchMyOpdSubmissionTimeline(id: string) {
+    return apiClient.get<OpdSubmissionTimelineItem[]>(
+      `/opd/submissions/${id}/timeline`,
+    );
   },
 
   fetchMyOpdSubmissionSummary(query: OpdSubmissionQuery = {}) {
@@ -95,9 +107,36 @@ export const opdSubmissionsApi = {
     return apiClient.get<OpdSubmission>(`/internal/opd-submissions/${id}`);
   },
 
+  fetchInternalOpdSubmissionTimeline(id: string) {
+    return apiClient.get<OpdSubmissionTimelineItem[]>(
+      `/internal/opd-submissions/${id}/timeline`,
+    );
+  },
+
   fetchInternalOpdSubmissionSummary(query: OpdSubmissionQuery = {}) {
     return apiClient.get<OpdSubmissionSummary>(
       '/internal/opd-submissions/summary',
+      cleanQuery(query),
+    );
+  },
+
+  fetchInternalSlaSummary(query: OpdSubmissionQuery = {}) {
+    return apiClient.get<OpdSubmissionSlaSummary>(
+      '/internal/opd-submissions/sla/summary',
+      cleanQuery(query),
+    );
+  },
+
+  fetchInternalSlaOverdue(query: OpdSubmissionQuery = {}) {
+    return apiClient.get<OpdSubmissionSlaQueue>(
+      '/internal/opd-submissions/sla/overdue',
+      cleanQuery(query),
+    );
+  },
+
+  fetchInternalSlaDueSoon(query: OpdSubmissionQuery = {}) {
+    return apiClient.get<OpdSubmissionSlaQueue>(
+      '/internal/opd-submissions/sla/due-soon',
       cleanQuery(query),
     );
   },
