@@ -61,6 +61,79 @@ export interface SopChecklistAuditLogApi {
   createdAt: string;
 }
 
+// ─── Dashboard types ────────────────────────────────────────────────────────
+
+export interface ChecklistDashboardByModule {
+  moduleKey: string;
+  total: number;
+  approved: number;
+  averageProgress: number;
+}
+
+export interface ChecklistDashboardBySop {
+  sopCode: string;
+  moduleKey: string;
+  total: number;
+  approved: number;
+  rejected: number;
+  inReview: number;
+  draft: number;
+  averageProgress: number;
+  lastUpdatedAt: string | null;
+}
+
+export interface ChecklistDashboardSummary {
+  totalInstances: number;
+  totalItems: number;
+  completedItems: number;
+  approved: number;
+  rejected: number;
+  inReview: number;
+  draft: number;
+  averageProgress: number;
+  pendingItems: number;
+  perluPerbaikanItems: number;
+  byModule: ChecklistDashboardByModule[];
+  bySop: ChecklistDashboardBySop[];
+  byStatus: Array<{ status: string; count: number }>;
+}
+
+export interface ChecklistDashboardActivity {
+  id: string;
+  instanceId: string;
+  sopCode: string;
+  moduleKey: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  actorId: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ChecklistRhkProgressRow {
+  sopCode: string;
+  moduleKey: string;
+  checklistTotal: number;
+  checklistApproved: number;
+  checklistProgress: number;
+  rhkCodes: string[];
+  targetQuantity: number | null;
+  realizationQuantity: number;
+  evidenceCount: number;
+}
+
+export interface DashboardQuery {
+  moduleKey?: string;
+  sopCode?: string;
+  status?: SopChecklistOverallStatusApi;
+  entityType?: string;
+  from?: string;
+  to?: string;
+}
+
 // ─── Request payloads ───────────────────────────────────────────────────────
 
 export interface CreateInstancePayload {
@@ -131,4 +204,46 @@ export const sopChecklistsApi = {
       `/sop-checklists/instances/${instanceId}/audit-logs`,
     );
   },
+
+  // ── Dashboard ──────────────────────────────────────────────────────────────
+
+  fetchChecklistDashboardSummary(params: DashboardQuery): Promise<ChecklistDashboardSummary> {
+    const qs = buildDashboardQs(params);
+    return apiClient.get<ChecklistDashboardSummary>(
+      `/sop-checklists/dashboard/summary${qs}`,
+    );
+  },
+
+  fetchChecklistDashboardBySop(params: DashboardQuery): Promise<ChecklistDashboardBySop[]> {
+    const qs = buildDashboardQs(params);
+    return apiClient.get<ChecklistDashboardBySop[]>(
+      `/sop-checklists/dashboard/by-sop${qs}`,
+    );
+  },
+
+  fetchChecklistRecentActivities(limit?: number): Promise<ChecklistDashboardActivity[]> {
+    const qs = limit ? `?limit=${limit}` : '';
+    return apiClient.get<ChecklistDashboardActivity[]>(
+      `/sop-checklists/dashboard/recent-activities${qs}`,
+    );
+  },
+
+  fetchChecklistRhkProgress(params: DashboardQuery): Promise<ChecklistRhkProgressRow[]> {
+    const qs = buildDashboardQs(params);
+    return apiClient.get<ChecklistRhkProgressRow[]>(
+      `/sop-checklists/dashboard/rhk-progress${qs}`,
+    );
+  },
 };
+
+function buildDashboardQs(params: DashboardQuery): string {
+  const p = new URLSearchParams();
+  if (params.moduleKey) p.set('moduleKey', params.moduleKey);
+  if (params.sopCode) p.set('sopCode', params.sopCode);
+  if (params.status) p.set('status', params.status);
+  if (params.entityType) p.set('entityType', params.entityType);
+  if (params.from) p.set('from', params.from);
+  if (params.to) p.set('to', params.to);
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}

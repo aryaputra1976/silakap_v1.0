@@ -33,6 +33,8 @@ import {
   StatusBadge,
 } from '@/components/workspace/ui';
 import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
+import { SopChecklistDashboardPanel } from '@/components/workspace/sop/sop-checklist-dashboard-panel';
 
 const quickLinks = [
   {
@@ -63,6 +65,7 @@ const quickLinks = [
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const userRole = getPrimaryRole(user?.roles);
   const [analytics, setAnalytics] = useState<AnalyticsDashboard | null>(null);
   const [slaOverdueFallback, setSlaOverdueFallback] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -316,6 +319,8 @@ export function DashboardPage() {
           >
             <RecentTimeline items={analytics.recentTimeline} />
           </SectionCard>
+
+          <SopChecklistDashboardPanel userRole={userRole} />
         </>
       ) : (
         <EmptyState

@@ -19,6 +19,7 @@ import { CreateInstanceDto } from './dto/create-instance.dto';
 import { UpdateChecklistItemDto } from './dto/update-checklist-item.dto';
 import { ApproveRejectDto } from './dto/approve-reject.dto';
 import { ListInstancesQueryDto } from './dto/list-instances-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 const INTERNAL_ROLES = [
   'SUPER_ADMIN',
@@ -30,6 +31,17 @@ const INTERNAL_ROLES = [
   'ANALIS_PERTAMA',
   'PENELAAH',
   'PPPK',
+];
+
+const DASHBOARD_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
 ];
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -102,6 +114,49 @@ export class SopChecklistController {
     @CurrentUser() user: AuthUser,
   ) {
     const data = await this.service.getAuditLogs(id, user.roles);
+    return ok(data);
+  }
+
+  // ─── Dashboard endpoints ───────────────────────────────────────────────────
+
+  @Get('dashboard/summary')
+  @Roles(...DASHBOARD_ROLES)
+  async getDashboardSummary(
+    @Query() query: DashboardQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.getDashboardSummary(query, user.roles);
+    return ok(data);
+  }
+
+  @Get('dashboard/by-sop')
+  @Roles(...DASHBOARD_ROLES)
+  async getDashboardBySop(
+    @Query() query: DashboardQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.getDashboardBySop(query, user.roles);
+    return ok(data);
+  }
+
+  @Get('dashboard/recent-activities')
+  @Roles(...DASHBOARD_ROLES)
+  async getRecentActivities(
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const take = limit ? Math.min(parseInt(limit, 10) || 20, 50) : 20;
+    const data = await this.service.getRecentActivities(user.roles, take);
+    return ok(data);
+  }
+
+  @Get('dashboard/rhk-progress')
+  @Roles(...DASHBOARD_ROLES)
+  async getRhkProgress(
+    @Query() query: DashboardQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.getRhkProgress(query, user.roles);
     return ok(data);
   }
 }

@@ -18,14 +18,20 @@ import {
   SopDataSourceBadge,
   type SopDataSource,
 } from '@/components/workspace/sop/sop-data-source-badge';
+import { SopChecklistDashboardPanel } from '@/components/workspace/sop/sop-checklist-dashboard-panel';
+import { SopRhkLinkPanel } from '@/components/workspace/sop/sop-rhk-link-panel';
 import {
   kinerjaBidangApi,
   type KinerjaBidangDashboardSummary,
   type KinerjaBidangReportResponse,
 } from '@/lib/api/kinerja-bidang';
+import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
 
 export function SopDashboardPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userRole = getPrimaryRole(user?.roles);
   const [summary, setSummary] = useState<KinerjaBidangDashboardSummary | null>(null);
   const [report, setReport] = useState<KinerjaBidangReportResponse | null>(null);
   const [source, setSource] = useState<SopDataSource>('static');
@@ -158,6 +164,10 @@ export function SopDashboardPage() {
       </SectionCard>
 
       <SopContextNote />
+
+      <SopChecklistDashboardPanel userRole={userRole} />
+
+      <SopRhkLinkPanel userRole={userRole} />
     </div>
   );
 }

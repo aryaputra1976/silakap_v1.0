@@ -9,6 +9,7 @@ import { CreateInstanceDto } from './dto/create-instance.dto';
 import { UpdateChecklistItemDto } from './dto/update-checklist-item.dto';
 import { ApproveRejectDto } from './dto/approve-reject.dto';
 import { ListInstancesQueryDto } from './dto/list-instances-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { AuditService } from '../audit/audit.service';
 
 // Roles that can approve/reject — mirrors frontend canApproveChecklist
@@ -196,5 +197,35 @@ export class SopChecklistService {
     const instance = await this.repo.findInstanceById(instanceId);
     if (!instance) throw new NotFoundException(`Checklist instance ${instanceId} tidak ditemukan`);
     return this.repo.findAuditLogs(instanceId);
+  }
+
+  // ─── Dashboard ───────────────────────────────────────────────────────────────
+
+  async getDashboardSummary(query: DashboardQueryDto, userRoles: string[]) {
+    if (userRoles.some((r) => BLOCKED_VIEW_ROLES.has(r))) {
+      throw new ForbiddenException('Role tidak memiliki akses dashboard ini');
+    }
+    return this.repo.getDashboardSummary(query);
+  }
+
+  async getDashboardBySop(query: DashboardQueryDto, userRoles: string[]) {
+    if (userRoles.some((r) => BLOCKED_VIEW_ROLES.has(r))) {
+      throw new ForbiddenException('Role tidak memiliki akses dashboard ini');
+    }
+    return this.repo.getDashboardBySop(query);
+  }
+
+  async getRecentActivities(userRoles: string[], limit = 20) {
+    if (userRoles.some((r) => BLOCKED_VIEW_ROLES.has(r))) {
+      throw new ForbiddenException('Role tidak memiliki akses aktivitas ini');
+    }
+    return this.repo.getRecentActivities(limit);
+  }
+
+  async getRhkProgress(query: DashboardQueryDto, userRoles: string[]) {
+    if (userRoles.some((r) => BLOCKED_VIEW_ROLES.has(r))) {
+      throw new ForbiddenException('Role tidak memiliki akses dashboard ini');
+    }
+    return this.repo.getRhkProgress(query);
   }
 }
