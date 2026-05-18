@@ -106,3 +106,42 @@ export function calculateElapsedHours(input: {
   const totalHours = diffHours(input.startedAt, end);
   return Math.max(0, totalHours - (input.pausedHours ?? 0));
 }
+
+// ─── Business-hours variants (Sprint 29) ───────────────────────────────────
+
+import type { WorkingCalendarConfig } from '../working-calendar/business-time.util';
+import {
+  addBusinessHours,
+  calculateBusinessElapsedHours,
+  calculateBusinessRemainingHours,
+} from '../working-calendar/business-time.util';
+
+export { addBusinessHours, calculateBusinessElapsedHours };
+
+const DUE_SOON_BUSINESS_HOURS = 8;
+
+export function calculateSlaStatusBusiness(
+  submission: OpdSlaSubject,
+  cal: WorkingCalendarConfig,
+  now = new Date(),
+): OpdSubmissionSlaStatus {
+  if (submission.status === 'CANCELLED') return 'CANCELLED';
+  if (isFinalStatus(submission.status)) return 'COMPLETED';
+  if (!submission.slaStartedAt || !submission.slaDueAt) return 'NOT_STARTED';
+  if (isCorrectionStatus(submission.status) || submission.slaPausedAt) {
+    return 'PAUSED_FOR_CORRECTION';
+  }
+
+  if (submission.slaDueAt <= now) return 'OVERDUE';
+
+  const remaining = calculateBusinessRemainingHours(now, submission.slaDueAt, cal);
+  return remaining <= DUE_SOON_BUSINESS_HOURS ? 'DUE_SOON' : 'ON_TRACK';
+}
+
+export function calculateSlaDueAtBusiness(
+  startDate: Date,
+  targetHours: number,
+  cal: WorkingCalendarConfig,
+): Date {
+  return addBusinessHours(startDate, targetHours, cal);
+}

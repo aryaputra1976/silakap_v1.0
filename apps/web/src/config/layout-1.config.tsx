@@ -2,6 +2,7 @@ import {
   Archive,
   BarChart3,
   BookOpenCheck,
+  CalendarDays,
   ClipboardCheck,
   Database,
   FileText,
@@ -405,6 +406,12 @@ export const MENU_SIDEBAR: MenuConfig = [
     ],
   },
   { heading: 'Control' },
+  {
+    title: 'Kalender Kerja',
+    icon: CalendarDays,
+    path: '/working-calendar',
+    moduleKey: 'WORKING_CALENDAR',
+  },
   {
     title: 'SIARSIP',
     icon: Archive,

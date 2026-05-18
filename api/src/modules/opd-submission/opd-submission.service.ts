@@ -22,10 +22,14 @@ import { UpdateOpdSubmissionDto } from './dto/update-opd-submission.dto';
 import { UploadSubmissionDocumentDto } from './dto/upload-submission-document.dto';
 import { assessCompletionReadiness } from './opd-completion.policy';
 import {
+  addBusinessHours,
   addHours,
+  calculateBusinessElapsedHours,
   calculateElapsedHours,
   calculateSlaDueAt,
   calculateSlaStatus,
+  calculateSlaStatusBusiness,
+  calculateSlaDueAtBusiness,
   diffHours,
   getSlaTargetHours,
 } from './opd-sla.policy';
@@ -34,6 +38,7 @@ import {
   OpdSubmissionRepository,
   OpdSubmissionTimelineRecord,
 } from './opd-submission.repository';
+import { WorkingCalendarService } from '../working-calendar/working-calendar.service';
 
 const OPD_ROLE = 'OPD';
 const INTERNAL_ROLES = [
@@ -115,6 +120,7 @@ export class OpdSubmissionService {
     private readonly auditService: AuditService,
     private readonly dmsService: DmsService,
     private readonly candidateService: KinerjaRhkCandidateService,
+    private readonly workingCalendarService: WorkingCalendarService,
   ) {}
 
   async listMine(query: OpdSubmissionQueryDto, user: AuthUser) {
@@ -230,7 +236,8 @@ export class OpdSubmissionService {
     const submissionNumber = before.submissionNumber ?? await this.generateSubmissionNumber();
     const now = new Date();
     const targetHours = getSlaTargetHours(before.moduleKey, before.serviceType);
-    const slaDueAt = calculateSlaDueAt(now, targetHours);
+    const cal = await this.workingCalendarService.getEffectiveCalendar();
+    const slaDueAt = calculateSlaDueAtBusiness(now, targetHours, cal);
     const updated = await this.repo.update(before.id, {
       submissionNumber,
       status: 'SUBMITTED',
@@ -404,12 +411,15 @@ export class OpdSubmissionService {
     }
 
     const now = new Date();
-    const pausedDuration = before.slaPausedAt
-      ? diffHours(before.slaPausedAt, now)
+    const cal = await this.workingCalendarService.getEffectiveCalendar();
+    const pausedBusinessHours = before.slaPausedAt
+      ? calculateBusinessElapsedHours(before.slaPausedAt, now, cal)
       : 0;
-    const nextPausedHours = (before.slaPausedHours ?? 0) + pausedDuration;
-    const nextDueAt = before.slaDueAt && pausedDuration > 0
-      ? addHours(before.slaDueAt, pausedDuration)
+    // Keep slaPausedHours in calendar hours for backward compatibility; extend due date by business hours
+    const pausedCalHours = before.slaPausedAt ? diffHours(before.slaPausedAt, now) : 0;
+    const nextPausedHours = (before.slaPausedHours ?? 0) + pausedCalHours;
+    const nextDueAt = before.slaDueAt && pausedBusinessHours > 0
+      ? addBusinessHours(before.slaDueAt, pausedBusinessHours, cal)
       : before.slaDueAt;
     const updated = await this.repo.update(before.id, {
       status: 'CORRECTION_SUBMITTED',
@@ -418,13 +428,14 @@ export class OpdSubmissionService {
       slaResumedAt: now,
       slaPausedHours: nextPausedHours,
       slaDueAt: nextDueAt,
-      slaStatus: calculateSlaStatus(
+      slaStatus: calculateSlaStatusBusiness(
         {
           ...before,
           status: 'CORRECTION_SUBMITTED',
           slaPausedAt: null,
           slaDueAt: nextDueAt,
         },
+        cal,
         now,
       ),
       lastStatusChangedAt: now,

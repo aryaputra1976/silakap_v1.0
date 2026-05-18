@@ -16,7 +16,7 @@ export function ServiceSlaCard({ submission }: { submission: OpdSubmission }) {
   return (
     <SectionCard
       title="SLA Layanan"
-      description="Waktu perbaikan OPD tidak dihitung sebagai keterlambatan internal PPIK."
+      description="SLA dihitung berdasarkan jam kerja. Waktu perbaikan OPD tidak dihitung sebagai keterlambatan internal PPIK."
       actions={
         <StatusBadge
           value={opdSubmissionSlaStatusLabel(submission.slaStatus)}

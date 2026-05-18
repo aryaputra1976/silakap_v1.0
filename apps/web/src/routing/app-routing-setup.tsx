@@ -64,6 +64,7 @@ import { OpdSipensiunCreatePage } from '@/pages/workspace/opd-sipensiun-create-p
 import { OpdSipensiunPage } from '@/pages/workspace/opd-sipensiun-page';
 import { OpdSubmissionDetailPage } from '@/pages/workspace/opd-submission-detail-page';
 import SianalitikPage from '@/pages/workspace/sianalitik-page';
+import { WorkingCalendarPage } from '@/pages/workspace/working-calendar-page';
 
 export function AppRoutingSetup() {
   return (
@@ -160,6 +161,9 @@ export function AppRoutingSetup() {
           <Route path="/siap/worklogs/executive" element={<SiapWorklogExecutivePage />} />
 
           <Route path="/siarsip" element={<SiarsipPage />} />
+
+          {/* WORKING CALENDAR */}
+          <Route path="/working-calendar" element={<WorkingCalendarPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

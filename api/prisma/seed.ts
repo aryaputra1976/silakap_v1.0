@@ -268,6 +268,32 @@ async function main() {
       create: { kode: data.kode, nama: data.nama, deskripsi: data.deskripsi, isActive: true },
     });
   }
+
+  // Default working calendar — Senin–Jumat 08:00–16:00, break 12:00–13:00, Asia/Makassar
+  await prisma.workingCalendar.upsert({
+    where: { name: 'Kalender Kerja BKPSDM' },
+    update: {
+      timezone: 'Asia/Makassar',
+      workDays: [1, 2, 3, 4, 5],
+      workStart: '08:00',
+      workEnd: '16:00',
+      breakStart: '12:00',
+      breakEnd: '13:00',
+      isDefault: true,
+      isActive: true,
+    },
+    create: {
+      name: 'Kalender Kerja BKPSDM',
+      timezone: 'Asia/Makassar',
+      workDays: [1, 2, 3, 4, 5],
+      workStart: '08:00',
+      workEnd: '16:00',
+      breakStart: '12:00',
+      breakEnd: '13:00',
+      isDefault: true,
+      isActive: true,
+    },
+  });
 }
 
 main()

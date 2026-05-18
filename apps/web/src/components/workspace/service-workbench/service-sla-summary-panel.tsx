@@ -19,7 +19,7 @@ export function ServiceSlaSummaryPanel({
       <StatCard
         label="Due Soon"
         value={summary?.dueSoon ?? 0}
-        description="Sisa waktu 24 jam atau kurang"
+        description="Due soon dihitung dari sisa ≤ 8 jam kerja."
         icon={Clock3}
         tone="warning"
       />

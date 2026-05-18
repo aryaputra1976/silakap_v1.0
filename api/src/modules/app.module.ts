@@ -23,6 +23,7 @@ import { SopGovernanceModule } from './sop-governance/sop-governance.module';
 import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
 import { SopReportsModule } from './sop-reports/sop-reports.module';
 import { OpdSubmissionModule } from './opd-submission/opd-submission.module';
+import { WorkingCalendarModule } from './working-calendar/working-calendar.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { OpdSubmissionModule } from './opd-submission/opd-submission.module';
     SopAnalyticsModule,
     SopReportsModule,
     OpdSubmissionModule,
+    WorkingCalendarModule,
   ],
   controllers: [
     HealthController,
