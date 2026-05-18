@@ -1425,7 +1425,8 @@ model KinerjaRhkCandidate {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  auditLogs KinerjaRhkCandidateAudit[]
+  auditLogs   KinerjaRhkCandidateAudit[]
+  realization KinerjaRhkRealization?
 
   @@index([opdSubmissionId])
   @@index([rhkCode])
@@ -1456,6 +1457,68 @@ model KinerjaRhkCandidateAudit {
 }
 
 // ─── SIDATA Reference Tables ──────────────────────────────────────────────────
+
+model KinerjaRhkRealization {
+  id                   String    @id @default(cuid()) @db.VarChar(36)
+  candidateId          String?   @unique @map("candidate_id") @db.VarChar(36)
+  rhkCode              String    @map("rhk_code") @db.VarChar(80)
+  rhkTitle             String?   @map("rhk_title") @db.VarChar(200)
+  moduleKey            String    @map("module_key") @db.VarChar(80)
+  periodYear           Int       @map("period_year")
+  periodMonth          Int?      @map("period_month")
+  periodQuarter        Int?      @map("period_quarter")
+  periodType           String    @map("period_type") @db.VarChar(20)
+  quantityValue        Int?      @map("quantity_value")
+  qualityScore         Int?      @map("quality_score")
+  timeScore            Int?      @map("time_score")
+  evidenceScore        Int?      @map("evidence_score")
+  complianceScore      Int?      @map("compliance_score")
+  finalScore           Int?      @map("final_score")
+  status               String    @db.VarChar(30)
+  sourceType           String?   @map("source_type") @db.VarChar(80)
+  sourceId             String?   @map("source_id") @db.VarChar(36)
+  submissionNumber     String?   @map("submission_number") @db.VarChar(80)
+  sopCode              String?   @map("sop_code") @db.VarChar(80)
+  title                String    @db.VarChar(200)
+  description          String?   @db.Text
+  evidenceSnapshotJson Json?     @map("evidence_snapshot_json")
+  approvedById         String?   @map("approved_by_id") @db.VarChar(36)
+  approvedAt           DateTime? @map("approved_at")
+  createdById          String?   @map("created_by_id") @db.VarChar(36)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  candidate KinerjaRhkCandidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  auditLogs KinerjaRhkRealizationAudit[]
+
+  @@index([rhkCode])
+  @@index([moduleKey])
+  @@index([periodYear, periodMonth])
+  @@index([periodYear, periodQuarter])
+  @@index([periodType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("kinerja_rhk_realizations")
+}
+
+model KinerjaRhkRealizationAudit {
+  id            String   @id @default(cuid()) @db.VarChar(36)
+  realizationId String   @map("realization_id") @db.VarChar(36)
+  action        String   @db.VarChar(100)
+  beforeJson    Json?    @map("before_json")
+  afterJson     Json?    @map("after_json")
+  actorId       String?  @map("actor_id") @db.VarChar(36)
+  actorRole     String?  @map("actor_role") @db.VarChar(80)
+  note          String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  realization KinerjaRhkRealization @relation(fields: [realizationId], references: [id], onDelete: Cascade)
+
+  @@index([realizationId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("kinerja_rhk_realization_audits")
+}
 
 model RefJenisJabatan {
   id        String  @id @default(uuid()) @db.VarChar(36)

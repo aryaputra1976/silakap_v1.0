@@ -17,15 +17,9 @@ import {
   rhkCandidateStatusLabel,
   rhkCandidateStatusTone,
 } from '@/lib/kinerja-rhk-candidates/types';
-import type { AppRole } from '@/lib/rbac/roles';
-
-const APPROVE_ROLES: AppRole[] = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'];
-
 export function RhkCandidateTable({
-  role,
   onSelect,
 }: {
-  role: AppRole;
   onSelect?: (candidate: KinerjaRhkCandidate) => void;
 }) {
   const [items, setItems] = useState<KinerjaRhkCandidate[]>([]);
@@ -33,8 +27,6 @@ export function RhkCandidateTable({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState<KinerjaRhkCandidateQuery>({ status: 'CANDIDATE', page: 1, limit: 20 });
-
-  const canApprove = APPROVE_ROLES.includes(role);
 
   const load = useCallback(() => {
     let mounted = true;
@@ -170,7 +162,7 @@ export function RhkCandidateTable({
                 header: 'Selesai',
                 render: (item) => formatDateTime(item.completedAt),
               },
-              ...(canApprove && onSelect
+              ...(onSelect
                 ? [
                     {
                       key: 'actions',

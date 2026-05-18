@@ -13,9 +13,20 @@ import {
   KinerjaRhkCandidateRepository,
   type KinerjaRhkCandidateRecord,
 } from './kinerja-rhk-candidate.repository';
+import { KinerjaRhkRealizationService } from '../kinerja-rhk-realization/kinerja-rhk-realization.service';
 
 const APPROVE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'];
-const VIEW_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN', 'KABID', 'ANALIS_MADYA', 'ANALIS_MUDA'];
+const VIEW_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'PPPK',
+];
 
 function primaryRole(user: AuthUser): string | null {
   return user.roles?.[0] ?? null;
@@ -38,7 +49,10 @@ function ensureApprove(user: AuthUser) {
 
 @Injectable()
 export class KinerjaRhkCandidateService {
-  constructor(private readonly repo: KinerjaRhkCandidateRepository) {}
+  constructor(
+    private readonly repo: KinerjaRhkCandidateRepository,
+    private readonly realizationService: KinerjaRhkRealizationService,
+  ) {}
 
   async generateFromSubmission(
     submission: OpdSubmissionRecord,
@@ -142,6 +156,8 @@ export class KinerjaRhkCandidateService {
       beforeJson: { status: candidate.status },
       afterJson: { status: 'APPROVED' },
     });
+
+    await this.realizationService.createApprovedRealization(updated, dto, user);
 
     return updated;
   }

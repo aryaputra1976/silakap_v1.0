@@ -73,6 +73,10 @@ export type KinerjaRhkCandidateQuery = {
 
 export type RhkCandidateActionPayload = {
   note?: string;
+  periodType?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+  periodYear?: number;
+  periodMonth?: number;
+  periodQuarter?: number;
 };
 
 export type RhkCandidateRejectPayload = {

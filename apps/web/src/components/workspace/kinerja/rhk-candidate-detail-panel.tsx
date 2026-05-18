@@ -11,6 +11,7 @@ import { CheckCircle2, Loader2, Archive, XCircle } from 'lucide-react';
 import { ApiError } from '@/lib/api/client';
 import { rhkCandidatesApi } from '@/lib/api/kinerja-rhk-candidates';
 import type { KinerjaRhkCandidate } from '@/lib/kinerja-rhk-candidates/types';
+import type { KinerjaRhkPeriodType } from '@/lib/kinerja-rhk-realizations/types';
 import {
   formatScore,
   rhkCandidateStatusLabel,
@@ -31,6 +32,10 @@ export function RhkCandidateDetailPanel({
 }) {
   const [candidate, setCandidate] = useState(initial);
   const [note, setNote] = useState('');
+  const [periodType, setPeriodType] = useState<KinerjaRhkPeriodType>('MONTHLY');
+  const [periodYear, setPeriodYear] = useState(String(new Date().getFullYear()));
+  const [periodMonth, setPeriodMonth] = useState(String(new Date().getMonth() + 1));
+  const [periodQuarter, setPeriodQuarter] = useState(String(Math.floor(new Date().getMonth() / 3) + 1));
   const [loading, setLoading] = useState<'approve' | 'reject' | 'archive' | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -42,7 +47,13 @@ export function RhkCandidateDetailPanel({
     setError('');
     setSuccess('');
     try {
-      const updated = await rhkCandidatesApi.approve(candidate.id, note ? { note } : {});
+      const updated = await rhkCandidatesApi.approve(candidate.id, {
+        note: note || undefined,
+        periodType,
+        periodYear: Number(periodYear),
+        periodMonth: periodType === 'MONTHLY' ? Number(periodMonth) : undefined,
+        periodQuarter: periodType === 'QUARTERLY' ? Number(periodQuarter) : undefined,
+      });
       if (updated) {
         setCandidate(updated);
         setSuccess('Kandidat RHK berhasil disetujui.');
@@ -202,6 +213,58 @@ export function RhkCandidateDetailPanel({
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
+            <div className="grid gap-3 md:grid-cols-4">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-semibold text-[#173c36]">Tipe periode</span>
+                <select
+                  className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                  value={periodType}
+                  onChange={(event) => setPeriodType(event.target.value as KinerjaRhkPeriodType)}
+                >
+                  <option value="MONTHLY">Bulanan</option>
+                  <option value="QUARTERLY">Triwulan</option>
+                  <option value="YEARLY">Tahunan</option>
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-semibold text-[#173c36]">Tahun</span>
+                <input
+                  className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                  inputMode="numeric"
+                  value={periodYear}
+                  onChange={(event) => setPeriodYear(event.target.value)}
+                />
+              </label>
+              {periodType === 'MONTHLY' ? (
+                <label className="grid gap-1.5 text-sm">
+                  <span className="font-semibold text-[#173c36]">Bulan</span>
+                  <select
+                    className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                    value={periodMonth}
+                    onChange={(event) => setPeriodMonth(event.target.value)}
+                  >
+                    {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                      <option key={month} value={month}>{month}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {periodType === 'QUARTERLY' ? (
+                <label className="grid gap-1.5 text-sm">
+                  <span className="font-semibold text-[#173c36]">Triwulan</span>
+                  <select
+                    className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                    value={periodQuarter}
+                    onChange={(event) => setPeriodQuarter(event.target.value)}
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                  </select>
+                </label>
+              ) : null}
+            </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton
                 icon={loading === 'approve' ? Loader2 : CheckCircle2}

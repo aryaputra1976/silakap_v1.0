@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export const CANDIDATE_STATUSES = ['CANDIDATE', 'APPROVED', 'REJECTED', 'ARCHIVED'] as const;
@@ -48,6 +48,31 @@ export class RhkCandidateActionDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsIn(['MONTHLY', 'QUARTERLY', 'YEARLY'])
+  periodType?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  periodYear?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  periodMonth?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  periodQuarter?: number;
 }
 
 export class RhkCandidateRequiredNoteDto {
