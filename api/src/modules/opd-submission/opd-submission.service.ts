@@ -9,12 +9,18 @@ import { basename, extname } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { DmsService, type UploadedDmsFile } from '../dms/dms.service';
+import { KinerjaRhkCandidateService } from '../kinerja-rhk-candidate/kinerja-rhk-candidate.service';
 import { CreateOpdSubmissionDto, OPD_MODULE_KEYS } from './dto/create-opd-submission.dto';
 import { OpdSubmissionQueryDto } from './dto/opd-submission-query.dto';
-import { RequestCorrectionDto, InternalActionNoteDto } from './dto/request-correction.dto';
+import {
+  CompleteOpdSubmissionDto,
+  RequestCorrectionDto,
+  InternalActionNoteDto,
+} from './dto/request-correction.dto';
 import { SubmitOpdSubmissionDto } from './dto/submit-opd-submission.dto';
 import { UpdateOpdSubmissionDto } from './dto/update-opd-submission.dto';
 import { UploadSubmissionDocumentDto } from './dto/upload-submission-document.dto';
+import { assessCompletionReadiness } from './opd-completion.policy';
 import {
   addHours,
   calculateElapsedHours,
@@ -108,6 +114,7 @@ export class OpdSubmissionService {
     private readonly repo: OpdSubmissionRepository,
     private readonly auditService: AuditService,
     private readonly dmsService: DmsService,
+    private readonly candidateService: KinerjaRhkCandidateService,
   ) {}
 
   async listMine(query: OpdSubmissionQueryDto, user: AuthUser) {
@@ -601,13 +608,42 @@ export class OpdSubmissionService {
     }, dto.note, user, context);
   }
 
-  async complete(id: string, dto: InternalActionNoteDto, user: AuthUser, context?: AuditContext) {
+  async complete(id: string, dto: CompleteOpdSubmissionDto, user: AuthUser, context?: AuditContext) {
     this.ensureInternalAction(user, FINAL_ROLES, 'menyelesaikan pengajuan OPD');
-    return this.changeInternalStatus(id, 'COMPLETE', ['VERIFIED', 'IN_VERIFICATION'], {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      updatedById: user.id,
-    }, dto.note, user, context);
+
+    const submission = await this.getSubmission(id);
+    const readiness = assessCompletionReadiness(submission);
+
+    if (!readiness.canComplete && !dto.overrideNote?.trim()) {
+      throw new BadRequestException(
+        `Pengajuan tidak dapat diselesaikan: ${readiness.reasons.join('; ')}`,
+      );
+    }
+
+    const noteForAudit = dto.overrideNote?.trim()
+      ? `[OVERRIDE] ${dto.overrideNote.trim()}${dto.note?.trim() ? ` | ${dto.note.trim()}` : ''}`
+      : dto.note;
+
+    const response = await this.changeInternalStatus(
+      id,
+      'COMPLETE',
+      ['VERIFIED', 'IN_VERIFICATION'],
+      { status: 'COMPLETED', completedAt: new Date(), updatedById: user.id },
+      noteForAudit,
+      user,
+      context,
+    );
+
+    const completedRecord = await this.repo.findById(id);
+    if (completedRecord) {
+      void this.candidateService
+        .generateFromSubmission(completedRecord, user.id)
+        .catch((err: unknown) => {
+          console.error('[complete] RHK candidate generation failed', err);
+        });
+    }
+
+    return response;
   }
 
   async uploadInternalDocumentFile(

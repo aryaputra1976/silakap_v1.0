@@ -1387,6 +1387,74 @@ model KinerjaBidangSopEvidence {
   @@map("kinerja_bidang_sop_evidence")
 }
 
+// ─── Kinerja RHK Candidate ────────────────────────────────────────────────────
+
+model KinerjaRhkCandidate {
+  id              String    @id @default(cuid()) @db.VarChar(36)
+  opdSubmissionId String    @unique @map("opd_submission_id") @db.VarChar(36)
+  rhkCode         String?   @map("rhk_code") @db.VarChar(30)
+  sopCode         String?   @map("sop_code") @db.VarChar(80)
+  moduleKey       String    @map("module_key") @db.VarChar(80)
+  serviceType     String    @map("service_type") @db.VarChar(80)
+  title           String    @db.VarChar(200)
+  opdName         String?   @map("opd_name") @db.VarChar(200)
+  subjectName     String?   @map("subject_name") @db.VarChar(200)
+  subjectNip      String?   @map("subject_nip") @db.VarChar(30)
+  status          String    @default("CANDIDATE") @db.VarChar(30)
+
+  qualityScore  Float?   @map("quality_score")
+  timeScore     Float?   @map("time_score")
+  evidenceScore Float?   @map("evidence_score")
+  overallScore  Float?   @map("overall_score")
+
+  slaStatus       String?   @map("sla_status") @db.VarChar(40)
+  slaElapsedHours Int?      @map("sla_elapsed_hours")
+  completedAt     DateTime? @map("completed_at")
+
+  approvedById  String?   @map("approved_by_id") @db.VarChar(36)
+  approvedByRole String?  @map("approved_by_role") @db.VarChar(80)
+  approvedAt    DateTime? @map("approved_at")
+  approvalNote  String?   @map("approval_note") @db.Text
+
+  rejectedById  String?   @map("rejected_by_id") @db.VarChar(36)
+  rejectedByRole String?  @map("rejected_by_role") @db.VarChar(80)
+  rejectedAt    DateTime? @map("rejected_at")
+  rejectionNote String?   @map("rejection_note") @db.Text
+
+  createdById String?   @map("created_by_id") @db.VarChar(36)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  auditLogs KinerjaRhkCandidateAudit[]
+
+  @@index([opdSubmissionId])
+  @@index([rhkCode])
+  @@index([sopCode])
+  @@index([moduleKey])
+  @@index([status])
+  @@index([createdAt])
+  @@map("kinerja_rhk_candidates")
+}
+
+model KinerjaRhkCandidateAudit {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  candidateId String   @map("candidate_id") @db.VarChar(36)
+  action      String   @db.VarChar(100)
+  actorId     String?  @map("actor_id") @db.VarChar(36)
+  actorRole   String?  @map("actor_role") @db.VarChar(80)
+  note        String?  @db.Text
+  beforeJson  Json?    @map("before_json")
+  afterJson   Json?    @map("after_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  candidate KinerjaRhkCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("kinerja_rhk_candidate_audits")
+}
+
 // ─── SIDATA Reference Tables ──────────────────────────────────────────────────
 
 model RefJenisJabatan {

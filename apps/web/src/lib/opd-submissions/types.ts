@@ -152,6 +152,11 @@ export type OpdActionNotePayload = {
   note?: string;
 };
 
+export type OpdCompletePayload = {
+  note?: string;
+  overrideNote?: string;
+};
+
 export type RequestOpdCorrectionPayload = {
   note: string;
 };

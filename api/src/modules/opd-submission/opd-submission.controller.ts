@@ -22,7 +22,11 @@ import { getAuditContext } from '../shared/request-context';
 import { ok } from '../shared/respond';
 import { CreateOpdSubmissionDto } from './dto/create-opd-submission.dto';
 import { OpdSubmissionQueryDto } from './dto/opd-submission-query.dto';
-import { InternalActionNoteDto, RequestCorrectionDto } from './dto/request-correction.dto';
+import {
+  CompleteOpdSubmissionDto,
+  InternalActionNoteDto,
+  RequestCorrectionDto,
+} from './dto/request-correction.dto';
 import { SubmitOpdSubmissionDto } from './dto/submit-opd-submission.dto';
 import { UpdateOpdSubmissionDto } from './dto/update-opd-submission.dto';
 import { UploadSubmissionDocumentDto } from './dto/upload-submission-document.dto';
@@ -296,7 +300,7 @@ export class InternalOpdSubmissionController {
   @Post(':id/complete')
   async complete(
     @Param('id') id: string,
-    @Body() dto: InternalActionNoteDto,
+    @Body() dto: CompleteOpdSubmissionDto,
     @CurrentUser() user: AuthUser,
     @Req() request: Request,
   ) {

@@ -4,6 +4,7 @@ import type {
   AddOpdSubmissionDocumentPayload,
   CreateOpdSubmissionPayload,
   OpdActionNotePayload,
+  OpdCompletePayload,
   OpdSubmission,
   OpdSubmissionQuery,
   OpdSubmissionSlaQueue,
@@ -176,7 +177,7 @@ export const opdSubmissionsApi = {
     );
   },
 
-  completeOpdSubmission(id: string, payload: OpdActionNotePayload = {}) {
+  completeOpdSubmission(id: string, payload: OpdCompletePayload = {}) {
     return apiClient.post<OpdSubmission>(
       `/internal/opd-submissions/${id}/complete`,
       payload,

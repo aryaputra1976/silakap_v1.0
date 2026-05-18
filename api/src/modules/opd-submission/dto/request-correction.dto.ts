@@ -10,3 +10,13 @@ export class InternalActionNoteDto {
   @IsString()
   note?: string;
 }
+
+export class CompleteOpdSubmissionDto {
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  overrideNote?: string;
+}

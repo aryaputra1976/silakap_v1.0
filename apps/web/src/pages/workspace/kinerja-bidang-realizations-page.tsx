@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   DataTable,
@@ -18,6 +19,12 @@ import {
   type KinerjaBidangRealization,
   type KinerjaSopRealizationStatus,
 } from '@/lib/api/kinerja-bidang';
+import { RhkCandidateSummaryPanel } from '@/components/workspace/kinerja/rhk-candidate-summary-panel';
+import { RhkCandidateTable } from '@/components/workspace/kinerja/rhk-candidate-table';
+import { RhkCandidateDetailPanel } from '@/components/workspace/kinerja/rhk-candidate-detail-panel';
+import type { KinerjaRhkCandidate } from '@/lib/kinerja-rhk-candidates/types';
+import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
 
 function periodLabel(item: KinerjaBidangRealization) {
   if (item.month) return `Bulan ${item.month}`;
@@ -26,10 +33,13 @@ function periodLabel(item: KinerjaBidangRealization) {
 }
 
 export function KinerjaBidangRealizationsPage() {
+  const { user } = useAuth();
+  const role = getPrimaryRole(user?.roles);
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<KinerjaBidangRealization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedCandidate, setSelectedCandidate] = useState<KinerjaRhkCandidate | null>(null);
 
   const year = searchParams.get('year') ?? String(new Date().getFullYear());
   const status = (searchParams.get('status') ?? '') as KinerjaSopRealizationStatus | '';
@@ -80,6 +90,21 @@ export function KinerjaBidangRealizationsPage() {
       />
 
       {error ? <ErrorAlert message={error} /> : null}
+
+      <RhkCandidateSummaryPanel />
+
+      {selectedCandidate ? (
+        <RhkCandidateDetailPanel
+          candidate={selectedCandidate}
+          role={role}
+          onUpdated={(updated) => setSelectedCandidate(updated)}
+        />
+      ) : null}
+
+      <RhkCandidateTable
+        role={role}
+        onSelect={(candidate) => setSelectedCandidate(candidate)}
+      />
 
       <SectionCard title="Filter" description="Filter sederhana berdasarkan tahun dan status.">
         <div className="grid gap-3 md:grid-cols-2">

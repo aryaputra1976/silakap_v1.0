@@ -13,6 +13,7 @@ import {
 } from '@/components/workspace/ui';
 import { SopChecklistPanel } from '@/components/workspace/sop/sop-checklist-panel';
 import { ServiceActionPanel } from '@/components/workspace/service-workbench/service-action-panel';
+import { ServiceCompletionReadinessCard } from '@/components/workspace/service-workbench/service-completion-readiness-card';
 import { ServiceAuditTimeline } from '@/components/workspace/service-workbench/service-audit-timeline';
 import {
   ServiceDocumentPanel,
@@ -26,6 +27,7 @@ import { ServiceSubmissionDataCard } from '@/components/workspace/service-workbe
 import { ServiceVerificationNotePanel } from '@/components/workspace/service-workbench/service-verification-note-panel';
 import { ServiceWorkbenchHeader } from '@/components/workspace/service-workbench/service-workbench-header';
 import type { InternalSubmissionAction } from '@/lib/opd-submissions/internal-policy';
+import { canCompleteSubmission } from '@/lib/opd-submissions/internal-policy';
 import { getSopCodeForSubmission } from '@/lib/opd-submissions/sop-mapping';
 import type {
   OpdSubmission,
@@ -42,6 +44,7 @@ export function LayananDetailPage() {
   const [submission, setSubmission] = useState<OpdSubmission | null>(null);
   const [timeline, setTimeline] = useState<OpdSubmissionTimelineItem[]>([]);
   const [note, setNote] = useState('');
+  const [overrideNote, setOverrideNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingAction, setLoadingAction] =
     useState<InternalSubmissionAction | null>(null);
@@ -99,11 +102,20 @@ export function LayananDetailPage() {
     setSuccess('');
 
     try {
-      const payload = trimmedNote ? { note: trimmedNote } : {};
+      const payload =
+        action === 'complete'
+          ? {
+              ...(trimmedNote ? { note: trimmedNote } : {}),
+              ...(overrideNote.trim() ? { overrideNote: overrideNote.trim() } : {}),
+            }
+          : trimmedNote
+            ? { note: trimmedNote }
+            : {};
       const updated = await runAction(submission.id, action, payload);
       setSubmission(updated);
       setSuccess('Aksi berhasil disimpan dan audit log diperbarui.');
       setNote('');
+      setOverrideNote('');
       loadDetail();
     } catch (caught) {
       setError(
@@ -277,6 +289,13 @@ export function LayananDetailPage() {
             value={note}
             onChange={setNote}
           />
+          {canCompleteSubmission(role, submission.status) ? (
+            <ServiceCompletionReadinessCard
+              submission={submission}
+              overrideNote={overrideNote}
+              onOverrideNoteChange={setOverrideNote}
+            />
+          ) : null}
           <ServiceActionPanel
             loadingAction={loadingAction}
             note={note}
@@ -319,7 +338,7 @@ function runDocumentAction(
 function runAction(
   id: string,
   action: InternalSubmissionAction,
-  payload: { note?: string },
+  payload: { note?: string; overrideNote?: string },
 ) {
   switch (action) {
     case 'receive':
