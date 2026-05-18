@@ -1,6 +1,8 @@
 import {
   canAccessModule,
   getDefaultDashboardPath,
+  INTERNAL_ROLES,
+  OPD_ROLES,
   type AppModuleKey,
   type AppPermission,
 } from './policies';
@@ -8,70 +10,80 @@ import { getPrimaryRole, normalizeAppRole, type AppRole } from './roles';
 
 interface RouteRule {
   prefix: string;
-  moduleKey: AppModuleKey;
+  moduleKey?: AppModuleKey;
   requiredPermission?: AppPermission;
   allowedRoles?: AppRole[];
 }
 
 const ROUTE_ACCESS_RULES: RouteRule[] = [
-  { prefix: '/dashboard', moduleKey: 'DASHBOARD' },
+  { prefix: '/opd', allowedRoles: OPD_ROLES },
+  { prefix: '/dashboard', moduleKey: 'DASHBOARD', allowedRoles: INTERNAL_ROLES },
   {
     prefix: '/kinerja-bidang/realizations',
     moduleKey: 'KINERJA_BIDANG',
     requiredPermission: 'input',
+    allowedRoles: INTERNAL_ROLES,
   },
   {
     prefix: '/kinerja-bidang/realisasi',
     moduleKey: 'KINERJA_BIDANG',
     requiredPermission: 'input',
+    allowedRoles: INTERNAL_ROLES,
   },
   {
     prefix: '/kinerja-bidang/report',
     moduleKey: 'KINERJA_BIDANG',
     requiredPermission: 'report',
+    allowedRoles: INTERNAL_ROLES,
   },
   {
     prefix: '/kinerja-bidang/laporan',
     moduleKey: 'KINERJA_BIDANG',
     requiredPermission: 'report',
+    allowedRoles: INTERNAL_ROLES,
   },
-  { prefix: '/kinerja-bidang', moduleKey: 'KINERJA_BIDANG' },
+  { prefix: '/kinerja-bidang', moduleKey: 'KINERJA_BIDANG', allowedRoles: INTERNAL_ROLES },
   {
     prefix: '/siap/worklogs/executive',
     moduleKey: 'SIAP',
     requiredPermission: 'monitor',
+    allowedRoles: INTERNAL_ROLES,
   },
   {
     prefix: '/siap/worklogs/team',
     moduleKey: 'SIAP',
     requiredPermission: 'review',
+    allowedRoles: INTERNAL_ROLES,
   },
-  { prefix: '/siap', moduleKey: 'SIAP' },
-  { prefix: '/dms/upload', moduleKey: 'DMS', requiredPermission: 'upload' },
+  { prefix: '/siap', moduleKey: 'SIAP', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/dms/upload', moduleKey: 'DMS', requiredPermission: 'upload', allowedRoles: INTERNAL_ROLES },
   {
     prefix: '/dms/verification',
     moduleKey: 'DMS',
     requiredPermission: 'verify',
+    allowedRoles: INTERNAL_ROLES,
   },
-  { prefix: '/dms/reports', moduleKey: 'DMS', requiredPermission: 'report' },
-  { prefix: '/dms', moduleKey: 'DMS' },
-  { prefix: '/sipensiun', moduleKey: 'SIPENSIUN' },
+  { prefix: '/dms/reports', moduleKey: 'DMS', requiredPermission: 'report', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/dms', moduleKey: 'DMS', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/sipensiun', moduleKey: 'SIPENSIUN', allowedRoles: INTERNAL_ROLES },
   {
     prefix: '/layanan/verifikasi',
     moduleKey: 'LAYANAN_KEPEGAWAIAN',
     requiredPermission: 'verify',
+    allowedRoles: INTERNAL_ROLES,
   },
   {
     prefix: '/layanan/laporan',
     moduleKey: 'LAYANAN_KEPEGAWAIAN',
     requiredPermission: 'report',
+    allowedRoles: INTERNAL_ROLES,
   },
-  { prefix: '/layanan', moduleKey: 'LAYANAN_KEPEGAWAIAN' },
-  { prefix: '/sidata/import', moduleKey: 'SIDATA', requiredPermission: 'upload' },
-  { prefix: '/sidata/laporan', moduleKey: 'SIDATA', requiredPermission: 'report' },
-  { prefix: '/sidata', moduleKey: 'SIDATA' },
-  { prefix: '/sianalitik', moduleKey: 'SIANALITIK' },
-  { prefix: '/siarsip', moduleKey: 'SIARSIP' },
+  { prefix: '/layanan', moduleKey: 'LAYANAN_KEPEGAWAIAN', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/sidata/import', moduleKey: 'SIDATA', requiredPermission: 'upload', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/sidata/laporan', moduleKey: 'SIDATA', requiredPermission: 'report', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/sidata', moduleKey: 'SIDATA', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/sianalitik', moduleKey: 'SIANALITIK', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/siarsip', moduleKey: 'SIARSIP', allowedRoles: INTERNAL_ROLES },
 ];
 
 export function canAccessRoute(
@@ -87,6 +99,10 @@ export function canAccessRoute(
 
   if (rule.allowedRoles?.length && !rule.allowedRoles.includes(appRole)) {
     return false;
+  }
+
+  if (!rule.moduleKey) {
+    return true;
   }
 
   return canAccessModule(

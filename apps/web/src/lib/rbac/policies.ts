@@ -1,4 +1,5 @@
 import type { AppRole } from './roles';
+import { getOpdDefaultPath } from './opd-menu';
 
 export const APP_MODULE_KEYS = [
   'DASHBOARD',
@@ -210,7 +211,7 @@ export function canAccessModule(
 
 export function getDefaultDashboardPath(role: AppRole): string {
   if (role === 'OPD') {
-    return '/layanan';
+    return getOpdDefaultPath();
   }
 
   if (role === 'PPPK') {

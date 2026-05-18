@@ -1,6 +1,7 @@
 import type { MenuConfig, MenuItem } from '@/config/types';
 import { canAccessModule, type AppPermission } from './policies';
 import { getPrimaryRole, normalizeAppRole, type AppRole } from './roles';
+import { OPD_MENU_SIDEBAR, shouldUseOpdMenu } from './opd-menu';
 
 export function canAccessMenu(
   role: AppRole | string | null | undefined,
@@ -34,7 +35,13 @@ export function getAccessibleMenuConfig(
   menu: MenuConfig,
   roles: readonly string[] | null | undefined,
 ): MenuConfig {
-  return removeEmptyHeadings(filterMenuForRole(menu, getPrimaryRole(roles)));
+  const primaryRole = getPrimaryRole(roles);
+
+  if (shouldUseOpdMenu(primaryRole)) {
+    return removeEmptyHeadings(filterMenuForRole(OPD_MENU_SIDEBAR, primaryRole));
+  }
+
+  return removeEmptyHeadings(filterMenuForRole(menu, primaryRole));
 }
 
 function filterMenuForRole(menu: MenuConfig, role: AppRole): MenuConfig {
