@@ -1822,3 +1822,56 @@ model SopChecklistAuditLog {
   @@index([createdAt])
   @@map("sop_checklist_audit_log")
 }
+
+// ─────────────────────────────────────────────
+// SOP Governance (Sprint 16)
+// ─────────────────────────────────────────────
+
+model SopGovernanceRecord {
+  id            String    @id @default(cuid()) @db.VarChar(36)
+  sopCode       String    @map("sop_code") @db.VarChar(50)
+  title         String    @db.VarChar(255)
+  moduleKey     String    @map("module_key") @db.VarChar(50)
+  version       String    @db.VarChar(20)
+  status        String    @default("DRAFT") @db.VarChar(30)
+  isCurrent     Boolean   @default(false) @map("is_current")
+  effectiveDate DateTime? @map("effective_date")
+  reviewDueDate DateTime? @map("review_due_date")
+  dmsDocumentId String?   @map("dms_document_id") @db.VarChar(36)
+  approvedById  String?   @map("approved_by_id") @db.VarChar(36)
+  approvedAt    DateTime? @map("approved_at")
+  ownerRole     String?   @map("owner_role") @db.VarChar(30)
+  notes         String?   @db.Text
+  createdById   String?   @map("created_by_id") @db.VarChar(36)
+  updatedById   String?   @map("updated_by_id") @db.VarChar(36)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  changeLogs SopGovernanceChangeLog[]
+
+  @@index([sopCode])
+  @@index([moduleKey])
+  @@index([status])
+  @@index([reviewDueDate])
+  @@index([dmsDocumentId])
+  @@map("sop_governance_record")
+}
+
+model SopGovernanceChangeLog {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  governanceId String   @map("governance_id") @db.VarChar(36)
+  action       String   @db.VarChar(100)
+  beforeJson   Json?    @map("before_json")
+  afterJson    Json?    @map("after_json")
+  actorId      String?  @map("actor_id") @db.VarChar(36)
+  actorRole    String?  @map("actor_role") @db.VarChar(30)
+  note         String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  record SopGovernanceRecord @relation(fields: [governanceId], references: [id], onDelete: Cascade)
+
+  @@index([governanceId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("sop_governance_change_log")
+}

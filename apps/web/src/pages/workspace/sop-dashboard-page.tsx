@@ -20,6 +20,7 @@ import {
 } from '@/components/workspace/sop/sop-data-source-badge';
 import { SopChecklistDashboardPanel } from '@/components/workspace/sop/sop-checklist-dashboard-panel';
 import { SopRhkLinkPanel } from '@/components/workspace/sop/sop-rhk-link-panel';
+import { SopGovernancePanel } from '@/components/workspace/sop/sop-governance-panel';
 import {
   kinerjaBidangApi,
   type KinerjaBidangDashboardSummary,
@@ -164,6 +165,8 @@ export function SopDashboardPage() {
       </SectionCard>
 
       <SopContextNote />
+
+      <SopGovernancePanel userRole={userRole} />
 
       <SopChecklistDashboardPanel userRole={userRole} />
 
