@@ -46,7 +46,9 @@ import { KinerjaBidangSopPage } from '@/pages/workspace/kinerja-bidang-sop-page'
 import { KinerjaBidangTargetsPage } from '@/pages/workspace/kinerja-bidang-targets-page';
 import { KinerjaBidangRealizationsPage } from '@/pages/workspace/kinerja-bidang-realizations-page';
 import { KinerjaBidangReportPage } from '@/pages/workspace/kinerja-bidang-report-page';
+import { LayananDetailPage } from '@/pages/workspace/layanan-detail-page';
 import { LayananKepegawaianPage } from '@/pages/workspace/layanan-kepegawaian-page';
+import { LayananWorkbenchPage } from '@/pages/workspace/layanan-workbench-page';
 import { LayananVerificationPage } from '@/pages/workspace/layanan-verification-page';
 import { LayananSlaPage } from '@/pages/workspace/layanan-sla-page';
 import { LayananDelayPage } from '@/pages/workspace/layanan-delay-page';
@@ -142,6 +144,8 @@ export function AppRoutingSetup() {
 
           {/* LAYANAN KEPEGAWAIAN */}
           <Route path="/layanan" element={<LayananKepegawaianPage />} />
+          <Route path="/layanan/workbench" element={<LayananWorkbenchPage />} />
+          <Route path="/layanan/:id" element={<LayananDetailPage />} />
           <Route path="/layanan/verifikasi" element={<LayananVerificationPage />} />
           <Route path="/layanan/sla" element={<LayananSlaPage />} />
           <Route path="/layanan/keterlambatan" element={<LayananDelayPage />} />

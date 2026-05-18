@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Search } from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api/client';
-import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import type { PaginatedResult, SiapTask } from '@/lib/api/types';
-import type { OpdSubmission } from '@/lib/opd-submissions/types';
 import {
   ErrorAlert,
   FilterBar,
@@ -11,6 +10,7 @@ import {
   LoadingState,
   PageHeader,
   SectionCard,
+  secondaryButtonClass,
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
@@ -22,12 +22,8 @@ import { LAYANAN_SOP_LIST } from '@/lib/layanan/layanan-data';
 export function LayananKepegawaianPage() {
   const [q, setQ] = useState('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
-  const [opdQueue, setOpdQueue] =
-    useState<PaginatedResult<OpdSubmission> | null>(null);
   const [loading, setLoading] = useState(false);
-  const [opdLoading, setOpdLoading] = useState(false);
   const [error, setError] = useState('');
-  const [opdError, setOpdError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -51,42 +47,6 @@ export function LayananKepegawaianPage() {
     };
   }, [q]);
 
-  useEffect(() => {
-    let active = true;
-
-    setOpdLoading(true);
-    setOpdError('');
-
-    opdSubmissionsApi
-      .fetchInternalOpdSubmissions({
-        moduleKey: 'LAYANAN_KEPEGAWAIAN',
-        limit: 10,
-      })
-      .then((result) => {
-        if (active) {
-          setOpdQueue(result);
-        }
-      })
-      .catch((caught) => {
-        if (active) {
-          setOpdError(
-            caught instanceof ApiError
-              ? caught.message
-              : 'Gagal memuat antrian OPD',
-          );
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setOpdLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -101,7 +61,6 @@ export function LayananKepegawaianPage() {
       />
 
       {error ? <ErrorAlert message={error} /> : null}
-      {opdError ? <ErrorAlert message={opdError} /> : null}
 
       <SectionCard
         title="Modul Layanan"
@@ -138,20 +97,41 @@ export function LayananKepegawaianPage() {
           )}
 
           <SectionCard
-            title="Antrian OPD Masuk"
-            description="Pengajuan OPD yang sudah dikirim dan menunggu penerimaan PPIK."
+            title="Meja Kerja Verifikasi PPIK"
+            description="Pengajuan OPD yang sudah dikirim diproses di workbench internal agar data OPD, dokumen, checklist SOP, catatan, dan audit tetap dalam satu alur."
             actions={
-              <StatusBadge
-                value={`${opdQueue?.total ?? 0} pengajuan OPD`}
-                tone="warning"
-              />
+              <Link className={secondaryButtonClass} to="/layanan/workbench">
+                Buka Workbench
+                <ArrowRight className="size-4" />
+              </Link>
             }
           >
-            {opdLoading ? (
-              <LoadingState label="Memuat antrian OPD" />
-            ) : (
-              <LayananOpdQueueTable items={opdQueue?.items ?? []} />
-            )}
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
+                  Data OPD
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#51614c]">
+                  Staff memeriksa data yang dikirim OPD tanpa input ulang.
+                </p>
+              </div>
+              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
+                  Checklist SOP
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#51614c]">
+                  Setiap pengajuan ditautkan ke checklist SOP sesuai module layanan.
+                </p>
+              </div>
+              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
+                  Audit Log
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#51614c]">
+                  Aksi receive, correction, verify, reject, dan complete tercatat.
+                </p>
+              </div>
+            </div>
           </SectionCard>
         </div>
 
@@ -159,40 +139,6 @@ export function LayananKepegawaianPage() {
           <LayananSopPanel sops={LAYANAN_SOP_LIST} title="SOP Layanan Kepegawaian" />
         </div>
       </div>
-    </div>
-  );
-}
-
-function LayananOpdQueueTable({ items }: { items: OpdSubmission[] }) {
-  if (items.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-[#b7c9b1] bg-[#f4f8ef] p-6 text-sm text-[#6d7e68]">
-        Belum ada pengajuan OPD yang menunggu penerimaan.
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="rounded-lg border border-[#d8e5d3] bg-white p-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="font-semibold text-[#173c36]">{item.title}</div>
-              <div className="mt-1 text-xs text-[#687967]">
-                {item.submissionNumber ?? 'DRAFT'} - {item.opdName ?? 'OPD'}
-              </div>
-            </div>
-            <StatusBadge value={item.status} tone="warning" />
-          </div>
-          <p className="mt-3 text-sm text-[#51614c]">
-            {item.description ?? 'Tidak ada keterangan.'}
-          </p>
-        </div>
-      ))}
     </div>
   );
 }

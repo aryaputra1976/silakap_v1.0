@@ -135,6 +135,12 @@ export const MENU_SIDEBAR: MenuConfig = [
         moduleKey: 'LAYANAN_KEPEGAWAIAN',
       },
       {
+        title: 'Meja Kerja Verifikasi',
+        path: '/layanan/workbench',
+        moduleKey: 'LAYANAN_KEPEGAWAIAN',
+        requiredPermission: 'verify',
+      },
+      {
         title: 'Verifikasi Berkas',
         path: '/layanan/verifikasi',
         moduleKey: 'LAYANAN_KEPEGAWAIAN',
