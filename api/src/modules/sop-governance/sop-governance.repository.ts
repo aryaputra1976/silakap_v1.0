@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { GovernanceListQueryDto } from './dto/governance-list-query.dto';
 import type { CreateGovernanceRecordDto } from './dto/create-governance-record.dto';
 import type { UpdateGovernanceRecordDto } from './dto/update-governance-record.dto';
+import type { CreateReminderDto } from './dto/create-reminder.dto';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -38,6 +39,28 @@ export interface GovernanceSummary {
   overdueReview: number;
   byModule: GovernanceSummaryByModule[];
   recentChanges: GovernanceChangeLogRow[];
+}
+
+// ─── Review workflow types ────────────────────────────────────────────────────
+
+export interface ReviewQueueItem {
+  id: string;
+  sopCode: string;
+  title: string;
+  moduleKey: string;
+  version: string;
+  status: string;
+  isCurrent: boolean;
+  reviewDueDate: Date | null;
+  effectiveDate: Date | null;
+}
+
+export interface ReviewQueue {
+  dueSoon: ReviewQueueItem[];
+  overdue: ReviewQueueItem[];
+  needsReview: ReviewQueueItem[];
+  inRevision: ReviewQueueItem[];
+  recentReviewActions: GovernanceChangeLogRow[];
 }
 
 // ─── Repository ────────────────────────────────────────────────────────────────
@@ -274,6 +297,207 @@ export class SopGovernanceRepository {
       sopCode: log.record.sopCode,
       title: log.record.title,
     }));
+  }
+
+  // ── Review workflow ──────────────────────────────────────────────────────────
+
+  async getReviewQueue(): Promise<ReviewQueue> {
+    const now = new Date();
+    const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const [dueSoon, overdue, needsReview, inRevision, recentRaw] = await Promise.all([
+      this.prisma.sopGovernanceRecord.findMany({
+        where: {
+          reviewDueDate: { gte: now, lte: in30 },
+          status: { notIn: ['ARCHIVED'] },
+        },
+        orderBy: { reviewDueDate: 'asc' },
+      }),
+      this.prisma.sopGovernanceRecord.findMany({
+        where: {
+          reviewDueDate: { lt: now },
+          status: { notIn: ['ARCHIVED'] },
+        },
+        orderBy: { reviewDueDate: 'asc' },
+      }),
+      this.prisma.sopGovernanceRecord.findMany({
+        where: { status: 'NEEDS_REVIEW' },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.sopGovernanceRecord.findMany({
+        where: { status: 'REVISION' },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.sopGovernanceChangeLog.findMany({
+        where: {
+          action: {
+            in: ['REVIEW_STARTED', 'REVIEW_COMPLETED', 'KEPT_ACTIVE', 'REVISION_REQUESTED'],
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: { record: { select: { sopCode: true, title: true } } },
+      }),
+    ]);
+
+    const mapRecord = (r: {
+      id: string; sopCode: string; title: string; moduleKey: string;
+      version: string; status: string; isCurrent: boolean;
+      reviewDueDate: Date | null; effectiveDate: Date | null;
+    }): ReviewQueueItem => ({
+      id: r.id, sopCode: r.sopCode, title: r.title, moduleKey: r.moduleKey,
+      version: r.version, status: r.status, isCurrent: r.isCurrent,
+      reviewDueDate: r.reviewDueDate, effectiveDate: r.effectiveDate,
+    });
+
+    const recentReviewActions: GovernanceChangeLogRow[] = recentRaw.map((log) => ({
+      id: log.id, governanceId: log.governanceId, action: log.action,
+      beforeJson: log.beforeJson as Record<string, unknown> | null,
+      afterJson: log.afterJson as Record<string, unknown> | null,
+      actorId: log.actorId, actorRole: log.actorRole, note: log.note, createdAt: log.createdAt,
+      sopCode: log.record.sopCode, title: log.record.title,
+    }));
+
+    return {
+      dueSoon: dueSoon.map(mapRecord),
+      overdue: overdue.map(mapRecord),
+      needsReview: needsReview.map(mapRecord),
+      inRevision: inRevision.map(mapRecord),
+      recentReviewActions,
+    };
+  }
+
+  async startReview(id: string, actorId: string | null, actorRole: string | null, note: string | null) {
+    const before = await this.prisma.sopGovernanceRecord.findUniqueOrThrow({ where: { id } });
+    const record = await this.prisma.sopGovernanceRecord.update({
+      where: { id },
+      data: { status: 'NEEDS_REVIEW', updatedById: actorId },
+    });
+    await this.writeChangeLog(record.id, 'REVIEW_STARTED', before, record, actorId, actorRole, note);
+    return record;
+  }
+
+  async completeReview(
+    id: string,
+    decision: string,
+    actorId: string | null,
+    actorRole: string | null,
+    note: string | null,
+    newReviewDueDate: string | null,
+  ) {
+    const before = await this.prisma.sopGovernanceRecord.findUniqueOrThrow({ where: { id } });
+
+    let newStatus = before.status;
+    const extra: Record<string, unknown> = { updatedById: actorId };
+
+    if (decision === 'KEEP_ACTIVE') {
+      newStatus = 'ACTIVE';
+      extra.isCurrent = true;
+      if (newReviewDueDate) extra.reviewDueDate = new Date(newReviewDueDate);
+      await this.prisma.sopGovernanceRecord.updateMany({
+        where: { sopCode: before.sopCode, isCurrent: true, id: { not: id } },
+        data: { isCurrent: false },
+      });
+    } else if (decision === 'REVISION_REQUIRED') {
+      newStatus = 'REVISION';
+    } else if (decision === 'ARCHIVED') {
+      newStatus = 'ARCHIVED';
+      extra.isCurrent = false;
+    }
+
+    const record = await this.prisma.sopGovernanceRecord.update({
+      where: { id },
+      data: { ...extra, status: newStatus },
+    });
+    await this.writeChangeLog(record.id, 'REVIEW_COMPLETED', before, record, actorId, actorRole, note);
+    return record;
+  }
+
+  async keepActive(
+    id: string,
+    actorId: string | null,
+    actorRole: string | null,
+    note: string | null,
+    newReviewDueDate: string | null,
+  ) {
+    const before = await this.prisma.sopGovernanceRecord.findUniqueOrThrow({ where: { id } });
+    await this.prisma.sopGovernanceRecord.updateMany({
+      where: { sopCode: before.sopCode, isCurrent: true, id: { not: id } },
+      data: { isCurrent: false },
+    });
+    const record = await this.prisma.sopGovernanceRecord.update({
+      where: { id },
+      data: {
+        status: 'ACTIVE',
+        isCurrent: true,
+        ...(newReviewDueDate ? { reviewDueDate: new Date(newReviewDueDate) } : {}),
+        updatedById: actorId,
+      },
+    });
+    await this.writeChangeLog(record.id, 'KEPT_ACTIVE', before, record, actorId, actorRole, note);
+    return record;
+  }
+
+  async requestRevision(id: string, actorId: string | null, actorRole: string | null, note: string | null) {
+    const before = await this.prisma.sopGovernanceRecord.findUniqueOrThrow({ where: { id } });
+    const record = await this.prisma.sopGovernanceRecord.update({
+      where: { id },
+      data: { status: 'REVISION', updatedById: actorId },
+    });
+    await this.writeChangeLog(record.id, 'REVISION_REQUESTED', before, record, actorId, actorRole, note);
+    return record;
+  }
+
+  // ── Reminders ────────────────────────────────────────────────────────────────
+
+  async createReminder(
+    governanceId: string,
+    dto: CreateReminderDto,
+    actorId: string | null,
+  ) {
+    const record = await this.prisma.sopGovernanceRecord.findUniqueOrThrow({
+      where: { id: governanceId },
+    });
+    return this.prisma.sopReviewReminder.create({
+      data: {
+        governanceId,
+        sopCode: record.sopCode,
+        title: record.title,
+        moduleKey: record.moduleKey,
+        reminderType: dto.reminderType,
+        status: 'OPEN',
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        sentToRole: dto.sentToRole ?? null,
+        sentToUserId: dto.sentToUserId ?? null,
+        message: dto.message ?? null,
+        createdById: actorId,
+      },
+    });
+  }
+
+  getReminders(params: { governanceId?: string; status?: string; moduleKey?: string }) {
+    return this.prisma.sopReviewReminder.findMany({
+      where: {
+        ...(params.governanceId ? { governanceId: params.governanceId } : {}),
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.moduleKey ? { moduleKey: params.moduleKey } : {}),
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async resolveReminder(id: string, userId: string | null) {
+    return this.prisma.sopReviewReminder.update({
+      where: { id },
+      data: { status: 'RESOLVED', resolvedById: userId, resolvedAt: new Date() },
+    });
+  }
+
+  async dismissReminder(id: string, userId: string | null) {
+    return this.prisma.sopReviewReminder.update({
+      where: { id },
+      data: { status: 'DISMISSED', resolvedById: userId, resolvedAt: new Date() },
+    });
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────────

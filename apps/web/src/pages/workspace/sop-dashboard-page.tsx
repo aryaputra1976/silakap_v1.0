@@ -21,6 +21,8 @@ import {
 import { SopChecklistDashboardPanel } from '@/components/workspace/sop/sop-checklist-dashboard-panel';
 import { SopRhkLinkPanel } from '@/components/workspace/sop/sop-rhk-link-panel';
 import { SopGovernancePanel } from '@/components/workspace/sop/sop-governance-panel';
+import { SopReviewQueuePanel } from '@/components/workspace/sop/sop-review-queue-panel';
+import { SopReviewReminderList } from '@/components/workspace/sop/sop-review-reminder-list';
 import {
   kinerjaBidangApi,
   type KinerjaBidangDashboardSummary,
@@ -167,6 +169,10 @@ export function SopDashboardPage() {
       <SopContextNote />
 
       <SopGovernancePanel userRole={userRole} />
+
+      <SopReviewQueuePanel userRole={userRole} />
+
+      <SopReviewReminderList userRole={userRole} />
 
       <SopChecklistDashboardPanel userRole={userRole} />
 

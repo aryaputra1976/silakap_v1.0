@@ -91,6 +91,10 @@ export const GOVERNANCE_ACTION_LABELS: Record<string, string> = {
   MARKED_REVIEW: 'Ditandai Review',
   SET_REVISION: 'Set Revisi',
   STATUS_CHANGED: 'Status Berubah',
+  REVIEW_STARTED: 'Review Dimulai',
+  REVIEW_COMPLETED: 'Review Selesai',
+  KEPT_ACTIVE: 'Tetap Berlaku',
+  REVISION_REQUESTED: 'Revisi Diminta',
 };
 
 export function governanceStatusLabel(status: string): string {
@@ -106,10 +110,82 @@ export function governanceActionLabel(action: string): string {
 }
 
 export function governanceActionTone(action: string): BadgeTone {
-  if (action === 'ACTIVATED') return 'success';
+  if (action === 'ACTIVATED' || action === 'KEPT_ACTIVE' || action === 'REVIEW_COMPLETED') return 'success';
   if (action === 'ARCHIVED') return 'dark';
-  if (action === 'MARKED_REVIEW') return 'warning';
-  if (action === 'SET_REVISION') return 'info';
-  if (action === 'CREATED') return 'neutral';
+  if (action === 'MARKED_REVIEW' || action === 'REVIEW_STARTED') return 'warning';
+  if (action === 'SET_REVISION' || action === 'REVISION_REQUESTED') return 'info';
   return 'neutral';
+}
+
+// ─── Review workflow types ────────────────────────────────────────────────────
+
+export type SopReviewReminderType =
+  | 'DUE_SOON'
+  | 'OVERDUE'
+  | 'MANUAL_REVIEW'
+  | 'REVISION_REQUIRED';
+
+export type SopReviewReminderStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED';
+
+export type SopReviewDecision = 'KEEP_ACTIVE' | 'REVISION_REQUIRED' | 'ARCHIVED';
+
+export interface SopReviewReminder {
+  id: string;
+  governanceId: string;
+  sopCode: string;
+  title: string;
+  moduleKey: string;
+  reminderType: SopReviewReminderType;
+  status: SopReviewReminderStatus;
+  dueDate: string | null;
+  sentToRole: string | null;
+  sentToUserId: string | null;
+  message: string | null;
+  createdById: string | null;
+  resolvedById: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewQueueItem {
+  id: string;
+  sopCode: string;
+  title: string;
+  moduleKey: string;
+  version: string;
+  status: string;
+  isCurrent: boolean;
+  reviewDueDate: string | null;
+  effectiveDate: string | null;
+}
+
+export interface SopReviewQueue {
+  dueSoon: ReviewQueueItem[];
+  overdue: ReviewQueueItem[];
+  needsReview: ReviewQueueItem[];
+  inRevision: ReviewQueueItem[];
+  recentReviewActions: SopGovernanceChangeLog[];
+}
+
+export const REMINDER_TYPE_LABELS: Record<SopReviewReminderType, string> = {
+  DUE_SOON: 'Due Soon',
+  OVERDUE: 'Overdue',
+  MANUAL_REVIEW: 'Review Manual',
+  REVISION_REQUIRED: 'Revisi Diperlukan',
+};
+
+export const REMINDER_TYPE_TONES: Record<SopReviewReminderType, BadgeTone> = {
+  DUE_SOON: 'warning',
+  OVERDUE: 'danger',
+  MANUAL_REVIEW: 'info',
+  REVISION_REQUIRED: 'info',
+};
+
+export function reminderTypeLabel(type: string): string {
+  return REMINDER_TYPE_LABELS[type as SopReviewReminderType] ?? type;
+}
+
+export function reminderTypeTone(type: string): BadgeTone {
+  return REMINDER_TYPE_TONES[type as SopReviewReminderType] ?? 'neutral';
 }

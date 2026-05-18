@@ -19,6 +19,12 @@ import { CreateGovernanceRecordDto } from './dto/create-governance-record.dto';
 import { UpdateGovernanceRecordDto } from './dto/update-governance-record.dto';
 import { GovernanceActionDto } from './dto/governance-action.dto';
 import { GovernanceListQueryDto } from './dto/governance-list-query.dto';
+import { StartReviewDto } from './dto/start-review.dto';
+import { CompleteReviewDto } from './dto/complete-review.dto';
+import { KeepActiveDto } from './dto/keep-active.dto';
+import { RequestRevisionDto } from './dto/request-revision.dto';
+import { CreateReminderDto } from './dto/create-reminder.dto';
+import { ReminderActionDto } from './dto/reminder-action.dto';
 
 // Roles that can read governance data (excludes OPD, PPPK)
 const VIEW_ROLES = [
@@ -149,6 +155,98 @@ export class SopGovernanceController {
   ) {
     const take = limit ? Math.min(parseInt(limit, 10) || 20, 100) : 20;
     const data = await this.service.getChangeLogs(governanceId, take, user.roles);
+    return ok(data);
+  }
+
+  // ── Review workflow ───────────────────────────────────────────────────────────
+
+  @Get('review/queue')
+  @Roles(...VIEW_ROLES)
+  async getReviewQueue(@CurrentUser() user: AuthUser) {
+    const data = await this.service.getReviewQueue(user.roles);
+    return ok(data);
+  }
+
+  @Post('records/:id/start-review')
+  @Roles(...WRITE_ROLES)
+  async startReview(
+    @Param('id') id: string,
+    @Body() dto: StartReviewDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.startReview(id, dto, user.id, user.roles);
+    return ok(data);
+  }
+
+  @Post('records/:id/complete-review')
+  @Roles(...ACTION_ROLES)
+  async completeReview(
+    @Param('id') id: string,
+    @Body() dto: CompleteReviewDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.completeReview(id, dto, user.id, user.roles);
+    return ok(data);
+  }
+
+  @Post('records/:id/keep-active')
+  @Roles(...ACTION_ROLES)
+  async keepActive(
+    @Param('id') id: string,
+    @Body() dto: KeepActiveDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.keepActive(id, dto, user.id, user.roles);
+    return ok(data);
+  }
+
+  @Post('records/:id/request-revision')
+  @Roles(...ACTION_ROLES)
+  async requestRevision(
+    @Param('id') id: string,
+    @Body() dto: RequestRevisionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.requestRevision(id, dto, user.id, user.roles);
+    return ok(data);
+  }
+
+  @Post('records/:id/reminders')
+  @Roles(...WRITE_ROLES)
+  async createReminder(
+    @Param('id') governanceId: string,
+    @Body() dto: CreateReminderDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.createReminder(governanceId, dto, user.id, user.roles);
+    return ok(data);
+  }
+
+  // ── Reminder management ───────────────────────────────────────────────────────
+
+  @Get('reminders')
+  @Roles(...VIEW_ROLES)
+  async getReminders(
+    @Query('governanceId') governanceId: string | undefined,
+    @Query('status') status: string | undefined,
+    @Query('moduleKey') moduleKey: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.service.getReminders({ governanceId, status, moduleKey }, user.roles);
+    return ok(data);
+  }
+
+  @Post('reminders/:id/resolve')
+  @Roles(...WRITE_ROLES)
+  async resolveReminder(@Param('id') id: string, @Body() _dto: ReminderActionDto, @CurrentUser() user: AuthUser) {
+    const data = await this.service.resolveReminder(id, user.id, user.roles);
+    return ok(data);
+  }
+
+  @Post('reminders/:id/dismiss')
+  @Roles(...WRITE_ROLES)
+  async dismissReminder(@Param('id') id: string, @Body() _dto: ReminderActionDto, @CurrentUser() user: AuthUser) {
+    const data = await this.service.dismissReminder(id, user.id, user.roles);
     return ok(data);
   }
 }

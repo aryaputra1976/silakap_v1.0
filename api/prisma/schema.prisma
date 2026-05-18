@@ -1848,6 +1848,7 @@ model SopGovernanceRecord {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   changeLogs SopGovernanceChangeLog[]
+  reminders  SopReviewReminder[]
 
   @@index([sopCode])
   @@index([moduleKey])
@@ -1874,4 +1875,37 @@ model SopGovernanceChangeLog {
   @@index([action])
   @@index([createdAt])
   @@map("sop_governance_change_log")
+}
+
+// ─────────────────────────────────────────────
+// SOP Review Workflow (Sprint 17)
+// ─────────────────────────────────────────────
+
+model SopReviewReminder {
+  id           String    @id @default(cuid()) @db.VarChar(36)
+  governanceId String    @map("governance_id") @db.VarChar(36)
+  sopCode      String    @map("sop_code") @db.VarChar(50)
+  title        String    @db.VarChar(255)
+  moduleKey    String    @map("module_key") @db.VarChar(50)
+  reminderType String    @map("reminder_type") @db.VarChar(30)
+  status       String    @default("OPEN") @db.VarChar(20)
+  dueDate      DateTime? @map("due_date")
+  sentToRole   String?   @map("sent_to_role") @db.VarChar(30)
+  sentToUserId String?   @map("sent_to_user_id") @db.VarChar(36)
+  message      String?   @db.Text
+  createdById  String?   @map("created_by_id") @db.VarChar(36)
+  resolvedById String?   @map("resolved_by_id") @db.VarChar(36)
+  resolvedAt   DateTime? @map("resolved_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  record SopGovernanceRecord @relation(fields: [governanceId], references: [id], onDelete: Cascade)
+
+  @@index([governanceId])
+  @@index([sopCode])
+  @@index([moduleKey])
+  @@index([status])
+  @@index([dueDate])
+  @@index([sentToRole])
+  @@map("sop_review_reminder")
 }

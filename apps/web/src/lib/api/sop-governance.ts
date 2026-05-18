@@ -3,6 +3,8 @@ import type {
   SopGovernanceRecord,
   SopGovernanceSummary,
   SopGovernanceChangeLog,
+  SopReviewReminder,
+  SopReviewQueue,
 } from '@/lib/sop-governance/types';
 
 // ─── Query / payload types ────────────────────────────────────────────────────
@@ -35,6 +37,45 @@ export interface GovernanceActionPayload {
 export interface GovernanceChangeLogsQuery {
   governanceId?: string;
   limit?: number;
+}
+
+// ─── Review workflow payloads ─────────────────────────────────────────────────
+
+export interface StartReviewPayload {
+  note?: string;
+}
+
+export interface CompleteReviewPayload {
+  decision: 'KEEP_ACTIVE' | 'REVISION_REQUIRED' | 'ARCHIVED';
+  note?: string;
+  reviewDueDate?: string;
+}
+
+export interface KeepActivePayload {
+  note?: string;
+  reviewDueDate?: string;
+}
+
+export interface RequestRevisionPayload {
+  note?: string;
+}
+
+export interface CreateReminderPayload {
+  reminderType: 'DUE_SOON' | 'OVERDUE' | 'MANUAL_REVIEW' | 'REVISION_REQUIRED';
+  message?: string;
+  sentToRole?: string;
+  sentToUserId?: string;
+  dueDate?: string;
+}
+
+export interface ReminderActionPayload {
+  note?: string;
+}
+
+export interface RemindersQuery {
+  governanceId?: string;
+  status?: string;
+  moduleKey?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -119,6 +160,67 @@ export const sopGovernanceApi = {
   ): Promise<SopGovernanceChangeLog[]> {
     return apiClient.get<SopGovernanceChangeLog[]>(
       `/sop-governance/change-logs${buildQs(params)}`,
+    );
+  },
+
+  // ── Review workflow ───────────────────────────────────────────────────────────
+
+  fetchSopReviewQueue(): Promise<SopReviewQueue> {
+    return apiClient.get<SopReviewQueue>('/sop-governance/review/queue');
+  },
+
+  startSopReview(recordId: string, payload: StartReviewPayload = {}): Promise<SopGovernanceRecord> {
+    return apiClient.post<SopGovernanceRecord>(
+      `/sop-governance/records/${recordId}/start-review`,
+      payload,
+    );
+  },
+
+  completeSopReview(recordId: string, payload: CompleteReviewPayload): Promise<SopGovernanceRecord> {
+    return apiClient.post<SopGovernanceRecord>(
+      `/sop-governance/records/${recordId}/complete-review`,
+      payload,
+    );
+  },
+
+  keepSopActive(recordId: string, payload: KeepActivePayload = {}): Promise<SopGovernanceRecord> {
+    return apiClient.post<SopGovernanceRecord>(
+      `/sop-governance/records/${recordId}/keep-active`,
+      payload,
+    );
+  },
+
+  requestSopRevision(recordId: string, payload: RequestRevisionPayload = {}): Promise<SopGovernanceRecord> {
+    return apiClient.post<SopGovernanceRecord>(
+      `/sop-governance/records/${recordId}/request-revision`,
+      payload,
+    );
+  },
+
+  createSopReviewReminder(recordId: string, payload: CreateReminderPayload): Promise<SopReviewReminder> {
+    return apiClient.post<SopReviewReminder>(
+      `/sop-governance/records/${recordId}/reminders`,
+      payload,
+    );
+  },
+
+  fetchSopReviewReminders(params: RemindersQuery = {}): Promise<SopReviewReminder[]> {
+    return apiClient.get<SopReviewReminder[]>(
+      `/sop-governance/reminders${buildQs(params)}`,
+    );
+  },
+
+  resolveSopReviewReminder(reminderId: string, payload: ReminderActionPayload = {}): Promise<SopReviewReminder> {
+    return apiClient.post<SopReviewReminder>(
+      `/sop-governance/reminders/${reminderId}/resolve`,
+      payload,
+    );
+  },
+
+  dismissSopReviewReminder(reminderId: string, payload: ReminderActionPayload = {}): Promise<SopReviewReminder> {
+    return apiClient.post<SopReviewReminder>(
+      `/sop-governance/reminders/${reminderId}/dismiss`,
+      payload,
     );
   },
 };
