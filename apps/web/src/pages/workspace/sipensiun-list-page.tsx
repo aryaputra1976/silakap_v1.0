@@ -95,7 +95,7 @@ export function SipensiunListPage() {
     return () => {
       active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [jenisParam, viewParam, currentState, q, showDashboard]);
 
   return (

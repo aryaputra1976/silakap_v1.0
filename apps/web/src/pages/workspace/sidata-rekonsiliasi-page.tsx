@@ -148,7 +148,7 @@ export function SidataRekonsiliasiPage() {
       return;
     }
     void loadReconciliation(selectedBatchId, page, q, type);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedBatchId, page, q, type]);
 
   const selectedBatch = useMemo(
