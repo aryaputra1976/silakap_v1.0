@@ -17,6 +17,7 @@ import { DmsModule } from './dms/dms.module';
 import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
 import { KinerjaRhkCandidateModule } from './kinerja-rhk-candidate/kinerja-rhk-candidate.module';
 import { KinerjaRhkRealizationModule } from './kinerja-rhk-realization/kinerja-rhk-realization.module';
+import { KinerjaExecutiveReportModule } from './kinerja-executive-report/kinerja-executive-report.module';
 import { SopChecklistModule } from './sop-checklist/sop-checklist.module';
 import { SopGovernanceModule } from './sop-governance/sop-governance.module';
 import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
@@ -45,6 +46,7 @@ import { OpdSubmissionModule } from './opd-submission/opd-submission.module';
     KinerjaBidangModule,
     KinerjaRhkCandidateModule,
     KinerjaRhkRealizationModule,
+    KinerjaExecutiveReportModule,
     SopChecklistModule,
     SopGovernanceModule,
     SopAnalyticsModule,
