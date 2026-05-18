@@ -4,18 +4,13 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
-  ClipboardCheck,
   Database,
   FileSpreadsheet,
   FolderSync,
-  GitBranch,
   Info,
   Layers3,
   RefreshCcw,
-  ScrollText,
   ShieldAlert,
-  ShieldCheck,
-  UploadCloud,
   Users,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

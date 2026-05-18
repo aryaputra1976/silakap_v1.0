@@ -1,4 +1,6 @@
 import { type LucideIcon } from 'lucide-react';
+import type { AppModuleKey } from '@/lib/rbac/policies';
+import type { AppRole } from '@/lib/rbac/roles';
 
 export interface MenuItem {
   title?: string;
@@ -14,6 +16,9 @@ export interface MenuItem {
   expandTitle?: string;
   badge?: string;
   separator?: boolean;
+  moduleKey?: AppModuleKey;
+  allowedRoles?: AppRole[];
+  requiredPermission?: string;
 }
 
 export type MenuConfig = MenuItem[];

@@ -1,9 +1,11 @@
 'use client';
 
-import { JSX, useCallback } from 'react';
+import { JSX, useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MENU_SIDEBAR } from '@/config/layout-1.config';
 import { MenuConfig, MenuItem } from '@/config/types';
+import { useAuth } from '@/lib/auth/session';
+import { getAccessibleMenuConfig } from '@/lib/rbac/menu-access';
 import { cn } from '@/lib/utils';
 import {
   AccordionMenu,
@@ -20,8 +22,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function SidebarMenu() {
   const { pathname, search } = useLocation();
+  const { user } = useAuth();
+  const menu = useMemo(
+    () => getAccessibleMenuConfig(MENU_SIDEBAR, user?.roles),
+    [user?.roles],
+  );
   const currentPath = `${pathname}${search}`;
-  const activeMenuPath = getActiveMenuPath(currentPath);
+  const activeMenuPath = getActiveMenuPath(currentPath, menu);
 
   // Memoize matchPath to prevent unnecessary re-renders
   const matchPath = useCallback(
@@ -220,15 +227,15 @@ export function SidebarMenu() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_SIDEBAR)}
+        {buildMenu(menu)}
       </AccordionMenu>
     </ScrollArea>
   );
 }
 
-function getActiveMenuPath(currentPath: string) {
+function getActiveMenuPath(currentPath: string, menu: MenuConfig) {
   const current = normalizePath(currentPath);
-  const paths = getMenuPaths(MENU_SIDEBAR);
+  const paths = getMenuPaths(menu);
   const exactMatch = paths.find((path) => normalizePath(path) === current);
 
   if (exactMatch) {

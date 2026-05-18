@@ -1,8 +1,10 @@
-import { Fragment, ReactNode } from 'react';
+import { Fragment, ReactNode, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { MENU_SIDEBAR } from '@/config/layout-1.config';
 import { MenuItem } from '@/config/types';
+import { useAuth } from '@/lib/auth/session';
+import { getAccessibleMenuConfig } from '@/lib/rbac/menu-access';
 import { cn } from '@/lib/utils';
 import { useMenu } from '@/hooks/use-menu';
 
@@ -25,8 +27,13 @@ function ToolbarActions({ children }: { children?: ReactNode }) {
 
 function ToolbarBreadcrumbs() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const menu = useMemo(
+    () => getAccessibleMenuConfig(MENU_SIDEBAR, user?.roles),
+    [user?.roles],
+  );
   const { getBreadcrumb, isActive } = useMenu(pathname);
-  const items: MenuItem[] = getBreadcrumb(MENU_SIDEBAR);
+  const items: MenuItem[] = getBreadcrumb(menu);
 
   if (items.length === 0) {
     return null;
@@ -77,8 +84,13 @@ function ToolbarHeading ({ children }: { children: ReactNode }) {
 
 function ToolbarPageTitle ({ children }: { children?: string }) {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const menu = useMemo(
+    () => getAccessibleMenuConfig(MENU_SIDEBAR, user?.roles),
+    [user?.roles],
+  );
   const { getCurrentItem } = useMenu(pathname);
-  const item = getCurrentItem(MENU_SIDEBAR);
+  const item = getCurrentItem(menu);
 
   return (
     <h1 className="text-xl font-medium leading-none text-mono">
