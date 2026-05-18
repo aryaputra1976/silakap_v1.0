@@ -17,6 +17,7 @@ import { DmsModule } from './dms/dms.module';
 import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
 import { SopChecklistModule } from './sop-checklist/sop-checklist.module';
 import { SopGovernanceModule } from './sop-governance/sop-governance.module';
+import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SopGovernanceModule } from './sop-governance/sop-governance.module';
     KinerjaBidangModule,
     SopChecklistModule,
     SopGovernanceModule,
+    SopAnalyticsModule,
   ],
   controllers: [
     HealthController,

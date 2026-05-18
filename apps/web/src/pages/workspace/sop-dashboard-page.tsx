@@ -23,6 +23,9 @@ import { SopRhkLinkPanel } from '@/components/workspace/sop/sop-rhk-link-panel';
 import { SopGovernancePanel } from '@/components/workspace/sop/sop-governance-panel';
 import { SopReviewQueuePanel } from '@/components/workspace/sop/sop-review-queue-panel';
 import { SopReviewReminderList } from '@/components/workspace/sop/sop-review-reminder-list';
+import { SopComplianceExecutivePanel } from '@/components/workspace/sop/sop-compliance-executive-panel';
+import { SopComplianceBySopTable } from '@/components/workspace/sop/sop-compliance-by-sop-table';
+import { SopEvidenceCompletenessPanel } from '@/components/workspace/sop/sop-evidence-completeness-panel';
 import {
   kinerjaBidangApi,
   type KinerjaBidangDashboardSummary,
@@ -168,15 +171,21 @@ export function SopDashboardPage() {
 
       <SopContextNote />
 
-      <SopGovernancePanel userRole={userRole} />
+      <SopComplianceExecutivePanel userRole={userRole} />
+
+      <SopComplianceBySopTable userRole={userRole} />
+
+      <SopEvidenceCompletenessPanel userRole={userRole} />
 
       <SopReviewQueuePanel userRole={userRole} />
 
-      <SopReviewReminderList userRole={userRole} />
+      <SopGovernancePanel userRole={userRole} />
 
       <SopChecklistDashboardPanel userRole={userRole} />
 
       <SopRhkLinkPanel userRole={userRole} />
+
+      <SopReviewReminderList userRole={userRole} />
     </div>
   );
 }
