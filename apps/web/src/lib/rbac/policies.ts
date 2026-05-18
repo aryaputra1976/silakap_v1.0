@@ -11,6 +11,7 @@ export const APP_MODULE_KEYS = [
   'SIDATA',
   'SIANALITIK',
   'SIARSIP',
+  'WORKING_CALENDAR',
   'ADMIN',
 ] as const;
 
@@ -132,6 +133,7 @@ export const ROLE_MODULE_POLICIES: Record<AppRole, ModulePolicy> = {
     LAYANAN_KEPEGAWAIAN: EXECUTIVE_PERMISSIONS,
     SIDATA: ['read', 'monitor', 'report'],
     SIANALITIK: ['read', 'monitor', 'report'],
+    WORKING_CALENDAR: ['read', 'monitor'],
   },
   KABID: {
     DASHBOARD: ['read', 'monitor', 'report'],
@@ -143,6 +145,7 @@ export const ROLE_MODULE_POLICIES: Record<AppRole, ModulePolicy> = {
     SIDATA: FIELD_CONTROL_PERMISSIONS,
     SIANALITIK: ['read', 'monitor', 'report'],
     SIARSIP: ['read', 'input', 'upload', 'monitor'],
+    WORKING_CALENDAR: ['read', 'input', 'monitor'],
   },
   ANALIS_MADYA: {
     DASHBOARD: ['read'],

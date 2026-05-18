@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -47,14 +49,18 @@ export class WorkingCalendarController {
 
   @Post()
   @Roles(...MANAGE_ROLES)
-  async create(@Body() dto: CreateWorkingCalendarDto) {
-    return ok(await this.service.create(dto));
+  async create(@Body() dto: CreateWorkingCalendarDto, @CurrentUser() user: AuthUser) {
+    return ok(await this.service.create(dto, user));
   }
 
   @Patch(':id')
   @Roles(...MANAGE_ROLES)
-  async update(@Param('id') id: string, @Body() dto: UpdateWorkingCalendarDto) {
-    return ok(await this.service.update(id, dto));
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkingCalendarDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.update(id, dto, user));
   }
 
   @Get(':id/holidays')
@@ -65,13 +71,21 @@ export class WorkingCalendarController {
 
   @Post(':id/holidays')
   @Roles(...MANAGE_ROLES)
-  async addHoliday(@Param('id') id: string, @Body() dto: CreateHolidayDto) {
-    return ok(await this.service.addHoliday(id, dto));
+  async addHoliday(
+    @Param('id') id: string,
+    @Body() dto: CreateHolidayDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.addHoliday(id, dto, user));
   }
 
   @Delete(':id/holidays/:holidayId')
   @Roles(...MANAGE_ROLES)
-  async deleteHoliday(@Param('id') id: string, @Param('holidayId') holidayId: string) {
-    return ok(await this.service.deleteHoliday(id, holidayId));
+  async deleteHoliday(
+    @Param('id') id: string,
+    @Param('holidayId') holidayId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.service.deleteHoliday(id, holidayId, user));
   }
 }

@@ -84,6 +84,7 @@ const ROUTE_ACCESS_RULES: RouteRule[] = [
   { prefix: '/sidata', moduleKey: 'SIDATA', allowedRoles: INTERNAL_ROLES },
   { prefix: '/sianalitik', moduleKey: 'SIANALITIK', allowedRoles: INTERNAL_ROLES },
   { prefix: '/siarsip', moduleKey: 'SIARSIP', allowedRoles: INTERNAL_ROLES },
+  { prefix: '/working-calendar', moduleKey: 'WORKING_CALENDAR', allowedRoles: INTERNAL_ROLES },
 ];
 
 export function canAccessRoute(

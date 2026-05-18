@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { WorkingCalendarController } from './working-calendar.controller';
@@ -6,7 +7,7 @@ import { WorkingCalendarRepository } from './working-calendar.repository';
 import { WorkingCalendarService } from './working-calendar.service';
 
 @Module({
-  imports: [AuthModule, PrismaModule],
+  imports: [AuthModule, PrismaModule, AuditModule],
   controllers: [WorkingCalendarController],
   providers: [WorkingCalendarRepository, WorkingCalendarService],
   exports: [WorkingCalendarService],

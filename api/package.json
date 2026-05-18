@@ -23,6 +23,7 @@
     "db:cleanup-smoke": "tsx scripts/cleanup-smoke-data.ts",
     "db:cleanup-pilot": "tsx scripts/cleanup-pilot-data.ts",
     "smoke:phase11": "tsx scripts/smoke-phase11-siap.ts",
+    "smoke:e2e-regression": "tsx scripts/e2e-regression-check.ts",
     "predeploy:check": "tsx scripts/predeploy-check.ts",
     "deploy:safe": "npm run predeploy:check && npm run build && prisma migrate deploy"
   },
