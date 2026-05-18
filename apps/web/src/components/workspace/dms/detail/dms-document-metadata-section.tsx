@@ -1,5 +1,5 @@
-import { Edit3, Save } from 'lucide-react';
-import { ActionButton, SectionCard } from '@/components/workspace/ui';
+import { BookOpen, Edit3, Save } from 'lucide-react';
+import { ActionButton, SectionCard, StatusBadge } from '@/components/workspace/ui';
 import {
   dmsAccessLevelLabel,
   dmsCategoryLabel,
@@ -10,6 +10,12 @@ import {
   DmsMetadataForm,
   type DmsMetadataFormValue,
 } from '@/components/workspace/dms/dms-metadata-form';
+import {
+  getSopDmsMappingByCode,
+  isSopSubCategory,
+  sopAccessLevelLabel,
+  SOP_MODULE_LABELS,
+} from '@/lib/dms/sop-taxonomy';
 
 export function DmsDocumentMetadataSection({
   document,
@@ -67,7 +73,12 @@ export function DmsDocumentMetadataSection({
           onChange={onFormChange}
         />
       ) : (
-        <DmsMetadataView document={document} />
+        <>
+          <DmsMetadataView document={document} />
+          {isSopSubCategory(document.subCategory ?? '') ? (
+            <SopMetadataPanel document={document} />
+          ) : null}
+        </>
       )}
     </SectionCard>
   );
@@ -119,4 +130,87 @@ function formatTags(tags: DmsDocument['tags']) {
   }
 
   return tags.map((item) => String(item)).join(', ');
+}
+
+function SopMetadataPanel({ document }: { document: DmsDocument }) {
+  const tagsArray = Array.isArray(document.tags)
+    ? document.tags.map((t) => String(t))
+    : [];
+  const sopCode = tagsArray.find((t) => t.startsWith('SOP-BKPSDM-'));
+  const mapping = sopCode ? getSopDmsMappingByCode(sopCode) : undefined;
+
+  return (
+    <div className="mt-4 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-[#2e6b3e]" />
+        <span className="text-sm font-semibold text-[#173c36]">
+          Metadata SOP
+        </span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <SopMeta
+          label="Kode SOP"
+          value={sopCode ?? dmsSubCategoryLabel(document.subCategory ?? '')}
+        />
+        {mapping ? (
+          <>
+            <SopMeta
+              label="Modul Terkait"
+              value={SOP_MODULE_LABELS[mapping.moduleKey]}
+            />
+            <SopMeta
+              label="Subkategori SOP"
+              value={dmsSubCategoryLabel(mapping.dmsSubCategory)}
+            />
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                Access Level SOP
+              </p>
+              <StatusBadge
+                value={sopAccessLevelLabel(mapping.accessLevel)}
+                tone={
+                  mapping.accessLevel === 'CONFIDENTIAL'
+                    ? 'danger'
+                    : mapping.accessLevel === 'LEADERSHIP_ONLY'
+                      ? 'info'
+                      : mapping.accessLevel === 'ADMIN_ONLY'
+                        ? 'dark'
+                        : mapping.accessLevel === 'BIDANG_PPIK'
+                          ? 'warning'
+                          : 'neutral'
+                }
+              />
+            </div>
+            {mapping.relatedRhkCodes && mapping.relatedRhkCodes.length > 0 ? (
+              <SopMeta
+                label="RHK Terkait"
+                value={mapping.relatedRhkCodes.join(', ')}
+              />
+            ) : null}
+            {mapping.description ? (
+              <div className="md:col-span-2">
+                <SopMeta label="Deskripsi SOP" value={mapping.description} />
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <SopMeta
+            label="Subkategori"
+            value={dmsSubCategoryLabel(document.subCategory ?? '')}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SopMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-medium text-zinc-900">{value}</p>
+    </div>
+  );
 }

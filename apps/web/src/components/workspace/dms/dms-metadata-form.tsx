@@ -13,12 +13,20 @@ import {
   type DmsAccessLevel,
   type DmsDocumentCategory,
 } from '@/lib/api/dms';
+import {
+  getSopDmsMappingByCode,
+  isSopSubCategory,
+  SOP_DMS_MAPPINGS,
+  sopAccessLevelToDms,
+} from '@/lib/dms/sop-taxonomy';
 
 export interface DmsMetadataFormValue {
   title: string;
   description: string;
   category: DmsDocumentCategory;
   subCategory: string;
+  /** Kode SOP jika dokumen adalah referensi SOP (opsional) */
+  sopCode: string;
   tags: string;
   accessLevel: DmsAccessLevel;
   periodYear: string;
@@ -35,6 +43,7 @@ export const initialDmsMetadataForm: DmsMetadataFormValue = {
   description: '',
   category: 'BUKTI_DUKUNG',
   subCategory: '',
+  sopCode: '',
   tags: '',
   accessLevel: 'INTERNAL',
   periodYear: String(new Date().getFullYear()),
@@ -119,6 +128,7 @@ export function DmsMetadataForm({
               onChange({
                 ...value,
                 subCategory: next,
+                sopCode: isSopSubCategory(next) ? value.sopCode : '',
                 accessLevel: suggestedLevel,
               });
             }}
@@ -212,6 +222,34 @@ export function DmsMetadataForm({
         </Field>
       </div>
 
+      {isSopSubCategory(value.subCategory) ? (
+        <SopCodeField
+          disabled={disabled}
+          subCategory={value.subCategory}
+          sopCode={value.sopCode}
+          onSopCodeChange={(nextCode) => {
+            const mapping = getSopDmsMappingByCode(nextCode);
+            if (mapping) {
+              const autoTags = [
+                nextCode,
+                ...mapping.tags,
+              ]
+                .filter((t, i, arr) => t && arr.indexOf(t) === i)
+                .join(', ');
+              onChange({
+                ...value,
+                sopCode: nextCode,
+                tags: autoTags,
+                accessLevel: sopAccessLevelToDms(mapping.accessLevel),
+                description: value.description || mapping.description || '',
+              });
+            } else {
+              onChange({ ...value, sopCode: nextCode });
+            }
+          }}
+        />
+      ) : null}
+
       <Field label="Tags">
         <input
           className={inputClass}
@@ -270,12 +308,18 @@ export function DmsMetadataForm({
 }
 
 export function toDmsCreatePayload(value: DmsMetadataFormValue) {
+  const baseTags = normalizeTags(value.tags) ?? [];
+  const tagsWithSopCode =
+    value.sopCode && !baseTags.includes(value.sopCode)
+      ? [value.sopCode, ...baseTags]
+      : baseTags;
+
   return {
     title: value.title.trim(),
     description: normalizeOptional(value.description),
     category: value.category,
     subCategory: normalizeOptional(value.subCategory),
-    tags: normalizeTags(value.tags),
+    tags: tagsWithSopCode.length > 0 ? tagsWithSopCode : undefined,
     accessLevel: value.accessLevel,
     periodYear: normalizeNumber(value.periodYear),
     periodMonth: normalizeNumber(value.periodMonth),
@@ -310,4 +354,57 @@ function normalizeTags(value: string) {
     .filter((item, index, items) => item && items.indexOf(item) === index);
 
   return tags.length > 0 ? tags : undefined;
+}
+
+function SopCodeField({
+  disabled,
+  subCategory,
+  sopCode,
+  onSopCodeChange,
+}: {
+  disabled?: boolean;
+  subCategory: string;
+  sopCode: string;
+  onSopCodeChange: (code: string) => void;
+}) {
+  const options = SOP_DMS_MAPPINGS.filter(
+    (item) => item.dmsSubCategory === subCategory,
+  );
+
+  if (options.length === 0) {
+    return (
+      <Field label="Kode SOP">
+        <input
+          className={inputClass}
+          disabled={disabled}
+          value={sopCode}
+          onChange={(event) => onSopCodeChange(event.target.value)}
+          placeholder="Contoh: SOP-BKPSDM-MAN-001"
+        />
+      </Field>
+    );
+  }
+
+  return (
+    <Field label="Kode SOP">
+      <select
+        className={inputClass}
+        disabled={disabled}
+        value={sopCode}
+        onChange={(event) => onSopCodeChange(event.target.value)}
+      >
+        <option value="">Pilih SOP (opsional)</option>
+        {options.map((item) => (
+          <option key={item.sopCode} value={item.sopCode}>
+            {item.sopCode} — {item.title}
+          </option>
+        ))}
+      </select>
+      {sopCode && getSopDmsMappingByCode(sopCode) ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {getSopDmsMappingByCode(sopCode)?.description}
+        </p>
+      ) : null}
+    </Field>
+  );
 }

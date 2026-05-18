@@ -37,7 +37,17 @@ export type DmsSubCategory =
   | 'SOP_MATRIKS'
   | 'SK_PENSIUN'
   | 'CHECKLIST_VERIFIKASI'
-  | 'LAPORAN_RHK';
+  | 'LAPORAN_RHK'
+  // Sprint 12 — SOP taxonomy subCategories
+  | 'SOP_MANAJEMEN_PPIK'
+  | 'SOP_LAYANAN_KEPEGAWAIAN'
+  | 'SOP_PENGADAAN_ASN'
+  | 'SOP_DATA_KEPEGAWAIAN'
+  | 'SOP_SIASN'
+  | 'SOP_DMS'
+  | 'SOP_PENSIUN'
+  | 'SOP_PEMBERHENTIAN'
+  | 'SOP_MONITORING';
 
 export const DMS_DOCUMENT_STATUSES: DmsDocumentStatus[] = [
   'DRAFT',
@@ -80,6 +90,15 @@ export const DMS_SUB_CATEGORIES: DmsSubCategory[] = [
   'SK_PENSIUN',
   'CHECKLIST_VERIFIKASI',
   'LAPORAN_RHK',
+  'SOP_MANAJEMEN_PPIK',
+  'SOP_LAYANAN_KEPEGAWAIAN',
+  'SOP_PENGADAAN_ASN',
+  'SOP_DATA_KEPEGAWAIAN',
+  'SOP_SIASN',
+  'SOP_DMS',
+  'SOP_PENSIUN',
+  'SOP_PEMBERHENTIAN',
+  'SOP_MONITORING',
 ];
 
 export interface DmsUnitKerja {
@@ -502,6 +521,15 @@ export function dmsSubCategoryLabel(subCategory: string) {
     SK_PENSIUN: 'SK Pensiun',
     CHECKLIST_VERIFIKASI: 'Checklist Verifikasi',
     LAPORAN_RHK: 'Laporan RHK',
+    SOP_MANAJEMEN_PPIK: 'Manajemen Bidang PPIK',
+    SOP_LAYANAN_KEPEGAWAIAN: 'Layanan Kepegawaian',
+    SOP_PENGADAAN_ASN: 'Pengadaan ASN',
+    SOP_DATA_KEPEGAWAIAN: 'Data Kepegawaian',
+    SOP_SIASN: 'SIASN / MySAPK',
+    SOP_DMS: 'Pengelolaan Dokumen Digital',
+    SOP_PENSIUN: 'Pensiun ASN',
+    SOP_PEMBERHENTIAN: 'Pemberhentian ASN',
+    SOP_MONITORING: 'Monitoring Status',
   };
 
   return labels[subCategory as DmsSubCategory] ?? subCategory.replace(/_/g, ' ');
@@ -557,8 +585,18 @@ export function getDefaultAccessLevelForSubCategory(
   switch (subCategory as DmsSubCategory) {
     case 'SK_PENSIUN':
     case 'SOP_PENSIUN_PEMBERHENTIAN':
-      return 'TERBATAS';
     case 'CHECKLIST_VERIFIKASI':
+      return 'TERBATAS';
+    case 'SOP_PEMBERHENTIAN':
+    case 'SOP_PENSIUN':
+      return 'SANGAT_TERBATAS';
+    case 'SOP_MANAJEMEN_PPIK':
+    case 'SOP_LAYANAN_KEPEGAWAIAN':
+    case 'SOP_PENGADAAN_ASN':
+    case 'SOP_DATA_KEPEGAWAIAN':
+    case 'SOP_SIASN':
+    case 'SOP_DMS':
+    case 'SOP_MONITORING':
       return 'TERBATAS';
     case 'LAPORAN_RHK':
     case 'SOP_TAHAP_1':

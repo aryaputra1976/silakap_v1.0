@@ -563,12 +563,21 @@ export function DmsDocumentDetailPage() {
 }
 
 function toFormValue(document: DmsDocument): DmsMetadataFormValue {
+  const tagsArray = Array.isArray(document.tags)
+    ? document.tags.map((t) => String(t))
+    : [];
+
+  const sopCodeFromTags = tagsArray.find((t) =>
+    t.startsWith('SOP-BKPSDM-'),
+  ) ?? '';
+
   return {
     title: document.title,
     description: document.description ?? '',
     category: document.category as DmsDocumentCategory,
     subCategory: document.subCategory ?? '',
-    tags: Array.isArray(document.tags) ? document.tags.join(', ') : '',
+    sopCode: sopCodeFromTags,
+    tags: tagsArray.join(', '),
     accessLevel:
       document.accessLevel === 'TERBATAS' ||
       document.accessLevel === 'SANGAT_TERBATAS' ||
