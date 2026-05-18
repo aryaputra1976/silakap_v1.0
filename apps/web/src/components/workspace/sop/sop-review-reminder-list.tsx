@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Loader2 } from 'lucide-react';
-import { SectionCard, StatusBadge } from '@/components/workspace/ui';
+import { Bell, Loader2, RefreshCcw } from 'lucide-react';
+import { ActionButton, SectionCard, StatusBadge } from '@/components/workspace/ui';
 import { sopGovernanceApi } from '@/lib/api/sop-governance';
 import { reminderTypeLabel, reminderTypeTone } from '@/lib/sop-governance/types';
 import type { SopReviewReminder } from '@/lib/sop-governance/types';
@@ -97,6 +97,16 @@ function ReminderListInner({
     <SectionCard
       title="Reminder Review SOP"
       description="Notifikasi internal untuk SOP yang perlu ditinjau."
+      actions={
+        <ActionButton
+          icon={loading ? Loader2 : RefreshCcw}
+          variant="secondary"
+          disabled={loading}
+          onClick={() => void load()}
+        >
+          Refresh
+        </ActionButton>
+      }
     >
       {error ? (
         <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">

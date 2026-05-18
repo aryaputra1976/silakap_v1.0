@@ -486,18 +486,40 @@ export class SopGovernanceRepository {
     });
   }
 
-  async resolveReminder(id: string, userId: string | null) {
-    return this.prisma.sopReviewReminder.update({
+  async resolveReminder(id: string, userId: string | null, actorRole: string | null = null) {
+    const reminder = await this.prisma.sopReviewReminder.findUniqueOrThrow({ where: { id } });
+    const updated = await this.prisma.sopReviewReminder.update({
       where: { id },
       data: { status: 'RESOLVED', resolvedById: userId, resolvedAt: new Date() },
     });
+    await this.writeChangeLog(
+      reminder.governanceId,
+      'REMINDER_RESOLVED',
+      null,
+      { reminderId: id, sopCode: reminder.sopCode, reminderType: reminder.reminderType },
+      userId,
+      actorRole,
+      null,
+    );
+    return updated;
   }
 
-  async dismissReminder(id: string, userId: string | null) {
-    return this.prisma.sopReviewReminder.update({
+  async dismissReminder(id: string, userId: string | null, actorRole: string | null = null) {
+    const reminder = await this.prisma.sopReviewReminder.findUniqueOrThrow({ where: { id } });
+    const updated = await this.prisma.sopReviewReminder.update({
       where: { id },
       data: { status: 'DISMISSED', resolvedById: userId, resolvedAt: new Date() },
     });
+    await this.writeChangeLog(
+      reminder.governanceId,
+      'REMINDER_DISMISSED',
+      null,
+      { reminderId: id, sopCode: reminder.sopCode, reminderType: reminder.reminderType },
+      userId,
+      actorRole,
+      null,
+    );
+    return updated;
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────────

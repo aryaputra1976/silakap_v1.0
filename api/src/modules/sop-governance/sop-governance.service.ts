@@ -245,12 +245,12 @@ export class SopGovernanceService {
   async resolveReminder(id: string, userId: string, roles: string[]) {
     assertNotBlocked(roles);
     assertRole(roles, MARK_REVIEW_ROLES);
-    return this.repo.resolveReminder(id, userId);
+    return this.repo.resolveReminder(id, userId, getPrimary(roles));
   }
 
   async dismissReminder(id: string, userId: string, roles: string[]) {
     assertNotBlocked(roles);
     assertRole(roles, MARK_REVIEW_ROLES);
-    return this.repo.dismissReminder(id, userId);
+    return this.repo.dismissReminder(id, userId, getPrimary(roles));
   }
 }
