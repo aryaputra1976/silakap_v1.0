@@ -70,6 +70,13 @@ export const opdSubmissionsApi = {
     );
   },
 
+  uploadOpdSubmissionDocumentFile(id: string, payload: FormData) {
+    return apiClient.upload<OpdSubmission>(
+      `/opd/submissions/${id}/documents/upload`,
+      payload,
+    );
+  },
+
   submitOpdCorrection(id: string, payload: OpdActionNotePayload = {}) {
     return apiClient.post<OpdSubmission>(
       `/opd/submissions/${id}/correction-submit`,
@@ -133,6 +140,46 @@ export const opdSubmissionsApi = {
   completeOpdSubmission(id: string, payload: OpdActionNotePayload = {}) {
     return apiClient.post<OpdSubmission>(
       `/internal/opd-submissions/${id}/complete`,
+      payload,
+    );
+  },
+
+  uploadInternalSubmissionDocumentFile(id: string, payload: FormData) {
+    return apiClient.upload<OpdSubmission>(
+      `/internal/opd-submissions/${id}/documents/upload`,
+      payload,
+    );
+  },
+
+  verifySubmissionDocument(
+    id: string,
+    documentId: string,
+    payload: OpdActionNotePayload = {},
+  ) {
+    return apiClient.post<OpdSubmission>(
+      `/internal/opd-submissions/${id}/documents/${documentId}/verify`,
+      payload,
+    );
+  },
+
+  requestSubmissionDocumentCorrection(
+    id: string,
+    documentId: string,
+    payload: RequestOpdCorrectionPayload,
+  ) {
+    return apiClient.post<OpdSubmission>(
+      `/internal/opd-submissions/${id}/documents/${documentId}/request-correction`,
+      payload,
+    );
+  },
+
+  rejectSubmissionDocument(
+    id: string,
+    documentId: string,
+    payload: RequestOpdCorrectionPayload,
+  ) {
+    return apiClient.post<OpdSubmission>(
+      `/internal/opd-submissions/${id}/documents/${documentId}/reject`,
       payload,
     );
   },

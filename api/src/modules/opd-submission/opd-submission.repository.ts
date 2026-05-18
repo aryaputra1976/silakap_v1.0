@@ -74,6 +74,22 @@ export class OpdSubmissionRepository {
     return this.prisma.opdSubmissionDocument.create({ data });
   }
 
+  findDocumentById(id: string) {
+    return this.prisma.opdSubmissionDocument.findUnique({
+      where: { id },
+    });
+  }
+
+  updateDocument(
+    id: string,
+    data: Prisma.OpdSubmissionDocumentUncheckedUpdateInput,
+  ) {
+    return this.prisma.opdSubmissionDocument.update({
+      where: { id },
+      data,
+    });
+  }
+
   countSubmittedOnDay(start: Date, end: Date) {
     return this.prisma.opdSubmission.count({
       where: {

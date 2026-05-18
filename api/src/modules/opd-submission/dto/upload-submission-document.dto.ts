@@ -17,4 +17,14 @@ export class UploadSubmissionDocumentDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subCategory?: string;
 }

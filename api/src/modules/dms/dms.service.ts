@@ -34,7 +34,7 @@ import {
   NormalizedDmsDocumentFilters,
 } from './dms.repository';
 
-type UploadedDmsFile = {
+export type UploadedDmsFile = {
   originalname: string;
   mimetype: string;
   size: number;
@@ -45,6 +45,22 @@ export interface DownloadDmsDocumentPayload {
   buffer: Buffer;
   mimeType: string;
   fileName: string;
+}
+
+export interface CreateUploadedOpdSubmissionDmsDocumentInput {
+  submissionId: string;
+  submissionNumber?: string | null;
+  title: string;
+  description?: string | null;
+  moduleKey: string;
+  serviceType: string;
+  documentType: string;
+  category?: DmsDocumentCategory;
+  subCategory?: string | null;
+  accessLevel?: string;
+  unitKerjaId?: string | null;
+  tags?: string[];
+  file: UploadedDmsFile;
 }
 
 const DMS_CREATE_ROLES = [
@@ -400,6 +416,69 @@ export class DmsService {
       action: 'DMS_DOCUMENT_ARCHIVED',
       performedBy: user.id,
       beforeData: DmsMapper.toAuditData(document),
+      afterData: DmsMapper.toAuditData(updated),
+      context,
+    });
+
+    return DmsMapper.toResponse(updated);
+  }
+
+  async createUploadedOpdSubmissionDocument(
+    input: CreateUploadedOpdSubmissionDmsDocumentInput,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    if (!input.file) {
+      throw new BadRequestException('File wajib diunggah');
+    }
+
+    if (input.file.size > MAX_UPLOAD_SIZE_BYTES) {
+      throw new BadRequestException('Ukuran file maksimal 10 MB');
+    }
+
+    const extension = this.getAllowedExtension(input.file.mimetype);
+    const created = await this.dmsRepository.create({
+      title: this.normalizeRequiredText(input.title, 'Judul dokumen wajib diisi'),
+      description: this.normalizeNullableText(input.description ?? undefined),
+      category: input.category ?? DmsDocumentCategory.BUKTI_DUKUNG,
+      subCategory: this.normalizeNullableText(input.subCategory ?? undefined),
+      tags: this.normalizeTags(input.tags),
+      accessLevel: input.accessLevel ?? DEFAULT_DMS_ACCESS_LEVEL,
+      unitKerjaId: input.unitKerjaId ?? null,
+      status: DmsDocumentStatus.DRAFT,
+      createdById: user.id,
+      updatedById: user.id,
+    });
+
+    const checksum = createHash('sha256').update(input.file.buffer).digest('hex');
+    const timestamp = Date.now();
+    const random = randomBytes(4).toString('hex');
+    const storedFileName = `OPD-${input.moduleKey}-${timestamp}-${random}.${extension}`;
+    const relativeStoragePath = this.toStoragePath(created.id, storedFileName);
+    const absoluteStoragePath = this.resolveSafeStoragePath(relativeStoragePath);
+
+    await mkdir(resolve(this.getUploadRoot(), 'dms', created.id), {
+      recursive: true,
+    });
+    await writeFile(absoluteStoragePath, input.file.buffer);
+
+    const updated = await this.dmsRepository.update(created.id, {
+      status: DmsDocumentStatus.UPLOADED,
+      fileName: storedFileName,
+      originalFileName: basename(input.file.originalname),
+      storagePath: relativeStoragePath,
+      mimeType: input.file.mimetype,
+      fileSize: input.file.size,
+      checksum,
+      updatedById: user.id,
+    });
+
+    await this.auditService.record({
+      entityType: 'DMS_DOCUMENT',
+      entityId: updated.id,
+      action: 'DMS_OPD_SUBMISSION_DOCUMENT_UPLOADED',
+      performedBy: user.id,
+      beforeData: DmsMapper.toAuditData(created),
       afterData: DmsMapper.toAuditData(updated),
       context,
     });

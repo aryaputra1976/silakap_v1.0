@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Save, Send } from 'lucide-react';
+import { Send, UploadCloud } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ActionButton,
@@ -15,6 +15,15 @@ import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdUploadGuidanceCard } from '@/components/workspace/opd/opd-upload-guidance-card';
 import type { OpdSubmission } from '@/lib/opd-submissions/types';
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
 export function OpdDocumentUploadPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,6 +34,7 @@ export function OpdDocumentUploadPage() {
   const [documentType, setDocumentType] = useState('');
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -60,25 +70,40 @@ export function OpdDocumentUploadPage() {
     setSuccess('');
     setError('');
 
+    if (!file) {
+      setError('File bukti dukung wajib dipilih.');
+      setSaving(false);
+      return;
+    }
+
+    const fileError = validateFile(file);
+    if (fileError) {
+      setError(fileError);
+      setSaving(false);
+      return;
+    }
+
     try {
-      const updated = await opdSubmissionsApi.addOpdSubmissionDocument(
+      const formData = new FormData();
+      formData.set('documentType', documentType);
+      formData.set('title', title);
+      if (note.trim()) {
+        formData.set('note', note.trim());
+      }
+      formData.set('file', file);
+
+      const updated = await opdSubmissionsApi.uploadOpdSubmissionDocumentFile(
         submissionId,
-        {
-          documentType,
-          title,
-          note,
-        },
+        formData,
       );
 
-      setSuccess(
-        'Metadata dokumen berhasil disimpan. File fisik belum diunggah sampai integrasi DMS OPD diaktifkan.',
-      );
+      setSuccess('File dokumen berhasil diunggah dan ditautkan ke pengajuan.');
       navigate(`/opd/layanan/${updated.id}`);
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Gagal menyimpan metadata dokumen OPD',
+          : 'Gagal mengunggah dokumen OPD',
       );
     } finally {
       setSaving(false);
@@ -101,9 +126,9 @@ export function OpdDocumentUploadPage() {
       {error ? <ErrorAlert message={error} /> : null}
 
       <SectionCard
-        title="Draft Upload Dokumen"
-        description="Form ini menyimpan metadata dokumen ke pengajuan OPD. File fisik tetap menunggu integrasi DMS OPD."
-        actions={<StatusBadge value="Metadata API" tone="success" />}
+        title="Upload Dokumen"
+        description="File bukti dukung diunggah ke endpoint OPD dan ditautkan ke DMS internal bila berhasil."
+        actions={<StatusBadge value="Multipart API" tone="success" />}
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -151,15 +176,19 @@ export function OpdDocumentUploadPage() {
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="File Bukti Dukung">
               <input
-                accept="application/pdf,image/jpeg,image/png"
+                accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className={inputClass}
-                disabled
                 type="file"
+                onChange={(event) => {
+                  const selectedFile = event.target.files?.[0] ?? null;
+                  setFile(selectedFile);
+                  setError(selectedFile ? validateFile(selectedFile) : '');
+                }}
               />
             </Field>
             <div className="lg:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Sprint 22 menyimpan metadata/link DMS. Upload file fisik lewat
-              endpoint OPD belum diaktifkan, sehingga kolom file dinonaktifkan.
+              Maksimal 10 MB. Format yang diterima: PDF, JPG, PNG, DOCX, dan
+              XLSX. Dokumen tidak otomatis terverifikasi setelah upload.
             </div>
           </div>
 
@@ -173,11 +202,11 @@ export function OpdDocumentUploadPage() {
           </Field>
 
           <div className="flex flex-wrap gap-2">
-            <ActionButton icon={Save} disabled={saving} type="submit">
-              Simpan Metadata
-            </ActionButton>
-            <ActionButton icon={Send} disabled>
+            <ActionButton icon={UploadCloud} disabled={saving} type="submit">
               Upload File
+            </ActionButton>
+            <ActionButton icon={Send} disabled={saving} variant="secondary">
+              Simpan ke Pengajuan
             </ActionButton>
           </div>
         </form>
@@ -186,4 +215,16 @@ export function OpdDocumentUploadPage() {
       <OpdUploadGuidanceCard />
     </div>
   );
+}
+
+function validateFile(file: File) {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return 'Ukuran file maksimal 10 MB.';
+  }
+
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    return 'Tipe file tidak didukung. Gunakan PDF, JPG, PNG, DOCX, atau XLSX.';
+  }
+
+  return '';
 }

@@ -1,4 +1,5 @@
 import type { StatusBadge } from '@/components/workspace/ui';
+import type { AppRole } from '@/lib/rbac/roles';
 
 export type OpdSubmissionStatus =
   | 'DRAFT'
@@ -27,6 +28,11 @@ export type OpdSubmissionDocument = {
   status: string;
   note: string | null;
   uploadedById?: string;
+  uploadedByRole?: string;
+  originalFileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  storageKey?: string;
   uploadedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -117,9 +123,18 @@ export type AddOpdSubmissionDocumentPayload = {
   title: string;
   dmsDocumentId?: string;
   note?: string;
+  category?: string;
+  subCategory?: string;
 };
 
 type StatusTone = Parameters<typeof StatusBadge>[0]['tone'];
+
+export type OpdSubmissionDocumentStatus =
+  | 'TERUNGGAH'
+  | 'UPLOADED'
+  | 'NEEDS_CORRECTION'
+  | 'VERIFIED'
+  | 'REJECTED';
 
 export function opdSubmissionStatusLabel(status: OpdSubmissionStatus | string) {
   const labels: Record<OpdSubmissionStatus, string> = {
@@ -166,4 +181,48 @@ export function canOpdEditSubmission(status: OpdSubmissionStatus | string) {
 
 export function canOpdSubmitCorrection(status: OpdSubmissionStatus | string) {
   return status === 'NEEDS_CORRECTION';
+}
+
+export function canOpdUploadDocument(status: OpdSubmissionStatus | string) {
+  return status === 'DRAFT' || status === 'SUBMITTED' || status === 'NEEDS_CORRECTION';
+}
+
+export function opdSubmissionDocumentStatusLabel(status: string) {
+  const labels: Record<OpdSubmissionDocumentStatus, string> = {
+    TERUNGGAH: 'Metadata Tersimpan',
+    UPLOADED: 'Terunggah',
+    NEEDS_CORRECTION: 'Perlu Perbaikan',
+    VERIFIED: 'Terverifikasi',
+    REJECTED: 'Ditolak',
+  };
+
+  return labels[status as OpdSubmissionDocumentStatus] ?? status;
+}
+
+export function opdSubmissionDocumentStatusTone(status: string): StatusTone {
+  switch (status as OpdSubmissionDocumentStatus) {
+    case 'VERIFIED':
+      return 'success';
+    case 'UPLOADED':
+    case 'TERUNGGAH':
+      return 'info';
+    case 'NEEDS_CORRECTION':
+      return 'warning';
+    case 'REJECTED':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+export function canInternalVerifyDocument(role: AppRole, status: string) {
+  const allowedRoles: AppRole[] = [
+    'SUPER_ADMIN',
+    'ADMIN_BKPSDM',
+    'KABID',
+    'ANALIS_MUDA',
+    'ANALIS_MADYA',
+  ];
+
+  return allowedRoles.includes(role) && status !== 'VERIFIED' && status !== 'REJECTED';
 }

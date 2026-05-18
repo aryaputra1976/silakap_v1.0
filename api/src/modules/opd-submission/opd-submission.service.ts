@@ -4,9 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { DmsDocumentCategory, Prisma } from '@prisma/client';
+import { basename, extname } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
+import { DmsService, type UploadedDmsFile } from '../dms/dms.service';
 import { CreateOpdSubmissionDto, OPD_MODULE_KEYS } from './dto/create-opd-submission.dto';
 import { OpdSubmissionQueryDto } from './dto/opd-submission-query.dto';
 import { RequestCorrectionDto, InternalActionNoteDto } from './dto/request-correction.dto';
@@ -56,6 +58,23 @@ const FINAL_ROLES = [
   'KABID',
 ];
 
+const DOCUMENT_CORRECTION_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'ANALIS_MUDA',
+  'ANALIS_MADYA',
+];
+
+const DOCUMENT_VERIFY_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MUDA',
+  'ANALIS_MADYA',
+];
+
 const OPD_MUTABLE_STATUSES = ['DRAFT', 'NEEDS_CORRECTION'];
 const OPD_DOCUMENT_MUTABLE_STATUSES = [
   'DRAFT',
@@ -63,12 +82,23 @@ const OPD_DOCUMENT_MUTABLE_STATUSES = [
   'NEEDS_CORRECTION',
   'CORRECTION_SUBMITTED',
 ];
+const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FILE_TYPES: Record<string, string[]> = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+};
+
+export type UploadedOpdSubmissionFile = UploadedDmsFile;
 
 @Injectable()
 export class OpdSubmissionService {
   constructor(
     private readonly repo: OpdSubmissionRepository,
     private readonly auditService: AuditService,
+    private readonly dmsService: DmsService,
   ) {}
 
   async listMine(query: OpdSubmissionQueryDto, user: AuthUser) {
@@ -240,6 +270,83 @@ export class OpdSubmissionService {
     return this.toResponse(updated, false);
   }
 
+  async uploadDocumentFileMine(
+    id: string,
+    dto: UploadSubmissionDocumentDto,
+    file: UploadedOpdSubmissionFile | undefined,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    this.ensureOpd(user);
+    const before = await this.getOwnedSubmission(id, user);
+
+    if (!['DRAFT', 'NEEDS_CORRECTION', 'SUBMITTED'].includes(before.status)) {
+      throw new BadRequestException(
+        'File dokumen hanya dapat diunggah saat DRAFT, SUBMITTED, atau NEEDS_CORRECTION',
+      );
+    }
+
+    const validatedFile = this.validateUploadedFile(file);
+    const dmsDocument = await this.dmsService.createUploadedOpdSubmissionDocument(
+      {
+        submissionId: before.id,
+        submissionNumber: before.submissionNumber,
+        title: this.normalizeRequired(dto.title, 'Judul dokumen wajib diisi'),
+        description: this.normalizeNullable(dto.note),
+        moduleKey: before.moduleKey,
+        serviceType: before.serviceType,
+        documentType: this.normalizeRequired(dto.documentType, 'Jenis dokumen wajib diisi'),
+        category: this.normalizeDmsCategory(dto.category),
+        subCategory:
+          this.normalizeOptional(dto.subCategory) ??
+          this.defaultDmsSubCategory(before.moduleKey),
+        accessLevel: 'INTERNAL',
+        unitKerjaId: before.opdUnitId,
+        tags: [
+          'opd-submission',
+          before.submissionNumber ?? before.id,
+          before.moduleKey,
+          before.serviceType,
+          dto.documentType,
+        ],
+        file: validatedFile,
+      },
+      user,
+      context,
+    );
+
+    await this.repo.addDocument({
+      submissionId: before.id,
+      dmsDocumentId: dmsDocument.id,
+      documentType: this.normalizeRequired(dto.documentType, 'Jenis dokumen wajib diisi'),
+      title: this.normalizeRequired(dto.title, 'Judul dokumen wajib diisi'),
+      status: 'UPLOADED',
+      note: this.normalizeNullable(dto.note),
+      uploadedById: user.id,
+      uploadedByRole: this.primaryRole(user),
+      originalFileName: basename(validatedFile.originalname),
+      mimeType: validatedFile.mimetype,
+      sizeBytes: validatedFile.size,
+      storageKey: dmsDocument.storagePath ?? null,
+    });
+
+    const updated = await this.repo.findById(before.id);
+    if (!updated) {
+      throw new NotFoundException('Pengajuan OPD tidak ditemukan');
+    }
+
+    await this.writeAudit(
+      updated,
+      'UPLOAD_DOCUMENT_FILE',
+      before,
+      updated,
+      user,
+      dto.note,
+      context,
+    );
+    return this.toResponse(updated, false);
+  }
+
   async submitCorrectionMine(
     id: string,
     dto: SubmitOpdSubmissionDto,
@@ -341,6 +448,158 @@ export class OpdSubmissionService {
       completedAt: new Date(),
       updatedById: user.id,
     }, dto.note, user, context);
+  }
+
+  async uploadInternalDocumentFile(
+    id: string,
+    dto: UploadSubmissionDocumentDto,
+    file: UploadedOpdSubmissionFile | undefined,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    this.ensureInternalAction(user, RECEIVE_ROLES, 'mengunggah dokumen internal PPIK');
+    const before = await this.getSubmission(id);
+    const validatedFile = this.validateUploadedFile(file);
+    const dmsDocument = await this.dmsService.createUploadedOpdSubmissionDocument(
+      {
+        submissionId: before.id,
+        submissionNumber: before.submissionNumber,
+        title: this.normalizeRequired(dto.title, 'Judul dokumen wajib diisi'),
+        description: this.normalizeNullable(dto.note),
+        moduleKey: before.moduleKey,
+        serviceType: before.serviceType,
+        documentType: this.normalizeRequired(dto.documentType, 'Jenis dokumen wajib diisi'),
+        category: this.normalizeDmsCategory(dto.category),
+        subCategory:
+          this.normalizeOptional(dto.subCategory) ??
+          this.defaultDmsSubCategory(before.moduleKey),
+        accessLevel: 'INTERNAL',
+        unitKerjaId: before.opdUnitId,
+        tags: [
+          'opd-submission',
+          'internal-ppik',
+          before.submissionNumber ?? before.id,
+          before.moduleKey,
+          before.serviceType,
+          dto.documentType,
+        ],
+        file: validatedFile,
+      },
+      user,
+      context,
+    );
+
+    await this.repo.addDocument({
+      submissionId: before.id,
+      dmsDocumentId: dmsDocument.id,
+      documentType: this.normalizeRequired(dto.documentType, 'Jenis dokumen wajib diisi'),
+      title: this.normalizeRequired(dto.title, 'Judul dokumen wajib diisi'),
+      status: 'UPLOADED',
+      note: this.normalizeNullable(dto.note),
+      uploadedById: user.id,
+      uploadedByRole: this.primaryRole(user),
+      originalFileName: basename(validatedFile.originalname),
+      mimeType: validatedFile.mimetype,
+      sizeBytes: validatedFile.size,
+      storageKey: dmsDocument.storagePath ?? null,
+    });
+
+    const updated = await this.getSubmission(before.id);
+    await this.writeAudit(
+      updated,
+      'INTERNAL_UPLOAD_DOCUMENT_FILE',
+      before,
+      updated,
+      user,
+      dto.note,
+      context,
+    );
+    return this.toResponse(updated, true);
+  }
+
+  async verifyDocument(
+    id: string,
+    documentId: string,
+    dto: InternalActionNoteDto,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    this.ensureInternalAction(user, DOCUMENT_VERIFY_ROLES, 'memverifikasi dokumen OPD');
+    return this.changeDocumentStatus(
+      id,
+      documentId,
+      'DOCUMENT_VERIFIED',
+      'VERIFIED',
+      dto.note,
+      user,
+      context,
+    );
+  }
+
+  async requestDocumentCorrection(
+    id: string,
+    documentId: string,
+    dto: RequestCorrectionDto,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    this.ensureInternalAction(user, DOCUMENT_CORRECTION_ROLES, 'meminta perbaikan dokumen OPD');
+    const note = this.normalizeRequired(dto.note, 'Catatan perbaikan dokumen wajib diisi');
+    return this.changeDocumentStatus(
+      id,
+      documentId,
+      'DOCUMENT_CORRECTION_REQUESTED',
+      'NEEDS_CORRECTION',
+      note,
+      user,
+      context,
+    );
+  }
+
+  async rejectDocument(
+    id: string,
+    documentId: string,
+    dto: RequestCorrectionDto,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    this.ensureInternalAction(user, DOCUMENT_VERIFY_ROLES, 'menolak dokumen OPD');
+    const note = this.normalizeRequired(dto.note, 'Catatan penolakan dokumen wajib diisi');
+    return this.changeDocumentStatus(
+      id,
+      documentId,
+      'DOCUMENT_REJECTED',
+      'REJECTED',
+      note,
+      user,
+      context,
+    );
+  }
+
+  private async changeDocumentStatus(
+    id: string,
+    documentId: string,
+    action: string,
+    status: string,
+    note: string | undefined,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    const before = await this.getSubmission(id);
+    const document = await this.repo.findDocumentById(documentId.trim());
+
+    if (!document || document.submissionId !== before.id) {
+      throw new NotFoundException('Dokumen pengajuan OPD tidak ditemukan');
+    }
+
+    await this.repo.updateDocument(document.id, {
+      status,
+      note: note ?? document.note,
+    });
+
+    const updated = await this.getSubmission(before.id);
+    await this.writeAudit(updated, action, before, updated, user, note, context);
+    return this.toResponse(updated, true);
   }
 
   private async changeInternalStatus(
@@ -448,6 +707,55 @@ export class OpdSubmissionService {
     return normalized;
   }
 
+  private validateUploadedFile(file: UploadedOpdSubmissionFile | undefined) {
+    if (!file) {
+      throw new BadRequestException('File wajib diunggah');
+    }
+
+    if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      throw new BadRequestException('Ukuran file maksimal 10 MB');
+    }
+
+    const allowedExtensions = ALLOWED_FILE_TYPES[file.mimetype];
+    if (!allowedExtensions) {
+      throw new BadRequestException(
+        'Tipe file tidak didukung. Gunakan PDF, JPG, PNG, DOCX, atau XLSX',
+      );
+    }
+
+    const extension = extname(basename(file.originalname)).toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      throw new BadRequestException('Ekstensi file tidak sesuai dengan tipe file');
+    }
+
+    return file;
+  }
+
+  private normalizeDmsCategory(value: string | undefined | null) {
+    const normalized = this.normalizeOptional(value);
+
+    if (!normalized) {
+      return DmsDocumentCategory.BUKTI_DUKUNG;
+    }
+
+    return Object.values(DmsDocumentCategory).includes(
+      normalized as DmsDocumentCategory,
+    )
+      ? (normalized as DmsDocumentCategory)
+      : DmsDocumentCategory.BUKTI_DUKUNG;
+  }
+
+  private defaultDmsSubCategory(moduleKey: string) {
+    const subCategories: Record<string, string> = {
+      SIPENSIUN: 'DOKUMEN_PENSIUN',
+      SIDATA: 'DOKUMEN_DATA_ASN',
+      LAYANAN_KEPEGAWAIAN: 'DOKUMEN_LAYANAN',
+      DMS: 'DOKUMEN_DMS',
+    };
+
+    return subCategories[moduleKey] ?? 'DOKUMEN_LAYANAN';
+  }
+
   private normalizePositiveInt(
     value: string | undefined,
     fallback: number,
@@ -541,6 +849,13 @@ export class OpdSubmissionService {
   }
 
   private toResponse(record: OpdSubmissionRecord, internal: boolean) {
+    const visibleDocuments = internal
+      ? record.documents
+      : record.documents.filter(
+          (document) =>
+            !document.uploadedByRole || document.uploadedByRole === OPD_ROLE,
+        );
+
     return {
       id: record.id,
       submissionNumber: record.submissionNumber,
@@ -565,7 +880,7 @@ export class OpdSubmissionService {
       assignedToId: internal ? record.assignedToId : undefined,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
-      documents: record.documents.map((document) => ({
+      documents: visibleDocuments.map((document) => ({
         id: document.id,
         submissionId: document.submissionId,
         dmsDocumentId: document.dmsDocumentId,
@@ -574,6 +889,11 @@ export class OpdSubmissionService {
         status: document.status,
         note: document.note,
         uploadedById: internal ? document.uploadedById : undefined,
+        uploadedByRole: internal ? document.uploadedByRole : undefined,
+        originalFileName: document.originalFileName,
+        mimeType: document.mimeType,
+        sizeBytes: document.sizeBytes,
+        storageKey: internal ? document.storageKey : undefined,
         uploadedAt: document.uploadedAt.toISOString(),
         createdAt: document.createdAt.toISOString(),
         updatedAt: document.updatedAt.toISOString(),

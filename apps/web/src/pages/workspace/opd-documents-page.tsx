@@ -15,6 +15,10 @@ import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdUploadGuidanceCard } from '@/components/workspace/opd/opd-upload-guidance-card';
 import type { OpdSubmissionDocument } from '@/lib/opd-submissions/types';
+import {
+  opdSubmissionDocumentStatusLabel,
+  opdSubmissionDocumentStatusTone,
+} from '@/lib/opd-submissions/types';
 
 type OpdDocumentsMode = 'list' | 'revision';
 
@@ -31,7 +35,7 @@ export function OpdDocumentsPage({
   const visibleDocuments = useMemo(
     () =>
       mode === 'revision'
-        ? documents.filter((document) => document.status === 'PERLU_PERBAIKAN')
+        ? documents.filter((document) => document.status === 'NEEDS_CORRECTION')
         : documents,
     [documents, mode],
   );
@@ -108,6 +112,10 @@ export function OpdDocumentsPage({
                     <div className="mt-1 text-xs text-[#687967]">
                       {item.documentType}
                     </div>
+                    <div className="mt-1 text-xs text-[#687967]">
+                      {item.originalFileName ?? 'Metadata tanpa file'} -{' '}
+                      {formatSize(item.sizeBytes)}
+                    </div>
                   </div>
                 ),
               },
@@ -119,7 +127,12 @@ export function OpdDocumentsPage({
               {
                 key: 'status',
                 header: 'Status',
-                render: (item) => <StatusBadge value={item.status} />,
+                render: (item) => (
+                  <StatusBadge
+                    value={opdSubmissionDocumentStatusLabel(item.status)}
+                    tone={opdSubmissionDocumentStatusTone(item.status)}
+                  />
+                ),
               },
               {
                 key: 'catatan',
@@ -143,4 +156,16 @@ export function OpdDocumentsPage({
       <OpdUploadGuidanceCard />
     </div>
   );
+}
+
+function formatSize(value: number | null) {
+  if (!value) {
+    return '-';
+  }
+
+  if (value < 1024 * 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }

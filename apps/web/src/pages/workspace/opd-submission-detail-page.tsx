@@ -15,6 +15,9 @@ import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import {
   canOpdSubmitCorrection,
+  canOpdUploadDocument,
+  opdSubmissionDocumentStatusLabel,
+  opdSubmissionDocumentStatusTone,
   opdSubmissionStatusLabel,
   opdSubmissionStatusTone,
   type OpdSubmission,
@@ -95,7 +98,11 @@ export function OpdSubmissionDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link to={`/opd/dokumen/upload?submissionId=${submission.id}`}>
-              <ActionButton icon={UploadCloud} variant="secondary">
+              <ActionButton
+                disabled={!canOpdUploadDocument(submission.status)}
+                icon={UploadCloud}
+                variant="secondary"
+              >
                 Tambah Dokumen
               </ActionButton>
             </Link>
@@ -185,6 +192,26 @@ export function OpdSubmissionDetailPage() {
                     </div>
                     <StatusBadge value={document.status} />
                   </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <FileMeta
+                      label="Nama File"
+                      value={document.originalFileName ?? '-'}
+                    />
+                    <FileMeta
+                      label="Ukuran"
+                      value={formatSize(document.sizeBytes)}
+                    />
+                    <FileMeta
+                      label="Tipe"
+                      value={document.mimeType ?? '-'}
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <StatusBadge
+                      value={opdSubmissionDocumentStatusLabel(document.status)}
+                      tone={opdSubmissionDocumentStatusTone(document.status)}
+                    />
+                  </div>
                   {document.note ? (
                     <p className="mt-3 text-sm text-[#51614c]">{document.note}</p>
                   ) : null}
@@ -212,4 +239,16 @@ export function OpdSubmissionDetailPage() {
       </section>
     </div>
   );
+}
+
+function formatSize(value: number | null) {
+  if (!value) {
+    return '-';
+  }
+
+  if (value < 1024 * 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }

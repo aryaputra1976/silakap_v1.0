@@ -14,7 +14,10 @@ import {
 import { SopChecklistPanel } from '@/components/workspace/sop/sop-checklist-panel';
 import { ServiceActionPanel } from '@/components/workspace/service-workbench/service-action-panel';
 import { ServiceAuditTimeline } from '@/components/workspace/service-workbench/service-audit-timeline';
-import { ServiceDocumentPanel } from '@/components/workspace/service-workbench/service-document-panel';
+import {
+  ServiceDocumentPanel,
+  type ServiceDocumentAction,
+} from '@/components/workspace/service-workbench/service-document-panel';
 import { ServiceInternalDocumentPanel } from '@/components/workspace/service-workbench/service-internal-document-panel';
 import { ServiceStatusBadge } from '@/components/workspace/service-workbench/service-status-badge';
 import { ServiceSubmissionDataCard } from '@/components/workspace/service-workbench/service-submission-data-card';
@@ -36,6 +39,7 @@ export function LayananDetailPage() {
   const [loading, setLoading] = useState(false);
   const [loadingAction, setLoadingAction] =
     useState<InternalSubmissionAction | null>(null);
+  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -100,6 +104,50 @@ export function LayananDetailPage() {
       );
     } finally {
       setLoadingAction(null);
+    }
+  }
+
+  async function handleDocumentAction(
+    documentId: string,
+    action: ServiceDocumentAction,
+  ) {
+    if (!submission) {
+      return;
+    }
+
+    const trimmedNote = note.trim();
+    if (
+      (action === 'request-document-correction' ||
+        action === 'reject-document') &&
+      !trimmedNote
+    ) {
+      setError('Catatan wajib diisi untuk Minta Perbaikan atau Tolak Dokumen.');
+      return;
+    }
+
+    setLoadingDocumentId(documentId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const updated = await runDocumentAction(
+        submission.id,
+        documentId,
+        action,
+        trimmedNote,
+      );
+      setSubmission(updated);
+      setSuccess('Aksi dokumen berhasil disimpan dan audit log diperbarui.');
+      setNote('');
+      loadDetail();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Aksi dokumen gagal diproses',
+      );
+    } finally {
+      setLoadingDocumentId(null);
     }
   }
 
@@ -187,7 +235,13 @@ export function LayananDetailPage() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <ServiceSubmissionDataCard submission={submission} />
-          <ServiceDocumentPanel documents={submission.documents} />
+          <ServiceDocumentPanel
+            documents={submission.documents}
+            loadingDocumentId={loadingDocumentId}
+            note={note}
+            role={role}
+            onDocumentAction={handleDocumentAction}
+          />
           <SopChecklistPanel
             entityId={submission.id}
             entityType="opd_submission"
@@ -223,6 +277,32 @@ export function LayananDetailPage() {
       </div>
     </div>
   );
+}
+
+function runDocumentAction(
+  id: string,
+  documentId: string,
+  action: ServiceDocumentAction,
+  note: string,
+) {
+  switch (action) {
+    case 'verify-document':
+      return opdSubmissionsApi.verifySubmissionDocument(
+        id,
+        documentId,
+        note ? { note } : {},
+      );
+    case 'request-document-correction':
+      return opdSubmissionsApi.requestSubmissionDocumentCorrection(
+        id,
+        documentId,
+        { note },
+      );
+    case 'reject-document':
+      return opdSubmissionsApi.rejectSubmissionDocument(id, documentId, {
+        note,
+      });
+  }
 }
 
 function runAction(

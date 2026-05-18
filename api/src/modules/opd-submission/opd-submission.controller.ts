@@ -7,8 +7,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,7 +26,10 @@ import { InternalActionNoteDto, RequestCorrectionDto } from './dto/request-corre
 import { SubmitOpdSubmissionDto } from './dto/submit-opd-submission.dto';
 import { UpdateOpdSubmissionDto } from './dto/update-opd-submission.dto';
 import { UploadSubmissionDocumentDto } from './dto/upload-submission-document.dto';
-import { OpdSubmissionService } from './opd-submission.service';
+import {
+  OpdSubmissionService,
+  type UploadedOpdSubmissionFile,
+} from './opd-submission.service';
 
 const INTERNAL_ROLES = [
   'SUPER_ADMIN',
@@ -135,6 +141,28 @@ export class OpdSubmissionController {
     );
   }
 
+  @Post(':id/documents/upload')
+  @Roles('OPD')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocumentFileMine(
+    @Param('id') id: string,
+    @Body() dto: UploadSubmissionDocumentDto,
+    @UploadedFile() file: UploadedOpdSubmissionFile | undefined,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    return ok(
+      await this.service.uploadDocumentFileMine(
+        id,
+        dto,
+        file,
+        user,
+        getAuditContext(request),
+      ),
+      'File dokumen OPD berhasil diunggah',
+    );
+  }
+
   @Post(':id/correction-submit')
   @Roles('OPD')
   async submitCorrectionMine(
@@ -235,5 +263,86 @@ export class InternalOpdSubmissionController {
     @Req() request: Request,
   ) {
     return ok(await this.service.complete(id, dto, user, getAuditContext(request)));
+  }
+
+  @Post(':id/documents/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadInternalDocumentFile(
+    @Param('id') id: string,
+    @Body() dto: UploadSubmissionDocumentDto,
+    @UploadedFile() file: UploadedOpdSubmissionFile | undefined,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    return ok(
+      await this.service.uploadInternalDocumentFile(
+        id,
+        dto,
+        file,
+        user,
+        getAuditContext(request),
+      ),
+      'File dokumen internal PPIK berhasil diunggah',
+    );
+  }
+
+  @Post(':id/documents/:documentId/verify')
+  async verifyDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: InternalActionNoteDto,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    return ok(
+      await this.service.verifyDocument(
+        id,
+        documentId,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
+      'Dokumen OPD berhasil diverifikasi',
+    );
+  }
+
+  @Post(':id/documents/:documentId/request-correction')
+  async requestDocumentCorrection(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: RequestCorrectionDto,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    return ok(
+      await this.service.requestDocumentCorrection(
+        id,
+        documentId,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
+      'Perbaikan dokumen OPD berhasil diminta',
+    );
+  }
+
+  @Post(':id/documents/:documentId/reject')
+  async rejectDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: RequestCorrectionDto,
+    @CurrentUser() user: AuthUser,
+    @Req() request: Request,
+  ) {
+    return ok(
+      await this.service.rejectDocument(
+        id,
+        documentId,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
+      'Dokumen OPD berhasil ditolak',
+    );
   }
 }

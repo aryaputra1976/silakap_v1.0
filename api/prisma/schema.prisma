@@ -955,6 +955,11 @@ model OpdSubmissionDocument {
   status        String   @default("TERUNGGAH") @db.VarChar(40)
   note          String?  @db.Text
   uploadedById  String?  @map("uploaded_by_id") @db.VarChar(36)
+  uploadedByRole String? @map("uploaded_by_role") @db.VarChar(80)
+  originalFileName String? @map("original_file_name") @db.VarChar(255)
+  mimeType      String?  @map("mime_type") @db.VarChar(120)
+  sizeBytes     Int?     @map("size_bytes")
+  storageKey    String?  @map("storage_key") @db.VarChar(500)
   uploadedAt    DateTime @default(now()) @map("uploaded_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
