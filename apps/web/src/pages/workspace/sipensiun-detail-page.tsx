@@ -11,8 +11,11 @@ import {
 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { apiClient, ApiError } from '@/lib/api/client';
+import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
 import { SipensiunSopPanel } from '@/components/workspace/sipensiun/sipensiun-sop-panel';
 import { SipensiunLifecycle } from '@/components/workspace/sipensiun/sipensiun-lifecycle';
+import { SopChecklistPanel } from '@/components/workspace/sop/sop-checklist-panel';
 import { SIPENSIUN_JENIS_LIST, sipensiunJenisLabel } from '@/lib/sipensiun/sipensiun-data';
 import type {
   ChecklistItem as ChecklistItemType,
@@ -102,6 +105,8 @@ function toLetterDataForm(detail: SipensiunCaseDetail): LetterDataForm {
 
 export function SipensiunDetailPage() {
   const { id = '' } = useParams();
+  const { user } = useAuth();
+  const userRole = getPrimaryRole(user?.roles);
 
   const [detail, setDetail] = useState<SipensiunCaseDetail | null>(null);
   const [checklist, setChecklist] = useState<DocumentChecklist | null>(null);
@@ -1102,6 +1107,15 @@ export function SipensiunDetailPage() {
           />
         )}
       </SectionCard>
+
+      <SopChecklistPanel
+        sopCode="SOP-BKPSDM-PAN-002"
+        userRole={userRole}
+        contextId={id}
+        persistenceMode="api"
+        entityType="sipensiun_case"
+        entityId={id}
+      />
     </div>
   );
 }

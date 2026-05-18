@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
+import { SopChecklistPanel } from '@/components/workspace/sop/sop-checklist-panel';
 import {
   AlertTriangle,
   ArrowRight,
@@ -129,6 +132,8 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 export function SidataPemutakhiranPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userRole = getPrimaryRole(user?.roles);
 
   const [asnTotal, setAsnTotal] = useState(0);
   const [asnBatches, setAsnBatches] = useState<SidataImportBatchWithKind[]>([]);
@@ -526,6 +531,14 @@ export function SidataPemutakhiranPage() {
           <SidataSopPanel
             sops={SIDATA_SOP_LIST.filter((s) => s.key === 'DAT-002' || s.key === 'DAT-003')}
             title="SOP Pemutakhiran Data ASN"
+          />
+
+          <SopChecklistPanel
+            sopCode="SOP-BKPSDM-DAT-002"
+            userRole={userRole}
+            persistenceMode="api"
+            entityType="sidata_module"
+            entityId="PEMUTAKHIRAN"
           />
         </>
       )}

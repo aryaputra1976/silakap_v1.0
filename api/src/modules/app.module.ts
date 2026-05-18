@@ -15,6 +15,7 @@ import { SlaModule } from './sla/sla.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { DmsModule } from './dms/dms.module';
 import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
+import { SopChecklistModule } from './sop-checklist/sop-checklist.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
     SlaModule,
     DmsModule,
     KinerjaBidangModule,
+    SopChecklistModule,
   ],
   controllers: [
     HealthController,

@@ -1748,3 +1748,77 @@ model SidataImportAuditLog {
   @@index([createdAt])
   @@map("sidata_import_audit_log")
 }
+
+// ─────────────────────────────────────────────
+// SOP Checklist Persistence (Sprint 14)
+// ─────────────────────────────────────────────
+
+model SopChecklistInstance {
+  id             String    @id @default(cuid()) @db.VarChar(36)
+  sopCode        String    @map("sop_code") @db.VarChar(50)
+  moduleKey      String    @map("module_key") @db.VarChar(50)
+  entityType     String    @map("entity_type") @db.VarChar(50)
+  entityId       String    @map("entity_id") @db.VarChar(36)
+  status         String    @default("DRAFT") @db.VarChar(30)
+  progress       Int       @default(0)
+  completedItems Int       @default(0) @map("completed_items")
+  totalItems     Int       @default(0) @map("total_items")
+  approvedById   String?   @map("approved_by_id") @db.VarChar(36)
+  approvedAt     DateTime? @map("approved_at")
+  rejectedById   String?   @map("rejected_by_id") @db.VarChar(36)
+  rejectedAt     DateTime? @map("rejected_at")
+  approvalNote   String?   @map("approval_note") @db.Text
+  createdById    String?   @map("created_by_id") @db.VarChar(36)
+  updatedById    String?   @map("updated_by_id") @db.VarChar(36)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  items     SopChecklistItem[]
+  auditLogs SopChecklistAuditLog[]
+
+  @@index([sopCode])
+  @@index([moduleKey])
+  @@index([entityType, entityId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sop_checklist_instance")
+}
+
+model SopChecklistItem {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  instanceId  String   @map("instance_id") @db.VarChar(36)
+  itemId      String   @map("item_id") @db.VarChar(100)
+  status      String   @default("PENDING") @db.VarChar(30)
+  notes       String?  @db.Text
+  dmsDocumentId String? @map("dms_document_id") @db.VarChar(36)
+  updatedById String?  @map("updated_by_id") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  instance SopChecklistInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, itemId])
+  @@index([instanceId])
+  @@index([status])
+  @@map("sop_checklist_item")
+}
+
+model SopChecklistAuditLog {
+  id         String   @id @default(cuid()) @db.VarChar(36)
+  instanceId String   @map("instance_id") @db.VarChar(36)
+  actorId    String?  @map("actor_id") @db.VarChar(36)
+  action     String   @db.VarChar(100)
+  itemId     String?  @map("item_id") @db.VarChar(100)
+  fromStatus String?  @map("from_status") @db.VarChar(30)
+  toStatus   String?  @map("to_status") @db.VarChar(30)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  instance SopChecklistInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("sop_checklist_audit_log")
+}

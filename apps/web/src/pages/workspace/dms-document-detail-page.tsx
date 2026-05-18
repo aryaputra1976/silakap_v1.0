@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Lock, RefreshCcw } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/lib/api/client';
+import { useAuth } from '@/lib/auth/session';
+import { getPrimaryRole } from '@/lib/rbac/roles';
 import {
   dmsApi,
   dmsAccessLevelLabel,
@@ -10,6 +12,8 @@ import {
   type DmsDocument,
   type DmsDocumentCategory,
 } from '@/lib/api/dms';
+import { getChecklistTemplateBySopCode } from '@/lib/sop-checklist/checklist-policy';
+import { SopChecklistPanel } from '@/components/workspace/sop/sop-checklist-panel';
 import {
   ActionButton,
   ErrorAlert,
@@ -37,6 +41,8 @@ export function DmsDocumentDetailPage() {
   const navigate = useNavigate();
   const params = useParams<{ id: string }>();
   const documentId = params.id;
+  const { user } = useAuth();
+  const userRole = getPrimaryRole(user?.roles);
 
   const [document, setDocument] = useState<DmsDocument | null>(null);
   const [form, setForm] = useState<DmsMetadataFormValue>(initialDmsMetadataForm);
@@ -434,6 +440,12 @@ export function DmsDocumentDetailPage() {
     document.status === 'UPLOADED' ||
     document.status === 'REJECTED';
 
+  const docSopCode = Array.isArray(document.tags)
+    ? (document.tags.map((t) => String(t)).find((t) => t.startsWith('SOP-BKPSDM-')) ?? '')
+    : '';
+  const hasChecklistTemplate =
+    docSopCode !== '' && Boolean(getChecklistTemplateBySopCode(docSopCode));
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -558,6 +570,17 @@ export function DmsDocumentDetailPage() {
           <DmsDocumentRelationsCard document={document} />
         </div>
       </div>
+
+      {hasChecklistTemplate ? (
+        <SopChecklistPanel
+          sopCode={docSopCode}
+          userRole={userRole}
+          contextId={document.id}
+          persistenceMode="api"
+          entityType="dms_document"
+          entityId={document.id}
+        />
+      ) : null}
     </div>
   );
 }
