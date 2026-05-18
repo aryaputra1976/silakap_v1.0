@@ -60,6 +60,7 @@ import { OpdLayananPage } from '@/pages/workspace/opd-layanan-page';
 import { OpdSidataPemutakhiranPage } from '@/pages/workspace/opd-sidata-pemutakhiran-page';
 import { OpdSipensiunCreatePage } from '@/pages/workspace/opd-sipensiun-create-page';
 import { OpdSipensiunPage } from '@/pages/workspace/opd-sipensiun-page';
+import { OpdSubmissionDetailPage } from '@/pages/workspace/opd-submission-detail-page';
 import SianalitikPage from '@/pages/workspace/sianalitik-page';
 
 export function AppRoutingSetup() {
@@ -78,10 +79,12 @@ export function AppRoutingSetup() {
           <Route path="/opd/layanan/ajukan" element={<OpdLayananCreatePage />} />
           <Route path="/opd/layanan/perbaikan" element={<OpdLayananPage mode="revision" />} />
           <Route path="/opd/layanan/riwayat" element={<OpdLayananPage mode="history" />} />
+          <Route path="/opd/layanan/:id" element={<OpdSubmissionDetailPage />} />
           <Route path="/opd/sipensiun" element={<OpdSipensiunPage />} />
           <Route path="/opd/sipensiun/ajukan" element={<OpdSipensiunCreatePage />} />
           <Route path="/opd/sipensiun/status" element={<OpdSipensiunPage mode="status" />} />
           <Route path="/opd/sipensiun/perbaikan" element={<OpdSipensiunPage mode="revision" />} />
+          <Route path="/opd/sipensiun/:id" element={<OpdSubmissionDetailPage />} />
           <Route path="/opd/sidata/pemutakhiran" element={<OpdSidataPemutakhiranPage />} />
           <Route path="/opd/sidata/status" element={<OpdSidataPemutakhiranPage mode="status" />} />
           <Route path="/opd/sidata/dokumen" element={<OpdSidataPemutakhiranPage mode="documents" />} />

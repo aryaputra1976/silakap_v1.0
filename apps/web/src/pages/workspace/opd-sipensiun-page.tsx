@@ -1,24 +1,26 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import {
   ActionButton,
+  ErrorAlert,
+  LoadingState,
   SectionCard,
   StatusBadge,
 } from '@/components/workspace/ui';
+import { ApiError } from '@/lib/api/client';
+import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdRequestTable } from '@/components/workspace/opd/opd-request-table';
 import { OpdStatusTimeline } from '@/components/workspace/opd/opd-status-timeline';
-import {
-  filterRequestsByStatus,
-  opdRequests,
-  opdTimeline,
-} from '@/lib/opd/opd-portal-data';
+import { opdTimeline } from '@/lib/opd/opd-portal-data';
+import type { OpdSubmission, OpdSubmissionStatus } from '@/lib/opd-submissions/types';
 
 type OpdSipensiunMode = 'list' | 'status' | 'revision';
 
 const pageCopy: Record<
   OpdSipensiunMode,
-  { title: string; description: string; empty: string; status?: 'PERLU_PERBAIKAN' }
+  { title: string; description: string; empty: string; status?: OpdSubmissionStatus }
 > = {
   list: {
     title: 'Usulan Pensiun Saya',
@@ -34,7 +36,7 @@ const pageCopy: Record<
     title: 'Perbaikan Berkas Pensiun',
     description: 'Usulan pensiun yang membutuhkan perbaikan dari OPD.',
     empty: 'Belum ada berkas pensiun yang perlu diperbaiki',
-    status: 'PERLU_PERBAIKAN',
+    status: 'NEEDS_CORRECTION',
   },
 };
 
@@ -44,7 +46,47 @@ export function OpdSipensiunPage({
   mode?: OpdSipensiunMode;
 }) {
   const copy = pageCopy[mode];
-  const requests = filterRequestsByStatus(opdRequests, copy.status);
+  const [requests, setRequests] = useState<OpdSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    setLoading(true);
+    setError('');
+
+    opdSubmissionsApi
+      .fetchMyOpdSubmissions({
+        moduleKey: 'SIPENSIUN',
+        status: copy.status,
+        limit: 30,
+      })
+      .then((result) => {
+        if (active) {
+          setRequests(result.items);
+        }
+      })
+      .catch((caught) => {
+        if (active) {
+          setRequests([]);
+          setError(
+            caught instanceof ApiError
+              ? caught.message
+              : 'Gagal memuat usulan pensiun OPD',
+          );
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [copy.status]);
 
   return (
     <div className="space-y-5">
@@ -58,13 +100,19 @@ export function OpdSipensiunPage({
         }
       />
 
+      {error ? <ErrorAlert message={error} /> : null}
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <SectionCard
           title={copy.title}
           description="Data usulan pensiun dibatasi untuk OPD yang sedang login."
           actions={<StatusBadge value={`${requests.length} usulan`} />}
         >
-          <OpdRequestTable items={requests} empty={copy.empty} />
+          {loading ? (
+            <LoadingState label="Memuat usulan pensiun OPD" />
+          ) : (
+            <OpdRequestTable items={requests} empty={copy.empty} />
+          )}
         </SectionCard>
 
         <SectionCard

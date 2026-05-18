@@ -1,17 +1,23 @@
 import { FilePenLine, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   ActionButton,
   DataTable,
   formatDate,
   StatusBadge,
 } from '@/components/workspace/ui';
-import type { OpdRequest } from '@/lib/opd/opd-portal-data';
+import {
+  canOpdEditSubmission,
+  opdSubmissionStatusLabel,
+  opdSubmissionStatusTone,
+  type OpdSubmission,
+} from '@/lib/opd-submissions/types';
 
 export function OpdRequestTable({
   items,
   empty = 'Belum ada permohonan OPD',
 }: {
-  items: OpdRequest[];
+  items: OpdSubmission[];
   empty?: string;
 }) {
   return (
@@ -25,42 +31,49 @@ export function OpdRequestTable({
           header: 'Nomor',
           render: (item) => (
             <span className="font-mono text-xs font-semibold">
-              {item.nomor}
+              {item.submissionNumber ?? 'DRAFT'}
             </span>
           ),
         },
         {
           key: 'jenis',
           header: 'Jenis Layanan',
-          render: (item) => item.jenisLayanan,
+          render: (item) => item.serviceType,
         },
         {
           key: 'tanggal',
           header: 'Tanggal Pengajuan',
-          render: (item) => formatDate(item.tanggalPengajuan),
+          render: (item) => formatDate(item.submittedAt ?? item.createdAt),
         },
         {
           key: 'status',
           header: 'Status',
-          render: (item) => <StatusBadge value={item.status} />,
+          render: (item) => (
+            <StatusBadge
+              value={opdSubmissionStatusLabel(item.status)}
+              tone={opdSubmissionStatusTone(item.status)}
+            />
+          ),
         },
         {
           key: 'catatan',
           header: 'Catatan Terakhir',
-          render: (item) => item.catatanTerakhir,
+          render: (item) => item.correctionNote ?? item.description ?? '-',
         },
         {
           key: 'aksi',
           header: 'Aksi',
           render: (item) => (
             <div className="flex flex-wrap gap-2">
-              <ActionButton icon={Eye} variant="secondary" disabled>
-                Lihat Detail
-              </ActionButton>
+              <Link to={buildDetailPath(item)}>
+                <ActionButton icon={Eye} variant="secondary">
+                  Lihat Detail
+                </ActionButton>
+              </Link>
               <ActionButton
                 icon={FilePenLine}
                 variant="secondary"
-                disabled={!item.canRevise}
+                disabled={!canOpdEditSubmission(item.status)}
               >
                 Perbaiki Berkas
               </ActionButton>
@@ -70,4 +83,12 @@ export function OpdRequestTable({
       ]}
     />
   );
+}
+
+function buildDetailPath(item: OpdSubmission) {
+  if (item.moduleKey === 'SIPENSIUN') {
+    return `/opd/sipensiun/${item.id}`;
+  }
+
+  return `/opd/layanan/${item.id}`;
 }

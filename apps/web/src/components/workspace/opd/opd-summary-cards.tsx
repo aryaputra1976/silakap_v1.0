@@ -7,9 +7,9 @@ import {
   Send,
 } from 'lucide-react';
 import { StatCard } from '@/components/workspace/ui';
-import type { OpdSummary } from '@/lib/opd/opd-portal-data';
+import type { OpdSubmissionSummary } from '@/lib/opd-submissions/types';
 
-export function OpdSummaryCards({ summary }: { summary: OpdSummary }) {
+export function OpdSummaryCards({ summary }: { summary: OpdSubmissionSummary }) {
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
       <StatCard
