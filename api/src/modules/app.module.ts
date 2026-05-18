@@ -18,6 +18,7 @@ import { KinerjaBidangModule } from './kinerja-bidang/kinerja-bidang.module';
 import { SopChecklistModule } from './sop-checklist/sop-checklist.module';
 import { SopGovernanceModule } from './sop-governance/sop-governance.module';
 import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
+import { SopReportsModule } from './sop-reports/sop-reports.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
     SopChecklistModule,
     SopGovernanceModule,
     SopAnalyticsModule,
+    SopReportsModule,
   ],
   controllers: [
     HealthController,

@@ -26,6 +26,8 @@ import { SopReviewReminderList } from '@/components/workspace/sop/sop-review-rem
 import { SopComplianceExecutivePanel } from '@/components/workspace/sop/sop-compliance-executive-panel';
 import { SopComplianceBySopTable } from '@/components/workspace/sop/sop-compliance-by-sop-table';
 import { SopEvidenceCompletenessPanel } from '@/components/workspace/sop/sop-evidence-completeness-panel';
+import { SopExecutiveReportPanel } from '@/components/workspace/sop/sop-executive-report-panel';
+import { SopEvidencePackagePanel } from '@/components/workspace/sop/sop-evidence-package-panel';
 import {
   kinerjaBidangApi,
   type KinerjaBidangDashboardSummary,
@@ -172,6 +174,10 @@ export function SopDashboardPage() {
       <SopContextNote />
 
       <SopComplianceExecutivePanel userRole={userRole} />
+
+      <SopExecutiveReportPanel userRole={userRole} />
+
+      <SopEvidencePackagePanel userRole={userRole} />
 
       <SopComplianceBySopTable userRole={userRole} />
 
