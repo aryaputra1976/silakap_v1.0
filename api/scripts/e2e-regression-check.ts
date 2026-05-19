@@ -201,7 +201,9 @@ async function checkMigrationCriticalFolders() {
     record(
       'prisma.critical-migrations-applied',
       total >= 4,
-      `${total}/4 migration Sprint 24-29 terdeteksi di _prisma_migrations.`,
+      total >= 4
+        ? 'Semua migration kritikal Sprint 24-29 sudah terdeteksi.'
+        : `${total}/4 migration Sprint 24-29 terdeteksi di _prisma_migrations.`,
       total >= 4 ? 'PASS' : 'WARN',
     );
   } catch {
