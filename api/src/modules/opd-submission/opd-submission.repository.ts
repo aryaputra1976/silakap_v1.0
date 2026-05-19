@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -36,7 +36,7 @@ export type OpdSubmissionListFilters = {
 
 @Injectable()
 export class OpdSubmissionRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findMany(filters: OpdSubmissionListFilters) {
     const where = this.buildWhere(filters);
@@ -181,6 +181,11 @@ export class OpdSubmissionRepository {
 
   async getSummary(filters: Omit<OpdSubmissionListFilters, 'page' | 'limit'>) {
     const where = this.buildWhere({ ...filters, page: 1, limit: 1 });
+    const countByStatus = (status: string | { in: string[] }) =>
+      this.prisma.opdSubmission.count({
+        where: { ...where, status },
+      });
+
     const [
       total,
       menungguVerifikasi,
@@ -190,33 +195,24 @@ export class OpdSubmissionRepository {
       usulanAktif,
     ] = await Promise.all([
       this.prisma.opdSubmission.count({ where }),
-      this.prisma.opdSubmission.count({
-        where: { ...where, status: { in: ['SUBMITTED', 'CORRECTION_SUBMITTED'] } },
-      }),
-      this.prisma.opdSubmission.count({
-        where: { ...where, status: 'NEEDS_CORRECTION' },
-      }),
-      this.prisma.opdSubmission.count({
-        where: { ...where, status: { in: ['COMPLETED', 'VERIFIED'] } },
-      }),
+      countByStatus({ in: ['SUBMITTED', 'CORRECTION_SUBMITTED'] }),
+      countByStatus('NEEDS_CORRECTION'),
+      countByStatus({ in: ['COMPLETED', 'VERIFIED'] }),
       this.prisma.opdSubmissionDocument.count({
         where: {
-          submission: where,
-        },
-      }),
-      this.prisma.opdSubmission.count({
-        where: {
-          ...where,
-          status: {
-            in: [
-              'SUBMITTED',
-              'RECEIVED',
-              'IN_VERIFICATION',
-              'NEEDS_CORRECTION',
-              'CORRECTION_SUBMITTED',
-            ],
+          submission: {
+            is: where,
           },
         },
+      }),
+      countByStatus({
+        in: [
+          'SUBMITTED',
+          'RECEIVED',
+          'IN_VERIFICATION',
+          'NEEDS_CORRECTION',
+          'CORRECTION_SUBMITTED',
+        ],
       }),
     ]);
 

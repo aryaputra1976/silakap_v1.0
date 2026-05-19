@@ -15,7 +15,7 @@
 | URL Frontend | _To be filled oleh DevOps_ |
 | URL Backend / API | _To be filled oleh DevOps_ |
 | Database | _To be filled oleh DevOps (bukan production)_ |
-| Commit hash | `7dc112bdab5209deee1e2f5928e80ce04ca7fc9d` |
+| Commit hash | _Pending final commit after rc.1 updates_ |
 | Commit message | `docs: add RC manual execution result for v1.0.0-rc.1` |
 | Branch | `main` |
 | Tag | **Belum dibuat** — menunggu sign-off final |
@@ -28,19 +28,20 @@
 
 ## 2. Automated Pre-check Result
 
-> Dijalankan di dev lokal pada **2026-05-19** terhadap commit `7dc112b`.  
+> Dijalankan di dev lokal pada **2026-05-19** terhadap local rc.1 working snapshot.  
 > Harus diulang di environment staging sebelum manual E2E dimulai.
 
 | Check | Command | Result (dev) | Notes |
 | --- | --- | --- | --- |
-| git status | `git status --short` | **PASS** | Clean — tidak ada uncommitted changes |
+| git status | `git status --short` | **PENDING** | Belum clean karena perubahan rc.1 masih dalam working tree; wajib clean sebelum tagging |
 | Prisma validate | `npm run prisma:validate` | **PASS** | "schema is valid 🚀" |
 | Prisma generate | `npm run prisma:generate` | **PASS** | Prisma Client v6.14.0 generated |
-| Migrate status | `npm run prisma:migrate:status` | **PASS** | 10 migrations, "Database schema is up to date!" |
+| Migrate status | `npm run prisma:migrate:status` | **PASS** | 13 migrations, "Database schema is up to date!" |
 | Smoke E2E regression | `npm run smoke:e2e-regression` | **PASS** | 9 checks, 0 FAIL, 0 WARN |
 | Backend build | `npm run build` | **PASS** | `tsc -p tsconfig.build.json` sukses, 0 errors |
 | Frontend lint | `npm run lint` | **PASS\*** | 0 errors, 10 warnings pre-existing |
-| Frontend build | `npm run build` | **PASS** | 2112 modules, ~15s |
+| Frontend build | `npm run build` | **PASS** | 2125 modules, ~16s |
+| Full project build | `npm run build` | **PASS** | API + web sukses setelah Prisma Client regenerate |
 
 > \* 10 warnings `react-hooks/exhaustive-deps` adalah pre-existing sejak Sprint 16–20. Tidak ada warning baru. 0 errors — build tidak terblokir.
 
@@ -50,7 +51,7 @@
 | --- | --- | --- | --- |
 | 0 | working-calendar.default | PASS | Default aktif: Kalender Kerja BKPSDM (Asia/Makassar) |
 | 1 | rbac.legacy-roles-disabled | PASS | SEKRETARIS/AUDITOR tidak aktif |
-| 2 | prisma.models-readable | PASS | submissions=0, documents=0, candidates=0, realizations=0, calendars=1, auditLogs=2 |
+| 2 | prisma.models-readable | PASS | submissions=0, documents=0, candidates=0, realizations=0, calendars=1, auditLogs=3 |
 | 3 | rhk.approved-candidate-has-realization | PASS | 0 kandidat APPROVED tanpa realisasi |
 | 4 | rhk.realization-only-from-approved-candidate | PASS | 0 realisasi terhubung ke kandidat non-APPROVED |
 | 5 | rhk.no-duplicate-realization-per-candidate | PASS | Tidak ada duplikasi candidateId |
@@ -107,6 +108,9 @@
 | R6 | Internal user (bukan OPD) dibuka portal OPD | Tidak redirect ke OPD portal; melihat workbench internal sesuai role | _To be filled_ | NOT RUN | |
 | R7 | KABID approve RHK candidate valid | Berhasil approve; realisasi terbentuk sekali | _To be filled_ | NOT RUN | |
 | R8 | KEPALA_BADAN view executive report | Berhasil view; tidak ada tombol input/edit | _To be filled_ | NOT RUN | |
+| R9 | SUPER_ADMIN/ADMIN_BKPSDM buka Admin Control | `/admin/rbac`, `/admin/users`, `/admin/settings` terbuka dan menampilkan data read-only | _To be filled_ | NOT RUN | |
+| R10 | OPD buka `/admin/*` | Forbidden / redirect aman, tidak ada data admin terekspos | _To be filled_ | NOT RUN | |
+| R11 | Role internal non-admin buka `/admin/*` | Forbidden / redirect aman, tidak ada data admin terekspos | _To be filled_ | NOT RUN | |
 
 ---
 
@@ -170,6 +174,7 @@ Keterbatasan berikut sudah diidentifikasi, diakui, dan **bukan blocker RC**:
 | L4 | Holiday nasional perlu seed resmi | Accepted | Default kalender aktif; hari libur dikelola manual via halaman Kalender Kerja |
 | L5 | Frontend lint: 10 warnings pre-existing | Accepted | Pre-existing sejak Sprint 16–20; 0 errors; build tidak terblokir |
 | L6 | API lint script belum tersedia | Accepted | Backend menggunakan `tsc --noEmit` dan `tsconfig.build.json`; tidak memblokir |
+| L7 | Admin Control rc.1 read-only | Accepted | RBAC, Pengguna, dan Pengaturan dapat dilihat oleh admin; create/edit user, reset password, dan edit permission belum dibuka |
 
 ---
 
@@ -195,15 +200,15 @@ Keterbatasan berikut sudah diidentifikasi, diakui, dan **bukan blocker RC**:
 
 | Kriteria | Status | Catatan |
 | --- | --- | --- |
-| git status clean | ✓ PASS | |
+| git status clean | ⏳ PENDING | Working tree must be clean before tagging |
 | Prisma validate | ✓ PASS | |
-| Prisma migrate status up to date | ✓ PASS | 10 migrations |
+| Prisma migrate status up to date | ✓ PASS | 13 migrations |
 | Smoke regression 0 FAIL, 0 WARN | ✓ PASS | 9 checks |
 | Backend build | ✓ PASS | |
-| Frontend build | ✓ PASS | 2112 modules |
+| Frontend build | ✓ PASS | 2125 modules |
 | Frontend lint 0 errors | ✓ PASS | 10 warnings pre-existing |
 | Manual E2E (20 skenario) | ⏳ NOT RUN | Diisi saat staging execution |
-| RBAC negative tests (8 test) | ⏳ NOT RUN | Diisi saat staging execution |
+| RBAC negative tests (11 test) | ⏳ NOT RUN | Diisi saat staging execution |
 | SLA staging test (7 test) | ⏳ NOT RUN | Diisi saat staging execution |
 | Evidence/DMS test (6 test) | ⏳ NOT RUN | Diisi saat staging execution |
 | Sign-off semua area | ⏳ NOT COMPLETED | Menunggu staging execution |

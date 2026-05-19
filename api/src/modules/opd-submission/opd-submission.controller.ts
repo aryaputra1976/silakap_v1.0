@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -50,7 +51,7 @@ const INTERNAL_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/opd/submissions')
 export class OpdSubmissionController {
-  constructor(private readonly service: OpdSubmissionService) {}
+  constructor(@Inject(OpdSubmissionService) private readonly service: OpdSubmissionService) {}
 
   @Get()
   @Roles('OPD')
@@ -192,7 +193,7 @@ export class OpdSubmissionController {
 @Roles(...INTERNAL_ROLES)
 @Controller('api/v1/internal/opd-submissions')
 export class InternalOpdSubmissionController {
-  constructor(private readonly service: OpdSubmissionService) {}
+  constructor(@Inject(OpdSubmissionService) private readonly service: OpdSubmissionService) {}
 
   @Get()
   async listInternal(

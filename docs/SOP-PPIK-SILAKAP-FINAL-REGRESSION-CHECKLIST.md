@@ -256,9 +256,9 @@ Authorization: Bearer <token SUPER_ADMIN>
 | Referensi SOP → Tahap 3 | /dms/documents?...SOP_TAHAP_3 | ✓ (DMS filter) | DmsDocumentsPage |
 | Referensi SOP → Pensiun | /dms/documents?...SOP_PENSIUN_PEMBERHENTIAN | ✓ (DMS filter) | DmsDocumentsPage |
 | Referensi SOP → Matriks | /dms/documents?...SOP_MATRIKS | ✓ (DMS filter) | DmsDocumentsPage |
-| RBAC | — | disabled | disabled (coming soon) |
-| Pengguna | — | disabled | disabled (coming soon) |
-| Pengaturan | — | disabled | disabled (coming soon) |
+| RBAC | /admin/rbac | active | Admin-only read-only matrix |
+| Pengguna | /admin/users | active | Admin-only read-only account list |
+| Pengaturan | /admin/settings | active | Admin-only runtime summary |
 
 ---
 

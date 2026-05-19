@@ -18,11 +18,18 @@ import { getLayananSopConfig } from '@/lib/layanan/layanan-data';
 
 const sopConfig = getLayananSopConfig('LAY-002');
 
-const STATE_OPTIONS = ['DRAFT', 'SUBMITTED', 'VERIFICATION', 'APPROVAL', 'COMPLETED'];
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'ASSIGNED', label: 'Ditugaskan' },
+  { value: 'IN_PROGRESS', label: 'Sedang Diverifikasi' },
+  { value: 'WAITING', label: 'Menunggu Koreksi OPD' },
+  { value: 'RETURNED', label: 'Dikembalikan ke OPD' },
+  { value: 'COMPLETED', label: 'Selesai' },
+  { value: 'OVERDUE', label: 'Melewati Batas Waktu' },
+];
 
 export function LayananVerificationPage() {
   const [q, setQ] = useState('');
-  const [currentState, setCurrentState] = useState('VERIFICATION');
+  const [currentState, setCurrentState] = useState('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -88,9 +95,9 @@ export function LayananVerificationPage() {
                 onChange={(event) => setCurrentState(event.target.value)}
               >
                 <option value="">Semua status</option>
-                {STATE_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {STATUS_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
                   </option>
                 ))}
               </select>

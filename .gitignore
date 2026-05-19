@@ -20,6 +20,7 @@ backup/
 backups/
 storage/
 *.sql
+!api/prisma/migrations/**/migration.sql
 *.dump
 *.bak
 *.pdf

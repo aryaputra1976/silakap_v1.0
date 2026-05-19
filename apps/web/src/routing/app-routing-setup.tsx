@@ -63,14 +63,32 @@ import { OpdSidataPemutakhiranPage } from '@/pages/workspace/opd-sidata-pemutakh
 import { OpdSipensiunCreatePage } from '@/pages/workspace/opd-sipensiun-create-page';
 import { OpdSipensiunPage } from '@/pages/workspace/opd-sipensiun-page';
 import { OpdSubmissionDetailPage } from '@/pages/workspace/opd-submission-detail-page';
+import { RekonsiliasiBpkadDashboardPage } from '@/pages/workspace/rekonsiliasi-bpkad-dashboard-page';
+import { RekonsiliasiBpkadPeriodePage } from '@/pages/workspace/rekonsiliasi-bpkad-periode-page';
+import { RekonsiliasiBpkadImportSimgajiPage } from '@/pages/workspace/rekonsiliasi-bpkad-import-simgaji-page';
+import { RekonsiliasiBpkadMatchingPage } from '@/pages/workspace/rekonsiliasi-bpkad-matching-page';
+import { RekonsiliasiBpkadTemuanPage } from '@/pages/workspace/rekonsiliasi-bpkad-temuan-page';
+import { RekonsiliasiBpkadTindakLanjutPage } from '@/pages/workspace/rekonsiliasi-bpkad-tindak-lanjut-page';
+import { RekonsiliasiBpkadBeritaAcaraPage } from '@/pages/workspace/rekonsiliasi-bpkad-berita-acara-page';
+import { RekonsiliasiBpkadLaporanPage } from '@/pages/workspace/rekonsiliasi-bpkad-laporan-page';
+import { RekonsiliasiBpkadLaporanPrintPage } from '@/pages/workspace/rekonsiliasi-bpkad-laporan-print';
+import { AdminRbacPage } from '@/pages/workspace/admin-rbac-page';
+import { AdminSettingsPage } from '@/pages/workspace/admin-settings-page';
+import { AdminUsersPage } from '@/pages/workspace/admin-users-page';
 import SianalitikPage from '@/pages/workspace/sianalitik-page';
 import { WorkingCalendarPage } from '@/pages/workspace/working-calendar-page';
+import { OpdIkmSurveyPage } from '@/pages/workspace/opd-ikm-survey-page';
+import { IkmPeriodePage } from '@/pages/workspace/ikm-periode-page';
+import { IkmDataPage } from '@/pages/workspace/ikm-data-page';
 
 export function AppRoutingSetup() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
+        {/* Print pages — no sidebar layout */}
+        <Route path="/rekonsiliasi-bpkad/laporan/print" element={<RekonsiliasiBpkadLaporanPrintPage />} />
+
         <Route element={<Layout1 />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -94,6 +112,7 @@ export function AppRoutingSetup() {
           <Route path="/opd/dokumen" element={<OpdDocumentsPage />} />
           <Route path="/opd/dokumen/upload" element={<OpdDocumentUploadPage />} />
           <Route path="/opd/dokumen/perbaikan" element={<OpdDocumentsPage mode="revision" />} />
+          <Route path="/opd/kepuasan" element={<OpdIkmSurveyPage />} />
 
           {/* KINERJA BIDANG / SOP & RHK */}
           <Route path="/kinerja-bidang" element={<KinerjaBidangDashboardPage />} />
@@ -128,6 +147,18 @@ export function AppRoutingSetup() {
           <Route path="/sidata/dokumen" element={<SidataDokumenPage />} />
           <Route path="/sidata/laporan" element={<SidataLaporanPage />} />
 
+          {/* REKONSILIASI BKPSDM-BPKAD */}
+          <Route path="/rekonsiliasi-bpkad" element={<Navigate to="/rekonsiliasi-bpkad/dashboard" replace />} />
+          <Route path="/rekonsiliasi-bpkad/dashboard" element={<RekonsiliasiBpkadDashboardPage />} />
+          <Route path="/rekonsiliasi-bpkad/periode" element={<RekonsiliasiBpkadPeriodePage />} />
+          <Route path="/rekonsiliasi-bpkad/import/simgaji" element={<RekonsiliasiBpkadImportSimgajiPage />} />
+          <Route path="/rekonsiliasi-bpkad/import/bkpsdm" element={<RekonsiliasiBpkadDashboardPage />} />
+          <Route path="/rekonsiliasi-bpkad/matching" element={<RekonsiliasiBpkadMatchingPage />} />
+          <Route path="/rekonsiliasi-bpkad/temuan" element={<RekonsiliasiBpkadTemuanPage />} />
+          <Route path="/rekonsiliasi-bpkad/tindak-lanjut" element={<RekonsiliasiBpkadTindakLanjutPage />} />
+          <Route path="/rekonsiliasi-bpkad/berita-acara" element={<RekonsiliasiBpkadBeritaAcaraPage />} />
+          <Route path="/rekonsiliasi-bpkad/laporan" element={<RekonsiliasiBpkadLaporanPage />} />
+
           {/* DMS */}
           <Route path="/dms" element={<DmsDashboardPage />} />
           <Route path="/dms/documents" element={<DmsDocumentsPage />} />
@@ -151,6 +182,8 @@ export function AppRoutingSetup() {
           <Route path="/layanan/sla" element={<LayananSlaPage />} />
           <Route path="/layanan/keterlambatan" element={<LayananDelayPage />} />
           <Route path="/layanan/kepuasan" element={<LayananSatisfactionPage />} />
+          <Route path="/layanan/ikm/periode" element={<IkmPeriodePage />} />
+          <Route path="/layanan/ikm/data" element={<IkmDataPage />} />
           <Route path="/layanan/laporan" element={<LayananReportPage />} />
 
           {/* SIAP */}
@@ -164,6 +197,11 @@ export function AppRoutingSetup() {
 
           {/* WORKING CALENDAR */}
           <Route path="/working-calendar" element={<WorkingCalendarPage />} />
+
+          {/* ADMIN CONTROL */}
+          <Route path="/admin/rbac" element={<AdminRbacPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

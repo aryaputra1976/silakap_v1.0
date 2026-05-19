@@ -4,6 +4,7 @@ import {
   FileText,
   FolderArchive,
   Gauge,
+  ThumbsUp,
 } from 'lucide-react';
 import type { MenuConfig } from '@/config/types';
 import type { AppModuleKey } from './policies';
@@ -70,6 +71,11 @@ export const OPD_MENU_SIDEBAR: MenuConfig = [
       { title: 'Dokumen Saya', path: '/opd/dokumen' },
       { title: 'Dokumen Perlu Perbaikan', path: '/opd/dokumen/perbaikan' },
     ],
+  },
+  {
+    title: 'Survei Kepuasan',
+    icon: ThumbsUp,
+    path: '/opd/kepuasan',
   },
 ];
 

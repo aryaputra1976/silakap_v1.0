@@ -8,10 +8,12 @@ import {
   FileText,
   FolderArchive,
   Gauge,
+  GitCompareArrows,
   GitBranch,
   Settings,
   ShieldAlert,
   ShieldCheck,
+  ThumbsUp,
   Users,
 } from 'lucide-react';
 import { MenuConfig } from '@/config/types';
@@ -174,6 +176,31 @@ export const MENU_SIDEBAR: MenuConfig = [
     ],
   },
   {
+    title: 'IKM Survei Kepuasan',
+    icon: ThumbsUp,
+    moduleKey: 'LAYANAN_KEPEGAWAIAN',
+    children: [
+      {
+        title: 'Hasil & Rekap IKM',
+        path: '/layanan/kepuasan',
+        moduleKey: 'LAYANAN_KEPEGAWAIAN',
+        requiredPermission: 'monitor',
+      },
+      {
+        title: 'Manajemen Periode IKM',
+        path: '/layanan/ikm/periode',
+        moduleKey: 'LAYANAN_KEPEGAWAIAN',
+        requiredPermission: 'verify',
+      },
+      {
+        title: 'Data Survei Masuk',
+        path: '/layanan/ikm/data',
+        moduleKey: 'LAYANAN_KEPEGAWAIAN',
+        requiredPermission: 'monitor',
+      },
+    ],
+  },
+  {
     title: 'SIDATA ASN',
     icon: Database,
     moduleKey: 'SIDATA',
@@ -253,6 +280,60 @@ export const MENU_SIDEBAR: MenuConfig = [
         title: 'Laporan',
         path: '/sidata/laporan',
         moduleKey: 'SIDATA',
+        requiredPermission: 'report',
+      },
+    ],
+  },
+  {
+    title: 'Rekonsiliasi BPKAD',
+    icon: GitCompareArrows,
+    moduleKey: 'REKONSILIASI_BPKAD',
+    children: [
+      {
+        title: 'Dashboard',
+        path: '/rekonsiliasi-bpkad/dashboard',
+        moduleKey: 'REKONSILIASI_BPKAD',
+      },
+      {
+        title: 'Manajemen Periode',
+        path: '/rekonsiliasi-bpkad/periode',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'verify',
+      },
+      {
+        title: 'Import Simgaji',
+        path: '/rekonsiliasi-bpkad/import/simgaji',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'upload',
+      },
+      {
+        title: 'Pencocokan Data',
+        path: '/rekonsiliasi-bpkad/matching',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'verify',
+      },
+      {
+        title: 'Matriks Temuan',
+        path: '/rekonsiliasi-bpkad/temuan',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'verify',
+      },
+      {
+        title: 'Tindak Lanjut',
+        path: '/rekonsiliasi-bpkad/tindak-lanjut',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'input',
+      },
+      {
+        title: 'Berita Acara',
+        path: '/rekonsiliasi-bpkad/berita-acara',
+        moduleKey: 'REKONSILIASI_BPKAD',
+        requiredPermission: 'approve',
+      },
+      {
+        title: 'Laporan',
+        path: '/rekonsiliasi-bpkad/laporan',
+        moduleKey: 'REKONSILIASI_BPKAD',
         requiredPermission: 'report',
       },
     ],
@@ -459,7 +540,7 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'RBAC',
     icon: ShieldCheck,
-    disabled: true,
+    path: '/admin/rbac',
     moduleKey: 'ADMIN',
     requiredPermission: 'admin',
     allowedRoles: ADMIN_ROLES,
@@ -467,7 +548,7 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'Pengguna',
     icon: Users,
-    disabled: true,
+    path: '/admin/users',
     moduleKey: 'ADMIN',
     requiredPermission: 'admin',
     allowedRoles: ADMIN_ROLES,
@@ -475,7 +556,7 @@ export const MENU_SIDEBAR: MenuConfig = [
   {
     title: 'Pengaturan',
     icon: Settings,
-    disabled: true,
+    path: '/admin/settings',
     moduleKey: 'ADMIN',
     requiredPermission: 'admin',
     allowedRoles: ADMIN_ROLES,

@@ -11,7 +11,7 @@
 | Field | Value |
 | --- | --- |
 | Release candidate | SILAKAP v1.0.0-rc.1 |
-| Commit hash | `7dc112bdab5209deee1e2f5928e80ce04ca7fc9d` |
+| Commit hash | _Pending final commit after rc.1 updates_ |
 | Branch | `main` |
 
 ---
@@ -24,7 +24,7 @@
 | API URL | _To be filled_ |
 | Web URL | _To be filled_ |
 | Database | _To be filled (bukan production)_ |
-| Build/artifact | Commit `7dc112b` — branch `main` |
+| Build/artifact | Local rc.1 working snapshot — final commit/artifact to be filled after commit |
 
 ---
 
@@ -46,9 +46,10 @@
 | --- | --- | --- |
 | Prisma validate | **PASS** | "schema is valid 🚀" — dev 2026-05-19 |
 | Prisma generate | **PASS** | Prisma Client v6.14.0 — dev 2026-05-19 |
-| Prisma migrate status | **PASS** | 10 migrations, up to date — dev 2026-05-19 |
+| Prisma migrate status | **PASS** | 13 migrations, database schema up to date — dev 2026-05-19 |
 | Backend build | **PASS** | tsc -p tsconfig.build.json, 0 errors — dev 2026-05-19 |
-| Frontend lint/build | **PASS\*** | 0 errors (10 warnings pre-existing), 2112 modules — dev 2026-05-19 |
+| Frontend lint/build | **PASS\*** | 0 errors (10 warnings pre-existing), 2125 modules — dev 2026-05-19 |
+| Full project build | **PASS** | `npm run build` (API + web), 0 errors — dev 2026-05-19 after Prisma Client regenerate |
 | Smoke regression 0 FAIL, 0 WARN | **PASS** | 9 checks, 0 FAIL, 0 WARN — dev 2026-05-19 |
 
 ---
@@ -98,6 +99,9 @@
 | PPPK cannot export executive report (tombol tidak ada / API 403) | NOT RUN | |
 | KABID can approve RHK candidate | NOT RUN | |
 | KEPALA_BADAN can view report (view only, tidak bisa input) | NOT RUN | |
+| SUPER_ADMIN/ADMIN_BKPSDM can open `/admin/rbac`, `/admin/users`, `/admin/settings` | NOT RUN | Admin Control is read-only in rc.1 |
+| OPD cannot access `/admin/*` | NOT RUN | |
+| Non-admin internal role cannot access `/admin/*` | NOT RUN | |
 
 ---
 
@@ -123,7 +127,7 @@
 | Area | Jumlah Test | Status | Catatan |
 | --- | --- | --- | --- |
 | Manual E2E (skenario alur utama) | 20 skenario | NOT RUN | |
-| RBAC negative tests | 8 test | NOT RUN | |
+| RBAC negative tests | 11 test | NOT RUN | includes Admin Control route checks |
 | SLA staging test | 7 test | NOT RUN | |
 | Evidence/DMS test | 6 test | NOT RUN | |
 

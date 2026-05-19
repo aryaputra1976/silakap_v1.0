@@ -257,15 +257,15 @@ Menu SIANALITIK digunakan untuk melihat data analitik dan ringkasan sistem.
 
 ### RBAC
 
-Menu RBAC digunakan untuk pengaturan hak akses. Pada versi tertentu, menu ini dapat dinonaktifkan.
+Menu RBAC digunakan oleh SUPER_ADMIN dan ADMIN_BKPSDM untuk melihat matrix role, module, dan permission aktif. Pada rc.1, halaman ini bersifat read-only.
 
 ### Pengguna
 
-Menu Pengguna digunakan untuk pengelolaan akun. Pada versi tertentu, menu ini dapat dinonaktifkan.
+Menu Pengguna digunakan oleh SUPER_ADMIN dan ADMIN_BKPSDM untuk melihat daftar akun, status, role, dan unit kerja. Pada rc.1, create/edit user dan reset password belum dibuka dari UI.
 
 ### Pengaturan
 
-Menu Pengaturan digunakan untuk konfigurasi sistem. Pada versi tertentu, menu ini dapat dinonaktifkan.
+Menu Pengaturan digunakan oleh SUPER_ADMIN dan ADMIN_BKPSDM untuk melihat ringkasan konfigurasi runtime dan data admin. Pada rc.1, kontrol konfigurasi bersifat read-only.
 
 ---
 

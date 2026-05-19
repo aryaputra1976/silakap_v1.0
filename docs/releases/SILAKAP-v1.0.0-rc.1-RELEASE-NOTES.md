@@ -10,10 +10,13 @@ SILAKAP v1.0.0-rc.1
 - SLA
 - RHK/Kinerja
 - Executive Report
+- Admin Control (RBAC, Pengguna, Pengaturan)
+- Rekonsiliasi BKPSDM-BPKAD
 - Deployment baseline
 
 ## 3. Major Features
 - RBAC role PPIK dan pemisahan akses OPD/internal.
+- Admin Control read-only untuk matrix RBAC, daftar pengguna, dan ringkasan pengaturan.
 - SOP DMS taxonomy dan mapping dokumen.
 - SOP checklist digital dengan persistence dan audit.
 - OPD submission flow: draft, submit, status tracking, correction.
@@ -24,6 +27,7 @@ SILAKAP v1.0.0-rc.1
 - RHK candidate bridge dari layanan completed.
 - RHK realization melalui approval role berwenang.
 - Executive report dan evidence bundle berbasis realization APPROVED.
+- Rekonsiliasi BKPSDM-BPKAD: import Simgaji, matching, temuan, tindak lanjut, berita acara, dan laporan.
 
 ## 4. Validation Summary
 - `npm run prisma:validate`: sukses.
@@ -31,6 +35,7 @@ SILAKAP v1.0.0-rc.1
 - `npm run prisma:migrate:status`: up to date.
 - `npm run smoke:e2e-regression`: 0 FAIL, 0 WARN.
 - Backend `npm run build`: sukses.
+- Full project `npm run build`: sukses (API + web) setelah `prisma generate`.
 - Frontend `npm run lint`: exit 0.
 - Frontend `npm run build`: sukses.
 
@@ -40,6 +45,7 @@ SILAKAP v1.0.0-rc.1
 - OPD preview/download masih dibatasi endpoint aman.
 - Holiday nasional perlu seed resmi.
 - API lint script belum tersedia.
+- Admin Control pada rc.1 bersifat read-only; create/edit user, reset password, dan edit role-permission belum dibuka dari UI.
 
 ## 6. Upgrade/Deploy Notes
 1. Backup database.

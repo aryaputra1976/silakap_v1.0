@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -116,11 +117,11 @@ export type UploadedOpdSubmissionFile = UploadedDmsFile;
 @Injectable()
 export class OpdSubmissionService {
   constructor(
-    private readonly repo: OpdSubmissionRepository,
-    private readonly auditService: AuditService,
-    private readonly dmsService: DmsService,
-    private readonly candidateService: KinerjaRhkCandidateService,
-    private readonly workingCalendarService: WorkingCalendarService,
+    @Inject(OpdSubmissionRepository) private readonly repo: OpdSubmissionRepository,
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(DmsService) private readonly dmsService: DmsService,
+    @Inject(KinerjaRhkCandidateService) private readonly candidateService: KinerjaRhkCandidateService,
+    @Inject(WorkingCalendarService) private readonly workingCalendarService: WorkingCalendarService,
   ) {}
 
   async listMine(query: OpdSubmissionQueryDto, user: AuthUser) {

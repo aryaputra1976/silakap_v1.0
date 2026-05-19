@@ -1,3 +1,10 @@
+import type { WorkingCalendarConfig } from '../working-calendar/business-time.util';
+import {
+  addBusinessHours,
+  calculateBusinessElapsedHours,
+  calculateBusinessRemainingHours,
+} from '../working-calendar/business-time.util';
+
 export type OpdSubmissionSlaStatus =
   | 'NOT_STARTED'
   | 'ON_TRACK'
@@ -108,13 +115,6 @@ export function calculateElapsedHours(input: {
 }
 
 // ─── Business-hours variants (Sprint 29) ───────────────────────────────────
-
-import type { WorkingCalendarConfig } from '../working-calendar/business-time.util';
-import {
-  addBusinessHours,
-  calculateBusinessElapsedHours,
-  calculateBusinessRemainingHours,
-} from '../working-calendar/business-time.util';
 
 export { addBusinessHours, calculateBusinessElapsedHours };
 

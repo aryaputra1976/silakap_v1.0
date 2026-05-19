@@ -24,6 +24,9 @@ import { SopAnalyticsModule } from './sop-analytics/sop-analytics.module';
 import { SopReportsModule } from './sop-reports/sop-reports.module';
 import { OpdSubmissionModule } from './opd-submission/opd-submission.module';
 import { WorkingCalendarModule } from './working-calendar/working-calendar.module';
+import { ReconciliationBpkadModule } from './reconciliation-bpkad/reconciliation-bpkad.module';
+import { AdminModule } from './admin/admin.module';
+import { IkmModule } from './ikm/ikm.module';
 
 @Module({
   imports: [
@@ -54,6 +57,9 @@ import { WorkingCalendarModule } from './working-calendar/working-calendar.modul
     SopReportsModule,
     OpdSubmissionModule,
     WorkingCalendarModule,
+    ReconciliationBpkadModule,
+    AdminModule,
+    IkmModule,
   ],
   controllers: [
     HealthController,

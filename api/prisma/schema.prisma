@@ -2201,3 +2201,273 @@ model HolidayCalendar {
   @@index([date])
   @@map("holiday_calendar")
 }
+
+// Rekonsiliasi BKPSDM-BPKAD (Sprint 34)
+
+model ReconciliationPeriod {
+  id            String    @id @default(cuid()) @db.VarChar(36)
+  periodYear    Int       @map("period_year")
+  periodMonth   Int?      @map("period_month")
+  periodQuarter Int?      @map("period_quarter")
+  periodType    String    @default("MONTHLY") @map("period_type") @db.VarChar(20)
+  title         String    @db.VarChar(200)
+  status        String    @default("DRAFT") @db.VarChar(30)
+  cutOffDate    DateTime? @map("cut_off_date") @db.Date
+  notes         String?   @db.Text
+  createdById   String?   @map("created_by_id") @db.VarChar(36)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  importBatches ReconciliationImportBatch[]
+  matchingRuns  ReconciliationMatchingRun[]
+  beritaAcara   ReconciliationBeritaAcara[]
+
+  @@index([periodYear, periodMonth])
+  @@index([periodYear, periodQuarter])
+  @@index([periodType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reconciliation_period")
+}
+
+model ReconciliationImportBatch {
+  id                  String    @id @default(cuid()) @db.VarChar(36)
+  periodId            String?   @map("period_id") @db.VarChar(36)
+  source              String    @db.VarChar(50)
+  importType          String    @map("import_type") @db.VarChar(100)
+  fileName            String?   @map("file_name") @db.VarChar(255)
+  originalFileName    String?   @map("original_file_name") @db.VarChar(255)
+  mimeType            String?   @map("mime_type") @db.VarChar(120)
+  sizeBytes           Int?      @map("size_bytes")
+  fileChecksum        String?   @map("file_checksum") @db.VarChar(64)
+  sheetName           String?   @map("sheet_name") @db.VarChar(120)
+  status              String    @default("UPLOADED") @db.VarChar(30)
+  totalRows           Int       @default(0) @map("total_rows")
+  validRows           Int       @default(0) @map("valid_rows")
+  invalidRows         Int       @default(0) @map("invalid_rows")
+  duplicateRows       Int       @default(0) @map("duplicate_rows")
+  warningRows         Int       @default(0) @map("warning_rows")
+  requiredColumnsJson Json?     @map("required_columns_json")
+  missingColumnsJson  Json?     @map("missing_columns_json")
+  uploadedById        String?   @map("uploaded_by_id") @db.VarChar(36)
+  uploadedAt          DateTime? @map("uploaded_at")
+  errorMessage        String?   @map("error_message") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  period      ReconciliationPeriod?             @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  bpkadRows   ReconciliationBpkadPayrollRecord[]
+
+  @@index([periodId])
+  @@index([source])
+  @@index([importType])
+  @@index([status])
+  @@index([fileChecksum])
+  @@index([createdAt])
+  @@map("reconciliation_import_batch")
+}
+
+model ReconciliationBpkadPayrollRecord {
+  id               String   @id @default(cuid()) @db.VarChar(36)
+  batchId          String   @map("batch_id") @db.VarChar(36)
+  rowNumber        Int      @map("row_number")
+  tglGaji          DateTime? @map("tgl_gaji") @db.Date
+  nip              String?  @db.VarChar(30)
+  nipLama          String?  @map("nip_lama") @db.VarChar(30)
+  nama             String?  @db.VarChar(250)
+  kdSkpd           String?  @map("kd_skpd") @db.VarChar(50)
+  kdSatker         String?  @map("kd_satker") @db.VarChar(50)
+  nmSkpd           String?  @map("nm_skpd") @db.VarChar(250)
+  nmSatker         String?  @map("nm_satker") @db.VarChar(250)
+  kdStapeg         String?  @map("kd_stapeg") @db.VarChar(50)
+  tmtStop          DateTime? @map("tmt_stop") @db.Date
+  kdPangkat        String?  @map("kd_pangkat") @db.VarChar(50)
+  gapok            Decimal? @db.Decimal(18, 2)
+  kotor            Decimal? @db.Decimal(18, 2)
+  potongan         Decimal? @db.Decimal(18, 2)
+  bersih           Decimal? @db.Decimal(18, 2)
+  npwp             String?  @db.VarChar(50)
+  noKtp            String?  @map("no_ktp") @db.VarChar(50)
+  validationStatus String   @default("VALID") @map("validation_status") @db.VarChar(30)
+  validationErrors Json?    @map("validation_errors")
+  rawData          Json     @map("raw_data")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  batch ReconciliationImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId])
+  @@index([nip])
+  @@index([nama])
+  @@index([kdSkpd])
+  @@index([kdSatker])
+  @@index([validationStatus])
+  @@map("reconciliation_bpkad_payroll_record")
+}
+
+model ReconciliationAuditLog {
+  id        String   @id @default(cuid()) @db.VarChar(36)
+  periodId  String?  @map("period_id") @db.VarChar(36)
+  batchId   String?  @map("batch_id") @db.VarChar(36)
+  action    String   @db.VarChar(100)
+  actorId   String?  @map("actor_id") @db.VarChar(36)
+  actorRole String?  @map("actor_role") @db.VarChar(50)
+  note      String?  @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([periodId])
+  @@index([batchId])
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("reconciliation_audit_log")
+}
+
+model ReconciliationMatchingRun {
+  id            String    @id @default(cuid()) @db.VarChar(36)
+  periodId      String    @map("period_id") @db.VarChar(36)
+  batchId       String    @map("batch_id") @db.VarChar(36)
+  status        String    @default("PENDING") @db.VarChar(30)
+  totalBkpsdm   Int       @default(0) @map("total_bkpsdm")
+  totalBpkad    Int       @default(0) @map("total_bpkad")
+  totalMatched  Int       @default(0) @map("total_matched")
+  totalR01      Int       @default(0) @map("total_r01")
+  totalR02      Int       @default(0) @map("total_r02")
+  totalR03      Int       @default(0) @map("total_r03")
+  totalR04      Int       @default(0) @map("total_r04")
+  totalR05      Int       @default(0) @map("total_r05")
+  totalR06      Int       @default(0) @map("total_r06")
+  totalR08      Int       @default(0) @map("total_r08")
+  totalR09      Int       @default(0) @map("total_r09")
+  totalFindings Int       @default(0) @map("total_findings")
+  runAt         DateTime? @map("run_at")
+  runById       String?   @map("run_by_id") @db.VarChar(36)
+  errorMessage  String?   @map("error_message") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  period   ReconciliationPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  findings ReconciliationFinding[]
+
+  @@index([periodId])
+  @@index([batchId])
+  @@index([status])
+  @@map("reconciliation_matching_run")
+}
+
+model ReconciliationFinding {
+  id            String    @id @default(cuid()) @db.VarChar(36)
+  matchingRunId String    @map("matching_run_id") @db.VarChar(36)
+  periodId      String    @map("period_id") @db.VarChar(36)
+  findingCode   String    @map("finding_code") @db.VarChar(5)
+  priority      String    @db.VarChar(20)
+  status        String    @default("OPEN") @db.VarChar(30)
+  nip           String?   @db.VarChar(30)
+  namaBkpsdm    String?   @map("nama_bkpsdm") @db.VarChar(250)
+  namaBpkad     String?   @map("nama_bpkad") @db.VarChar(250)
+  bkpsdmValue   String?   @map("bkpsdm_value") @db.VarChar(500)
+  bpkadValue    String?   @map("bpkad_value") @db.VarChar(500)
+  description   String?   @db.VarChar(500)
+  asnId         String?   @map("asn_id") @db.VarChar(36)
+  bpkadRowId    String?   @map("bpkad_row_id") @db.VarChar(36)
+  notes         String?   @db.Text
+  rtlPic        String?   @map("rtl_pic") @db.VarChar(200)
+  rtlDeadline   DateTime? @map("rtl_deadline") @db.Date
+  rtlAction     String?   @map("rtl_action") @db.VarChar(50)
+  rtlNotes      String?   @map("rtl_notes") @db.Text
+  resolvedAt    DateTime? @map("resolved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  matchingRun ReconciliationMatchingRun @relation(fields: [matchingRunId], references: [id], onDelete: Cascade)
+
+  @@index([matchingRunId])
+  @@index([periodId])
+  @@index([findingCode])
+  @@index([priority])
+  @@index([status])
+  @@index([nip])
+  @@map("reconciliation_finding")
+}
+
+model ReconciliationBeritaAcara {
+  id             String    @id @default(cuid()) @db.VarChar(36)
+  periodId       String    @map("period_id") @db.VarChar(36)
+  matchingRunId  String?   @map("matching_run_id") @db.VarChar(36)
+  status         String    @default("DRAFT") @db.VarChar(30)
+  nomorBA        String?   @map("nomor_ba") @db.VarChar(100)
+  tanggalBA      DateTime? @map("tanggal_ba") @db.Date
+  totalTemuan    Int       @default(0) @map("total_temuan")
+  totalResolved  Int       @default(0) @map("total_resolved")
+  totalPending   Int       @default(0) @map("total_pending")
+  summaryJson    Json?     @map("summary_json")
+  draftedById    String?   @map("drafted_by_id") @db.VarChar(36)
+  draftedAt      DateTime? @map("drafted_at")
+  finalizedById  String?   @map("finalized_by_id") @db.VarChar(36)
+  finalizedAt    DateTime? @map("finalized_at")
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  period ReconciliationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId])
+  @@index([status])
+  @@map("reconciliation_berita_acara")
+}
+
+// ─── IKM Survei Kepuasan Layanan ───────────────────────────────────────────
+
+model IkmSurveyPeriod {
+  id        String      @id @default(cuid()) @db.VarChar(36)
+  year      Int
+  semester  Int         // 1 or 2
+  label     String      @db.VarChar(100)
+  status    String      @default("OPEN") @db.VarChar(20)  // OPEN | CLOSED
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  surveys   IkmSurvey[]
+
+  @@unique([year, semester])
+  @@index([status])
+  @@map("ikm_survey_period")
+}
+
+model IkmSurvey {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  periodId     String   @map("period_id") @db.VarChar(36)
+  opdName      String   @map("opd_name") @db.VarChar(200)
+  serviceType  String?  @map("service_type") @db.VarChar(50)
+  submissionId String?  @map("submission_id") @db.VarChar(36)
+  respondentId String?  @map("respondent_id") @db.VarChar(36)
+
+  // 9 unsur IKM PermenPANRB No. 14/2017 (skala 1-4)
+  u1  Int  // Persyaratan
+  u2  Int  // Prosedur Pelayanan
+  u3  Int  // Waktu Penyelesaian
+  u4  Int  // Biaya/Tarif
+  u5  Int  // Produk Spesifikasi Jenis Pelayanan
+  u6  Int  // Kompetensi Pelaksana
+  u7  Int  // Perilaku Pelaksana
+  u8  Int  // Penanganan Pengaduan, Saran, dan Masukan
+  u9  Int  // Sarana dan Prasarana
+
+  ikmScore    Float?  @map("ikm_score")    // rata-rata 1-4
+  ikmConvert  Float?  @map("ikm_convert")  // konversi 25-100
+  predikat    String? @db.VarChar(2)       // A/B/C/D
+
+  comments    String?  @db.Text
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  period IkmSurveyPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId])
+  @@index([serviceType])
+  @@index([respondentId])
+  @@map("ikm_survey")
+}
+

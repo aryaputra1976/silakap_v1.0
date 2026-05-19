@@ -406,8 +406,8 @@ export class SiapRepository {
       where.taskType = filters.taskType;
     }
 
-    if (filters.status) {
-      where.status = filters.status;
+    if (filters.status && (Object.values(TaskStatus) as string[]).includes(filters.status)) {
+      where.status = filters.status as TaskStatus;
     }
 
     if (filters.activeOnly) {

@@ -154,11 +154,22 @@ export function StatCard({
   );
 }
 
-export function StatusBadge({ value, tone }: { value: string | null | undefined; tone?: Tone }) {
-  const normalized = value ?? 'UNKNOWN';
+export function StatusBadge({
+  value,
+  tone,
+  children,
+  className,
+}: {
+  value?: string | null | undefined;
+  tone?: Tone;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const text = children ?? value ?? 'UNKNOWN';
+  const normalized = typeof text === 'string' ? text : (value ?? 'UNKNOWN');
   return (
-    <span className={cn('inline-flex items-center rounded-md border px-2 py-1 text-xs font-semibold', toneClass[tone ?? badgeTone(normalized)])}>
-      {normalized}
+    <span className={cn('inline-flex items-center rounded-md border px-2 py-1 text-xs font-semibold', toneClass[tone ?? badgeTone(normalized)], className)}>
+      {text}
     </span>
   );
 }
@@ -184,11 +195,12 @@ export function SlaBadge({ dueDate, status }: { dueDate?: string | null; status?
   return <StatusBadge value={overdue ? 'OVERDUE' : `DUE ${formatDate(dueDate)}`} tone={overdue ? 'danger' : 'info'} />;
 }
 
-export function LoadingState({ label = 'Memuat data' }: { label?: string }) {
+export function LoadingState({ label, message }: { label?: string; message?: string }) {
+  const text = message ?? label ?? 'Memuat data';
   return (
     <div className="flex min-h-48 items-center justify-center gap-3 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] text-sm text-[#6d7e68] shadow-sm">
       <Loader2 className="size-5 animate-spin text-[#0f766e]" />
-      {label}
+      {text}
     </div>
   );
 }
@@ -226,22 +238,36 @@ export function ErrorAlert({ message }: { message: string }) {
 
 export function DataTable<T>({
   items,
+  data,
   columns,
   empty,
   rowKey,
+  keyField,
+  onRowClick,
 }: {
-  items: T[];
+  items?: T[];
+  data?: T[];
   columns: Array<{
     key: string;
     header: string;
     render: (item: T) => ReactNode;
     className?: string;
   }>;
-  empty: string;
+  empty?: string;
   rowKey?: (item: T, index: number) => string;
+  keyField?: keyof T;
+  onRowClick?: (item: T) => void;
 }) {
-  if (items.length === 0) {
-    return <EmptyState title={empty} />;
+  const rows = data ?? items ?? [];
+
+  if (rows.length === 0) {
+    return <EmptyState title={empty ?? 'Tidak ada data'} />;
+  }
+
+  function resolveKey(item: T, index: number): string {
+    if (keyField) return String(item[keyField]);
+    if (rowKey) return rowKey(item, index);
+    return String(index);
   }
 
   return (
@@ -258,8 +284,12 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e0eadb]">
-            {items.map((item, index) => (
-              <tr key={rowKey ? rowKey(item, index) : index} className="bg-[#fbfdf8] transition-colors hover:bg-[#f1f7ed]">
+            {rows.map((item, index) => (
+              <tr
+                key={resolveKey(item, index)}
+                className={cn('bg-[#fbfdf8] transition-colors hover:bg-[#f1f7ed]', onRowClick ? 'cursor-pointer' : '')}
+                onClick={onRowClick ? () => onRowClick(item) : undefined}
+              >
                 {columns.map((column) => (
                   <td key={column.key} className={cn('break-words px-4 py-3.5 align-top text-[#4e5f49]', column.className)}>
                     {column.render(item)}
@@ -454,10 +484,11 @@ export function DownloadButton({ onClick, disabled }: { onClick: () => void; dis
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, description, children }: { label: string; description?: string; children: ReactNode }) {
   return (
     <label className="grid min-w-0 gap-1.5 text-sm">
       <span className="font-semibold text-zinc-800">{label}</span>
+      {description && <span className="text-xs text-muted-foreground -mt-1">{description}</span>}
       {children}
     </label>
   );

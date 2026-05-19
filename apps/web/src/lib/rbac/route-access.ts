@@ -79,12 +79,25 @@ const ROUTE_ACCESS_RULES: RouteRule[] = [
     allowedRoles: INTERNAL_ROLES,
   },
   { prefix: '/layanan', moduleKey: 'LAYANAN_KEPEGAWAIAN', allowedRoles: INTERNAL_ROLES },
+  {
+    prefix: '/rekonsiliasi-bpkad/import',
+    moduleKey: 'REKONSILIASI_BPKAD',
+    requiredPermission: 'upload',
+    allowedRoles: INTERNAL_ROLES,
+  },
+  { prefix: '/rekonsiliasi-bpkad', moduleKey: 'REKONSILIASI_BPKAD', allowedRoles: INTERNAL_ROLES },
   { prefix: '/sidata/import', moduleKey: 'SIDATA', requiredPermission: 'upload', allowedRoles: INTERNAL_ROLES },
   { prefix: '/sidata/laporan', moduleKey: 'SIDATA', requiredPermission: 'report', allowedRoles: INTERNAL_ROLES },
   { prefix: '/sidata', moduleKey: 'SIDATA', allowedRoles: INTERNAL_ROLES },
   { prefix: '/sianalitik', moduleKey: 'SIANALITIK', allowedRoles: INTERNAL_ROLES },
   { prefix: '/siarsip', moduleKey: 'SIARSIP', allowedRoles: INTERNAL_ROLES },
   { prefix: '/working-calendar', moduleKey: 'WORKING_CALENDAR', allowedRoles: INTERNAL_ROLES },
+  {
+    prefix: '/admin',
+    moduleKey: 'ADMIN',
+    requiredPermission: 'admin',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN_BKPSDM'],
+  },
 ];
 
 export function canAccessRoute(

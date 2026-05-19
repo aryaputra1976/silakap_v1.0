@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../auth/auth.types';
 import { DEFAULT_CALENDAR, WorkingCalendarConfig } from './business-time.util';
@@ -11,8 +11,8 @@ import { WorkingCalendarRepository } from './working-calendar.repository';
 @Injectable()
 export class WorkingCalendarService {
   constructor(
-    private readonly repo: WorkingCalendarRepository,
-    private readonly audit: AuditService,
+    @Inject(WorkingCalendarRepository) private readonly repo: WorkingCalendarRepository,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   findAll() {

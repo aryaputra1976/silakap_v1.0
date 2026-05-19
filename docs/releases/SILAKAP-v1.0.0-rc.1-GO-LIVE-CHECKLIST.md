@@ -51,6 +51,7 @@
 | `npm run smoke:e2e-regression` 0 FAIL, 0 WARN |  |  |
 | Login OPD |  |  |
 | Internal workbench opens |  |  |
+| Admin Control opens (`/admin/rbac`, `/admin/users`, `/admin/settings`) for SUPER_ADMIN/ADMIN_BKPSDM only |  |  |
 | Upload file path works |  |  |
 | Report page opens |  |  |
 
@@ -63,6 +64,7 @@
 | Executive report |  |  |
 | Evidence bundle |  |  |
 | RBAC negative tests |  |  |
+| Admin Control read-only verified |  |  |
 
 ## 8. Go/No-Go
 Go criteria:
@@ -70,6 +72,7 @@ Go criteria:
 - Smoke regression 0 FAIL, 0 WARN.
 - Manual staging sign-off approved.
 - OPD cannot access internal routes.
+- OPD/non-admin cannot access Admin Control routes.
 - Candidate approval creates realization exactly once.
 - Executive report reads only APPROVED realization.
 
@@ -78,6 +81,7 @@ No-go criteria:
 - Smoke regression FAIL or WARN not accepted.
 - Manual E2E critical failure.
 - OPD can access workbench/kinerja/working calendar.
+- OPD or non-admin can access `/admin/*`.
 - Upload invalid accepted as success.
 - Report counts non-approved candidate/realization.
 
