@@ -32,9 +32,23 @@ async function main() {
 
   console.table(results);
   console.log(`Summary: ${results.length} checks, ${failed.length} fail, ${warned.length} warn`);
+  printOperationalHints(warned);
 
   if (failed.length > 0) {
     throw new Error('E2E regression integrity check gagal. Lihat baris FAIL.');
+  }
+}
+
+function printOperationalHints(warned: CheckResult[]) {
+  if (warned.some((item) => item.name === 'prisma.critical-migrations-applied')) {
+    console.warn('Migration warning detected.');
+    console.warn('Check status: npm run prisma:migrate:status');
+    console.warn('Apply in staging/production after DB backup: npm run prisma:migrate:deploy');
+  }
+
+  if (warned.some((item) => item.name === 'working-calendar.default')) {
+    console.warn('Working calendar warning detected.');
+    console.warn('Run controlled seed or create default WorkingCalendar before go-live.');
   }
 }
 

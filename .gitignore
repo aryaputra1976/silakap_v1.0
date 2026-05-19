@@ -5,6 +5,8 @@ out/
 build/
 .env
 .env.local
+.env.production
+.env.*.local
 .DS_Store
 Thumbs.db
 *.log
@@ -12,5 +14,13 @@ Thumbs.db
 *.tsbuildinfo
 
 api/uploads/
+uploads/
+upload/
+backup/
+backups/
+storage/
+*.sql
+*.dump
+*.bak
 *.pdf
 silakap_v1.htm
