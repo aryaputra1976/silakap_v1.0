@@ -356,15 +356,7 @@ export function SipensiunDetailPage() {
     setError('');
 
     try {
-      const blob = await apiClient.download(`/siarsip/documents/${documentId}/download`);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-
-      anchor.href = url;
-      anchor.download = fileName;
-      anchor.click();
-
-      URL.revokeObjectURL(url);
+      await apiClient.download(`/siarsip/documents/${documentId}/download`, fileName);
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : 'Gagal download dokumen',

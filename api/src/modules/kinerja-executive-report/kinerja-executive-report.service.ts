@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { KinerjaRhkRealizationService } from '../kinerja-rhk-realization/kinerja-rhk-realization.service';
 import type { QueryRealizationDto } from '../kinerja-rhk-realization/dto/query-realization.dto';
@@ -18,8 +18,11 @@ function getPrimary(user: AuthUser): string {
 @Injectable()
 export class KinerjaExecutiveReportService {
   constructor(
+    @Inject(KinerjaExecutiveReportRepository)
     private readonly repo: KinerjaExecutiveReportRepository,
+    @Inject(KinerjaRhkRealizationService)
     private readonly realizationService: KinerjaRhkRealizationService,
+    @Inject(AuditService)
     private readonly audit: AuditService,
   ) {}
 

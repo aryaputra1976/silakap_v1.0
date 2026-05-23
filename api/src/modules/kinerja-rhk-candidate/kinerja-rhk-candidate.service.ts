@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -50,7 +51,9 @@ function ensureApprove(user: AuthUser) {
 @Injectable()
 export class KinerjaRhkCandidateService {
   constructor(
+    @Inject(KinerjaRhkCandidateRepository)
     private readonly repo: KinerjaRhkCandidateRepository,
+    @Inject(KinerjaRhkRealizationService)
     private readonly realizationService: KinerjaRhkRealizationService,
   ) {}
 

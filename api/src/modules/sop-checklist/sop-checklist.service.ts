@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -59,7 +60,9 @@ function deriveStatus(
 @Injectable()
 export class SopChecklistService {
   constructor(
+    @Inject(SopChecklistRepository)
     private readonly repo: SopChecklistRepository,
+    @Inject(AuditService)
     private readonly auditService: AuditService,
   ) {}
 

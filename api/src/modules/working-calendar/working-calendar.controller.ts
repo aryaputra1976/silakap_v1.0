@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -27,7 +28,10 @@ const MANAGE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM'];
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/working-calendar')
 export class WorkingCalendarController {
-  constructor(private readonly service: WorkingCalendarService) {}
+  constructor(
+    @Inject(WorkingCalendarService)
+    private readonly service: WorkingCalendarService,
+  ) {}
 
   @Get()
   @Roles(...VIEW_ROLES)

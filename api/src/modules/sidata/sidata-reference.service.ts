@@ -64,6 +64,12 @@ export class SidataReferenceService {
     return items.map((item) => this.toJenisJabatanResponse(item));
   }
 
+  async ensureDefaultJenisJabatan(user: AuthUser): Promise<JenisJabatanResponse[]> {
+    this.ensureCanMaintainReference(user);
+    const items = await this.referenceRepository.ensureDefaultJenisJabatan();
+    return items.map((item) => this.toJenisJabatanResponse(item));
+  }
+
   async findJabatanList(query: SidataJabatanQueryDto): Promise<PaginatedJabatanResponse> {
     const filters = this.normalizeJabatanFilters(query);
     const result = await this.referenceRepository.findJabatanList(filters);
@@ -209,7 +215,7 @@ export class SidataReferenceService {
     return {
       type,
       q: this.normalizeOptionalText(query.q),
-      isActive: query.isActive,
+      isActive: this.normalizeOptionalBoolean(query.isActive),
     };
   }
 
@@ -219,7 +225,7 @@ export class SidataReferenceService {
       jenisJabatanKode: this.normalizeOptionalText(query.jenisJabatanKode),
       rumpun: this.normalizeOptionalText(query.rumpun),
       kelasJabatan: this.normalizeOptionalText(query.kelasJabatan),
-      isActive: query.isActive,
+      isActive: this.normalizeOptionalBoolean(query.isActive),
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
       limit: this.normalizePositiveNumber(query.limit, 20, 1, 100),
     };
@@ -228,6 +234,15 @@ export class SidataReferenceService {
   private normalizeOptionalText(value: string | undefined): string | undefined {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
+  }
+
+  private normalizeOptionalBoolean(value: boolean | string | undefined): boolean | undefined {
+    if (typeof value === 'boolean') return value;
+    const normalized = value?.trim().toLowerCase();
+    if (!normalized) return undefined;
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+    return undefined;
   }
 
   private normalizePositiveNumber(

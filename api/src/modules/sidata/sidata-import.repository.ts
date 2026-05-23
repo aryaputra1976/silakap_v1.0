@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { REF_JENIS_JABATAN_DEFAULTS } from './sidata-reference.types';
 import {
   CommitGenericReferenceResult,
   CommitJfProfileResult,
@@ -148,6 +149,9 @@ type AsnReferenceMaps = {
   agamaByNama: Map<string, string>;
   statusKawinByNama: Map<string, string>;
   pendidikanByNama: Map<string, string>;
+  pendidikanTingkatByKode: Map<string, string>;
+  pendidikanTingkatByNama: Map<string, string>;
+  pendidikanTingkatIdByPendidikanNama: Map<string, string>;
 };
 
 type ExtractedAsnJabatanPair = {
@@ -185,19 +189,29 @@ const asnImportStagingSelect = {
   rowNumber: true,
   nip: true,
   nipLama: true,
+  nik: true,
   nama: true,
+  gelarDepan: true,
+  gelarBelakang: true,
   namaJabatan: true,
   jenisJabatan: true,
   kdJabatan: true,
   kdJabatanSiasn: true,
   tmtJabatan: true,
+  nomorSkJabatan: true,
+  tanggalSkJabatan: true,
+  siasnEselonId: true,
+  eselonNama: true,
   namaGolongan: true,
+  namaPangkat: true,
   namaRuang: true,
   kdGolongan: true,
   kdGolonganSiasn: true,
   tmtGolongan: true,
   masaKerjaGolongan: true,
   masaKerjaSeluruh: true,
+  nomorSkGolongan: true,
+  tanggalSkGolongan: true,
   namaUnorEselon1: true,
   namaUnorEselon2: true,
   namaUnorEselon3: true,
@@ -215,8 +229,22 @@ const asnImportStagingSelect = {
   statusKepegawaian: true,
   jenisAsn: true,
   kedudukanHukum: true,
+  nomorPerjanjianKerja: true,
+  tmtPerjanjianKerja: true,
+  akhirPerjanjianKerja: true,
+  masaHubunganKerjaBulan: true,
   noSk: true,
   tanggalSk: true,
+  masaKerjaTahun: true,
+  masaKerjaBulan: true,
+  nomorHp: true,
+  email: true,
+  emailGov: true,
+  alamat: true,
+  npwpNomor: true,
+  bpjsNomor: true,
+  tahunLulus: true,
+  unorNama: true,
   validationStatus: true,
   validationErrors: true,
   mappingStatus: true,
@@ -478,6 +506,29 @@ export class SidataImportRepository {
       where: { kode, deletedAt: null },
       select: jenisJabatanSelect,
     });
+  }
+
+  async ensureDefaultJenisJabatan(): Promise<void> {
+    await this.prisma.$transaction(
+      REF_JENIS_JABATAN_DEFAULTS.map((item) =>
+        this.prisma.refJenisJabatan.upsert({
+          where: { kode: item.kode },
+          update: {
+            nama: item.nama,
+            deskripsi: item.deskripsi,
+            isActive: true,
+            deletedAt: null,
+          },
+          create: {
+            id: randomUUID(),
+            kode: item.kode,
+            nama: item.nama,
+            deskripsi: item.deskripsi,
+            isActive: true,
+          },
+        }),
+      ),
+    );
   }
 
   async commitReferenceJabatanBatch(params: {
@@ -1630,19 +1681,29 @@ export class SidataImportRepository {
         rowNumber: row.rowNumber,
         nip: row.nip,
         nipLama: row.nipLama,
+        nik: row.nik,
         nama: row.nama,
+        gelarDepan: row.gelarDepan,
+        gelarBelakang: row.gelarBelakang,
         namaJabatan: row.namaJabatan,
         jenisJabatan: row.jenisJabatan,
         kdJabatan: row.kdJabatan,
         kdJabatanSiasn: row.kdJabatanSiasn,
         tmtJabatan: row.tmtJabatan,
+        nomorSkJabatan: row.nomorSkJabatan,
+        tanggalSkJabatan: row.tanggalSkJabatan,
+        siasnEselonId: row.siasnEselonId,
+        eselonNama: row.eselonNama,
         namaGolongan: row.namaGolongan,
+        namaPangkat: row.namaPangkat,
         namaRuang: row.namaRuang,
         kdGolongan: row.kdGolongan,
         kdGolonganSiasn: row.kdGolonganSiasn,
         tmtGolongan: row.tmtGolongan,
         masaKerjaGolongan: row.masaKerjaGolongan,
         masaKerjaSeluruh: row.masaKerjaSeluruh,
+        nomorSkGolongan: row.nomorSkGolongan,
+        tanggalSkGolongan: row.tanggalSkGolongan,
         namaUnorEselon1: row.namaUnorEselon1,
         namaUnorEselon2: row.namaUnorEselon2,
         namaUnorEselon3: row.namaUnorEselon3,
@@ -1660,8 +1721,22 @@ export class SidataImportRepository {
         statusKepegawaian: row.statusKepegawaian,
         jenisAsn: row.jenisAsn,
         kedudukanHukum: row.kedudukanHukum,
+        nomorPerjanjianKerja: row.nomorPerjanjianKerja,
+        tmtPerjanjianKerja: row.tmtPerjanjianKerja,
+        akhirPerjanjianKerja: row.akhirPerjanjianKerja,
+        masaHubunganKerjaBulan: row.masaHubunganKerjaBulan,
         noSk: row.noSk,
         tanggalSk: row.tanggalSk,
+        masaKerjaTahun: row.masaKerjaTahun,
+        masaKerjaBulan: row.masaKerjaBulan,
+        nomorHp: row.nomorHp,
+        email: row.email,
+        emailGov: row.emailGov,
+        alamat: row.alamat,
+        npwpNomor: row.npwpNomor,
+        bpjsNomor: row.bpjsNomor,
+        tahunLulus: row.tahunLulus,
+        unorNama: row.unorNama,
         validationStatus: row.validationStatus,
         validationErrors: row.validationErrors as Prisma.InputJsonValue,
         mappingStatus: row.isDuplicate
@@ -2301,7 +2376,7 @@ export class SidataImportRepository {
     const norm = (v: string | null | undefined) => this.normalizeText(v ?? '');
 
     const [unitKerjas, jenisJabatans, jabatans, golongans, pangkats,
-      jenisAsns, kedudukanHukums, jenisKelamins, agamas, statusKawins, pendidikans] =
+      jenisAsns, kedudukanHukums, jenisKelamins, agamas, statusKawins, pendidikanTingkat, pendidikans] =
       await Promise.all([
         this.prisma.unitKerja.findMany({
           where: { deletedAt: null },
@@ -2323,7 +2398,8 @@ export class SidataImportRepository {
         this.prisma.refJenisKelamin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 10 }),
         this.prisma.refAgama.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
         this.prisma.refStatusKawin.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20 }),
-        this.prisma.refPendidikan.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 20_000 }),
+        this.prisma.refPendidikanTingkat.findMany({ select: { id: true, kode: true, nama: true }, take: 100 }),
+        this.prisma.refPendidikan.findMany({ where: { deletedAt: null }, select: { id: true, nama: true, tingkatPendidikanId: true }, take: 20_000 }),
       ]);
 
     const simpleMap = (items: { id: string; nama: string }[]) =>
@@ -2371,6 +2447,13 @@ export class SidataImportRepository {
       agamaByNama: simpleMap(agamas),
       statusKawinByNama: simpleMap(statusKawins),
       pendidikanByNama: simpleMap(pendidikans),
+      pendidikanTingkatByKode: new Map(pendidikanTingkat.filter((p) => p.kode).map((p) => [p.kode!, p.id])),
+      pendidikanTingkatByNama: simpleMap(pendidikanTingkat),
+      pendidikanTingkatIdByPendidikanNama: new Map(
+        pendidikans
+          .filter((p) => p.tingkatPendidikanId)
+          .map((p) => [norm(p.nama), p.tingkatPendidikanId!]),
+      ),
     };
   }
 
@@ -2391,6 +2474,13 @@ export class SidataImportRepository {
       ? this.normalizeRawDataKeys(row.rawData as Record<string, unknown>)
       : {};
     const rawJabatanCode = this.pickRaw(raw, ['jabatan_id', 'id_jabatan', 'kd_jabatan_siasn', 'kd_jabatan', 'kode_jabatan']);
+    const rawTingkatPendidikanCode = this.pickRaw(raw, ['tingkat_pendidikan_id', 'tingkat pendidikan id', 'id_tingkat_pendidikan']);
+    const rawTingkatPendidikanName = this.pickRaw(raw, [
+      'tingkat_pendidikan_nama',
+      'tingkat pendidikan nama',
+      'tingkat_pendidikan',
+      'tingkat pendidikan',
+    ]);
 
     const unitKerjaId = this.findUnitKerjaIdFromMaps(maps, {
       code: row.kdUnor,
@@ -2423,6 +2513,10 @@ export class SidataImportRepository {
       agamaId: fromMap(maps.agamaByNama, null, row.agama),
       statusKawinId: fromMap(maps.statusKawinByNama, null, row.statusKawin),
       pendidikanId: fromMap(maps.pendidikanByNama, null, row.pendidikanTerakhir),
+      tingkatPendidikanId:
+        fromMap(maps.pendidikanTingkatByKode, rawTingkatPendidikanCode, null)
+        ?? fromMap(maps.pendidikanTingkatByNama, null, rawTingkatPendidikanName)
+        ?? maps.pendidikanTingkatIdByPendidikanNama.get(norm(row.pendidikanTerakhir)) ?? null,
     };
   }
 
@@ -2566,6 +2660,13 @@ export class SidataImportRepository {
       'kd_jabatan',
       'kode_jabatan',
     ]);
+    const rawTingkatPendidikanCode = this.pickRaw(raw, ['tingkat_pendidikan_id', 'tingkat pendidikan id', 'id_tingkat_pendidikan']);
+    const rawTingkatPendidikanName = this.pickRaw(raw, [
+      'tingkat_pendidikan_nama',
+      'tingkat pendidikan nama',
+      'tingkat_pendidikan',
+      'tingkat pendidikan',
+    ]);
 
     const [
       unitKerjaId,
@@ -2578,6 +2679,7 @@ export class SidataImportRepository {
       agamaId,
       statusKawinId,
       pendidikanId,
+      tingkatPendidikanIdByRaw,
     ] = await Promise.all([
       this.findUnitKerjaIdInTx(tx, {
         code: row.kdUnor,
@@ -2629,7 +2731,15 @@ export class SidataImportRepository {
         code: null,
         name: row.pendidikanTerakhir,
       }),
+      this.findSimpleRefIdInTx(tx, {
+        model: 'refPendidikanTingkat',
+        code: rawTingkatPendidikanCode,
+        name: rawTingkatPendidikanName ?? row.pendidikanTerakhir,
+      }),
     ]);
+    const tingkatPendidikanId =
+      tingkatPendidikanIdByRaw
+      ?? (pendidikanId ? await this.findPendidikanTingkatIdFromPendidikanInTx(tx, pendidikanId) : null);
 
     return {
       unitKerjaId,
@@ -2642,6 +2752,7 @@ export class SidataImportRepository {
       agamaId,
       statusKawinId,
       pendidikanId,
+      tingkatPendidikanId,
     };
   }
 
@@ -2810,6 +2921,7 @@ export class SidataImportRepository {
         | 'refGolongan'
         | 'refPangkat'
         | 'refPendidikan'
+        | 'refPendidikanTingkat'
         | 'refAgama'
         | 'refJenisKelamin'
         | 'refStatusKawin'
@@ -2852,6 +2964,18 @@ export class SidataImportRepository {
     }
 
     return null;
+  }
+
+  private async findPendidikanTingkatIdFromPendidikanInTx(
+    tx: Prisma.TransactionClient,
+    pendidikanId: string,
+  ): Promise<string | null> {
+    const pendidikan = await tx.refPendidikan.findFirst({
+      where: { id: pendidikanId, deletedAt: null },
+      select: { tingkatPendidikanId: true },
+    });
+
+    return pendidikan?.tingkatPendidikanId ?? null;
   }
 
   private async findExistingAsnInTx(
@@ -3130,6 +3254,50 @@ export class SidataImportRepository {
     const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
     const jenisAsnNama = row.jenisAsn ?? this.rawString(raw, ['jenis_pegawai_nama', 'jenis_asn_nama']);
     const kedudukanHukumNama = row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']);
+    const masaKerjaSeluruh = this.parseMasaKerja(
+      row.masaKerjaSeluruh
+      ?? this.rawString(raw, ['masa_kerja_seluruh', 'masa kerja seluruh', 'masa_kerja_total', 'total_masa_kerja']),
+    );
+    const masaKerjaTahun = row.masaKerjaTahun ?? this.rawInt(raw, [
+      'mk_tahun_seluruh',
+      'mk_tahun',
+      'masa_kerja_tahun',
+      'masa kerja tahun',
+      'masa_kerja_tahun_seluruh',
+    ]) ?? masaKerjaSeluruh.tahun;
+    const masaKerjaBulan = row.masaKerjaBulan ?? this.rawInt(raw, [
+      'mk_bulan_seluruh',
+      'mk_bulan',
+      'masa_kerja_bulan',
+      'masa kerja bulan',
+      'masa_kerja_bulan_seluruh',
+    ]) ?? masaKerjaSeluruh.bulan;
+    const masaKerjaTotalBulan = masaKerjaTahun !== null || masaKerjaBulan !== null
+      ? (masaKerjaTahun ?? 0) * 12 + (masaKerjaBulan ?? 0)
+      : null;
+    const tingkatPendidikanNama = this.rawString(raw, [
+      'tingkat_pendidikan_nama',
+      'tingkat pendidikan nama',
+      'tingkat_pendidikan',
+      'tingkat pendidikan',
+    ]);
+    const pendidikanNama = row.pendidikanTerakhir ?? this.rawString(raw, [
+      'pendidikan_nama',
+      'pendidikan nama',
+      'pendidikan_terakhir',
+      'pendidikan terakhir',
+      'pendidikan',
+    ]);
+    const tahunLulus = row.tahunLulus ?? this.rawInt(raw, ['tahun_lulus', 'tahun lulus']);
+    const detailStatusNama = this.rawString(raw, [
+      'detail_status_nama',
+      'detail status nama',
+      'status_detail',
+      'status detail',
+      'status_pegawai',
+      'status pegawai',
+      'status_cpns_pns',
+    ]) ?? row.statusKepegawaian ?? kedudukanHukumNama;
 
     const currentData = {
       siasnPnsId: this.rawString(raw, ['pns_id']),
@@ -3150,7 +3318,7 @@ export class SidataImportRepository {
       tmtPensiun: row.tmtPensiun,
       unitKerjaId: mappedData.unitKerjaId ?? null,
       siasnUnorId,
-      unorNama: this.rawString(raw, ['unor_nama']),
+      unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
       jabatanRefId: mappedData.jabatanId ?? null,
       siasnJabatanId,
       jenisJabatanNama: row.jenisJabatan,
@@ -3160,6 +3328,34 @@ export class SidataImportRepository {
       siasnGolonganId,
       golonganNama: golonganAkhirNama,
       tmtGolongan: row.tmtGolongan,
+      masaKerjaTahun,
+      masaKerjaBulan,
+      masaKerjaTotalBulan,
+      kelasJabatan: this.rawInt(raw, ['kelas_jabatan', 'kelas jabatan']),
+      siasnEselonId: row.siasnEselonId ?? this.rawString(raw, ['eselon_id', 'eselon id', 'id_eselon']),
+      eselonNama: row.eselonNama
+        ?? this.rawString(raw, ['eselon_nama', 'eselon nama', 'eselon'])
+        ?? this.inferEselonNama(row.namaJabatan, row.jenisJabatan),
+      namaUnorEselon1: row.namaUnorEselon1,
+      namaUnorEselon2: row.namaUnorEselon2,
+      namaUnorEselon3: row.namaUnorEselon3,
+      namaUnorEselon4: row.namaUnorEselon4,
+      pangkatNama: row.namaPangkat ?? row.namaRuang,
+      ruangNama: row.namaRuang,
+      nomorSk: row.nomorSkJabatan ?? row.noSk,
+      tanggalSk: row.tanggalSkJabatan ?? row.tanggalSk,
+      nomorPerjanjianKerja: row.nomorPerjanjianKerja,
+      tmtPerjanjianKerja: row.tmtPerjanjianKerja,
+      akhirPerjanjianKerja: row.akhirPerjanjianKerja,
+      masaHubunganKerjaBulan: row.masaHubunganKerjaBulan,
+      jenisPegawaiNama: jenisAsnNama,
+      detailStatusNama,
+      pendidikanRefId: mappedData.pendidikanId ?? null,
+      pendidikanNama,
+      tingkatPendidikanRefId: mappedData.tingkatPendidikanId ?? null,
+      tingkatPendidikanNama,
+      tahunLulus,
+      namaSekolah: row.namaSekolah,
       sourceBatchId: params.batchId ?? null,
       deletedAt: null,
     };
@@ -3200,6 +3396,20 @@ export class SidataImportRepository {
     const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
     const siasnPendidikanId = this.rawString(raw, ['pendidikan_id']);
     const siasnTingkatPendidikanId = this.rawString(raw, ['tingkat_pendidikan_id']);
+    const tingkatPendidikanNama = this.rawString(raw, [
+      'tingkat_pendidikan_nama',
+      'tingkat pendidikan nama',
+      'tingkat_pendidikan',
+      'tingkat pendidikan',
+    ]);
+    const pendidikanNama = row.pendidikanTerakhir ?? this.rawString(raw, [
+      'pendidikan_nama',
+      'pendidikan nama',
+      'pendidikan_terakhir',
+      'pendidikan terakhir',
+      'pendidikan',
+    ]);
+    const tahunLulus = row.tahunLulus ?? this.rawInt(raw, ['tahun_lulus', 'tahun lulus']);
 
     await tx.asnSiasnProfile.upsert({
       where: { asnId },
@@ -3208,12 +3418,12 @@ export class SidataImportRepository {
         asnId,
         sourceBatchId: batchId,
         siasnPnsId,
-        email: this.rawString(raw, ['email']),
-        emailGov: this.rawString(raw, ['email_gov']),
-        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
-        alamat: this.rawString(raw, ['alamat']),
-        npwpNomor: this.rawString(raw, ['npwp_nomor', 'npwp']),
-        bpjsNomor: this.rawString(raw, ['bpjs', 'bpjs_nomor']),
+        email: row.email ?? this.rawString(raw, ['email']),
+        emailGov: row.emailGov ?? this.rawString(raw, ['email_gov']),
+        phone: row.nomorHp ?? this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: row.alamat ?? this.rawString(raw, ['alamat']),
+        npwpNomor: row.npwpNomor ?? this.rawString(raw, ['npwp_nomor', 'npwp']),
+        bpjsNomor: row.bpjsNomor ?? this.rawString(raw, ['bpjs', 'bpjs_nomor']),
         tempatLahirId: this.rawString(raw, ['tempat_lahir_id']),
         tempatLahirNama: row.tempatLahir ?? this.rawString(raw, ['tempat_lahir_nama']),
         tanggalLahir: row.tanggalLahir,
@@ -3245,7 +3455,7 @@ export class SidataImportRepository {
         lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
         lokasiKerjaNama: this.rawString(raw, ['lokasi_kerja_nama']),
         siasnUnorId,
-        unorNama: this.rawString(raw, ['unor_nama']),
+        unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
         instansiIndukId: this.rawString(raw, ['instansi_induk_id']),
         instansiIndukNama: this.rawString(raw, ['instansi_induk_nama']),
         instansiKerjaId: this.rawString(raw, ['instansi_kerja_id']),
@@ -3265,12 +3475,12 @@ export class SidataImportRepository {
       update: {
         sourceBatchId: batchId,
         siasnPnsId,
-        email: this.rawString(raw, ['email']),
-        emailGov: this.rawString(raw, ['email_gov']),
-        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
-        alamat: this.rawString(raw, ['alamat']),
-        npwpNomor: this.rawString(raw, ['npwp_nomor', 'npwp']),
-        bpjsNomor: this.rawString(raw, ['bpjs', 'bpjs_nomor']),
+        email: row.email ?? this.rawString(raw, ['email']),
+        emailGov: row.emailGov ?? this.rawString(raw, ['email_gov']),
+        phone: row.nomorHp ?? this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: row.alamat ?? this.rawString(raw, ['alamat']),
+        npwpNomor: row.npwpNomor ?? this.rawString(raw, ['npwp_nomor', 'npwp']),
+        bpjsNomor: row.bpjsNomor ?? this.rawString(raw, ['bpjs', 'bpjs_nomor']),
         tempatLahirId: this.rawString(raw, ['tempat_lahir_id']),
         tempatLahirNama: row.tempatLahir ?? this.rawString(raw, ['tempat_lahir_nama']),
         tanggalLahir: row.tanggalLahir,
@@ -3302,7 +3512,7 @@ export class SidataImportRepository {
         lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
         lokasiKerjaNama: this.rawString(raw, ['lokasi_kerja_nama']),
         siasnUnorId,
-        unorNama: this.rawString(raw, ['unor_nama']),
+        unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
         instansiIndukId: this.rawString(raw, ['instansi_induk_id']),
         instansiIndukNama: this.rawString(raw, ['instansi_induk_nama']),
         instansiKerjaId: this.rawString(raw, ['instansi_kerja_id']),
@@ -3353,7 +3563,7 @@ export class SidataImportRepository {
     const assignmentData = {
       unitKerjaId: mappedData.unitKerjaId ?? null,
       siasnUnorId,
-      unorNama: this.rawString(raw, ['unor_nama']),
+      unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
       jabatanRefId: mappedData.jabatanId ?? null,
       siasnJabatanId,
       jabatanNama: row.namaJabatan,
@@ -3362,6 +3572,10 @@ export class SidataImportRepository {
       jenisJabatanNama: row.jenisJabatan,
       tmtJabatan: row.tmtJabatan,
       effectiveDate: row.tmtJabatan,
+      nomorSk: row.nomorSkJabatan ?? row.noSk,
+      tanggalSk: row.tanggalSkJabatan ?? row.tanggalSk,
+      siasnEselonId: row.siasnEselonId ?? this.rawString(raw, ['eselon_id']),
+      eselonNama: row.eselonNama ?? this.rawString(raw, ['eselon_nama', 'eselon']),
       rawData: assignmentRawData,
       checksum: assignmentChecksum,
       syncedAt: now,
@@ -3399,7 +3613,7 @@ export class SidataImportRepository {
       golonganRefId: mappedData.golonganId ?? null,
       siasnGolonganId,
       golonganNama: golonganAkhirNama,
-      pangkatNama: row.namaRuang,
+      pangkatNama: row.namaPangkat ?? row.namaRuang,
       ruangNama: row.namaRuang,
       siasnGolonganAwalId: this.rawString(raw, ['gol_awal_id', 'golongan_awal_id']),
       golonganAwalNama: this.rawString(raw, ['gol_awal_nama', 'golongan_awal_nama']),
@@ -3409,6 +3623,8 @@ export class SidataImportRepository {
       mkTahun: this.rawInt(raw, ['mk_tahun']) ?? this.parseMasaKerja(row.masaKerjaGolongan).tahun,
       mkBulan: this.rawInt(raw, ['mk_bulan']) ?? this.parseMasaKerja(row.masaKerjaGolongan).bulan,
       effectiveDate: row.tmtGolongan,
+      nomorSk: row.nomorSkGolongan ?? row.noSk,
+      tanggalSk: row.tanggalSkGolongan ?? row.tanggalSk,
       rawData: golonganRawData,
       checksum: golonganChecksum,
       syncedAt: now,
@@ -3445,11 +3661,11 @@ export class SidataImportRepository {
     const pendidikanData = {
       pendidikanRefId: mappedData.pendidikanId ?? null,
       siasnPendidikanId,
-      pendidikanNama: row.pendidikanTerakhir,
-      tingkatPendidikanRefId: null,
+      pendidikanNama,
+      tingkatPendidikanRefId: mappedData.tingkatPendidikanId ?? null,
       siasnTingkatPendidikanId,
-      tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
-      tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+      tingkatPendidikanNama,
+      tahunLulus,
       namaSekolah: row.namaSekolah,
       effectiveDate: this.rawDate(raw, ['tanggal_lulus', 'tgl_lulus']),
       rawData: pendidikanRawData,
@@ -3502,10 +3718,10 @@ export class SidataImportRepository {
         gelarBelakang: this.rawString(raw, ['gelar_belakang']),
       },
       contact: {
-        email: this.rawString(raw, ['email']),
-        emailGov: this.rawString(raw, ['email_gov']),
-        phone: this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
-        alamat: this.rawString(raw, ['alamat']),
+        email: row.email ?? this.rawString(raw, ['email']),
+        emailGov: row.emailGov ?? this.rawString(raw, ['email_gov']),
+        phone: row.nomorHp ?? this.rawString(raw, ['nomor_hp', 'no_hp', 'phone']),
+        alamat: row.alamat ?? this.rawString(raw, ['alamat']),
       },
       employment: {
         tipePegawai,
@@ -3518,7 +3734,7 @@ export class SidataImportRepository {
       assignment: {
         unitKerjaId: mappedData.unitKerjaId ?? null,
         siasnUnorId: row.kdUnor ?? this.rawString(raw, ['unor_id']),
-        unorNama: this.rawString(raw, ['unor_nama']),
+        unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
         siasnJabatanId: row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']),
         jabatanNama: row.namaJabatan,
         jenisJabatanNama: row.jenisJabatan,
@@ -3538,7 +3754,7 @@ export class SidataImportRepository {
         tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
         pendidikanId: this.rawString(raw, ['pendidikan_id']),
         pendidikanNama: row.pendidikanTerakhir,
-        tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+        tahunLulus: row.tahunLulus ?? this.rawInt(raw, ['tahun_lulus']),
         namaSekolah: row.namaSekolah,
       },
       mappedReference: mappedData as Record<string, string | null | undefined>,
@@ -3553,7 +3769,7 @@ export class SidataImportRepository {
     return {
       unitKerjaId: mappedData.unitKerjaId ?? null,
       siasnUnorId: row.kdUnor ?? this.rawString(raw, ['unor_id']),
-      unorNama: this.rawString(raw, ['unor_nama']),
+      unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
       siasnJabatanId: row.kdJabatan ?? row.kdJabatanSiasn ?? this.rawString(raw, ['jabatan_id']),
       jabatanNama: row.namaJabatan,
       jenisJabatanNama: row.jenisJabatan,
@@ -3582,10 +3798,21 @@ export class SidataImportRepository {
   ): Prisma.InputJsonValue {
     return {
       tingkatPendidikanId: this.rawString(raw, ['tingkat_pendidikan_id']),
-      tingkatPendidikanNama: this.rawString(raw, ['tingkat_pendidikan_nama']),
+      tingkatPendidikanNama: this.rawString(raw, [
+        'tingkat_pendidikan_nama',
+        'tingkat pendidikan nama',
+        'tingkat_pendidikan',
+        'tingkat pendidikan',
+      ]),
       pendidikanId: this.rawString(raw, ['pendidikan_id']),
-      pendidikanNama: row.pendidikanTerakhir,
-      tahunLulus: this.rawInt(raw, ['tahun_lulus']),
+      pendidikanNama: row.pendidikanTerakhir ?? this.rawString(raw, [
+        'pendidikan_nama',
+        'pendidikan nama',
+        'pendidikan_terakhir',
+        'pendidikan terakhir',
+        'pendidikan',
+      ]),
+      tahunLulus: this.rawInt(raw, ['tahun_lulus', 'tahun lulus']),
       namaSekolah: row.namaSekolah,
     } as Prisma.InputJsonValue;
   }
@@ -3613,6 +3840,7 @@ export class SidataImportRepository {
       agamaId: this.toNullableStringFromJson(record['agamaId']),
       statusKawinId: this.toNullableStringFromJson(record['statusKawinId']),
       pendidikanId: this.toNullableStringFromJson(record['pendidikanId']),
+      tingkatPendidikanId: this.toNullableStringFromJson(record['tingkatPendidikanId']),
     };
   }
 
@@ -3775,6 +4003,51 @@ export class SidataImportRepository {
       tahun: tahunMatch ? Number.parseInt(tahunMatch[1], 10) : null,
       bulan: bulanMatch ? Number.parseInt(bulanMatch[1], 10) : null,
     };
+  }
+
+  private inferEselonNama(
+    jabatanNama: string | null | undefined,
+    jenisJabatan: string | null | undefined,
+  ): string | null {
+    const jenis = this.normalizeText(jenisJabatan ?? '').toUpperCase();
+    if (!jenis.includes('STRUKTURAL')) return null;
+
+    const jabatan = this.normalizeText(jabatanNama ?? '').toUpperCase();
+    if (!jabatan) return null;
+
+    if (jabatan.startsWith('SEKRETARIS DAERAH')) return 'II.a';
+    if (
+      jabatan.startsWith('KEPALA DINAS')
+      || jabatan.startsWith('KEPALA BADAN')
+      || jabatan.startsWith('KEPALA SATUAN')
+      || jabatan.startsWith('INSPEKTUR')
+      || jabatan.startsWith('SEKRETARIS DPRD')
+    ) return 'II.b';
+    if (
+      jabatan.startsWith('ASISTEN')
+      || jabatan.startsWith('STAF AHLI')
+      || jabatan.startsWith('SEKRETARIS DINAS')
+      || jabatan.startsWith('SEKRETARIS BADAN')
+      || jabatan.startsWith('SEKRETARIS INSPEKTORAT')
+      || jabatan.startsWith('KEPALA BAGIAN')
+      || jabatan.startsWith('CAMAT')
+    ) return 'III.a';
+    if (
+      jabatan.startsWith('KEPALA BIDANG')
+      || jabatan.startsWith('INSPEKTUR PEMBANTU')
+      || jabatan.startsWith('SEKRETARIS CAMAT')
+    ) return 'III.b';
+    if (
+      jabatan.startsWith('KEPALA SUB BAGIAN')
+      || jabatan.startsWith('KEPALA SUBBAGIAN')
+      || jabatan.startsWith('KEPALA SUB BIDANG')
+      || jabatan.startsWith('KEPALA SUBBIDANG')
+      || jabatan.startsWith('KEPALA SEKSI')
+      || jabatan.startsWith('LURAH')
+      || jabatan.startsWith('SEKRETARIS LURAH')
+    ) return 'IV.a';
+
+    return null;
   }
 
   private isMissingReferenceMessage(message: string): boolean {

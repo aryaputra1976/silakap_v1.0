@@ -116,6 +116,17 @@ function canShowRemap(batch: SidataImportBatch, summary: SidataImportSummary | n
   );
 }
 
+function normalizeUnitSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\bsubbag\b/g, 'sub bagian')
+    .replace(/\bsub\s+bag\b/g, 'sub bagian')
+    .replace(/kepegawiaan/g, 'kepegawaian')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 export function SidataImportMappingReferensiPage() {
   const [batches, setBatches] = useState<SidataImportBatch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<SidataImportBatch | null>(null);
@@ -193,11 +204,12 @@ export function SidataImportMappingReferensiPage() {
   }, [batches]);
 
   const filteredUnitOptions = useMemo(() => {
-    const q = unitSearch.trim().toLowerCase();
+    const q = normalizeUnitSearchText(unitSearch);
     return unitOptions
       .filter((unit) => {
         if (!q) return true;
-        return `${unit.kode} ${unit.nama}`.toLowerCase().includes(q);
+        const haystack = normalizeUnitSearchText(`${unit.kode} ${unit.nama}`);
+        return haystack.includes(q) || q.split(' ').every((token) => haystack.includes(token));
       })
       .slice(0, 40);
   }, [unitOptions, unitSearch]);

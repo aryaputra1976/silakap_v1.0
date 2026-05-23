@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { SopReportsRepository } from './sop-reports.repository';
 import type { ReportQueryDto } from './dto/report-query.dto';
@@ -14,7 +14,9 @@ function getPrimary(user: AuthUser): string {
 @Injectable()
 export class SopReportsService {
   constructor(
+    @Inject(SopReportsRepository)
     private readonly repo: SopReportsRepository,
+    @Inject(AuditService)
     private readonly audit: AuditService,
   ) {}
 

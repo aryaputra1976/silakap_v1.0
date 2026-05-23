@@ -27,8 +27,38 @@ import { UploadDocumentDto } from './dto/upload-document.dto';
 import { SiarsipService } from './siarsip.service';
 import { UploadedDocumentFile } from './siarsip.types';
 
+const SIARSIP_VIEW_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+] as const;
+
+const SIARSIP_UPLOAD_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'PPPK',
+] as const;
+
+const SIARSIP_WRITE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+] as const;
+
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
 @Controller('api/v1/siarsip')
 export class SiarsipController {
   constructor(
@@ -37,18 +67,21 @@ export class SiarsipController {
   ) {}
 
   @Get('documents')
+  @Roles(...SIARSIP_VIEW_ROLES)
   async findDocuments(@Query() query: DocumentListQueryDto) {
     const result = await this.siarsipService.findDocuments(query);
     return ok(result);
   }
 
   @Get('documents/:id')
+  @Roles(...SIARSIP_VIEW_ROLES)
   async findDocumentById(@Param('id') id: string) {
     const result = await this.siarsipService.findDocumentById(id);
     return ok(result);
   }
 
   @Get('documents/:id/download')
+  @Roles(...SIARSIP_UPLOAD_ROLES)
   async downloadDocument(@Param('id') id: string) {
     const result = await this.siarsipService.downloadDocument(id);
 
@@ -59,12 +92,14 @@ export class SiarsipController {
   }
 
   @Get('cases/:caseId/documents')
+  @Roles(...SIARSIP_VIEW_ROLES)
   async findDocumentsByCaseId(@Param('caseId') caseId: string) {
     const result = await this.siarsipService.findDocumentsByCaseId(caseId);
     return ok(result);
   }
 
   @Post('cases/:caseId/documents')
+  @Roles(...SIARSIP_WRITE_ROLES)
   async createDocument(
     @Param('caseId') caseId: string,
     @Body() dto: CreateDocumentDto,
@@ -75,6 +110,7 @@ export class SiarsipController {
   }
 
   @Post('cases/:caseId/upload')
+  @Roles(...SIARSIP_UPLOAD_ROLES)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
@@ -100,6 +136,7 @@ export class SiarsipController {
   }
 
   @Get('cases/:caseId/checklist')
+  @Roles(...SIARSIP_VIEW_ROLES)
   async getChecklist(@Param('caseId') caseId: string) {
     const result = await this.siarsipService.getChecklist(caseId);
     return ok(result);

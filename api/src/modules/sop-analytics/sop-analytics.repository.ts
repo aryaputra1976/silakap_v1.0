@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto';
 
@@ -93,7 +93,10 @@ function buildReasons(row: {
 
 @Injectable()
 export class SopAnalyticsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ── Core: per-SOP compliance rows ─────────────────────────────────────────
 

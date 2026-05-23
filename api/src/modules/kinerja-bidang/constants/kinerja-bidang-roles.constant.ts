@@ -1,20 +1,20 @@
 export const KINERJA_BIDANG_READ_ROLES = [
   'SUPER_ADMIN',
-  'ADMIN',
+  'ADMIN_BKPSDM',
   'KEPALA_BADAN',
   'SEKRETARIS',
   'KABID',
   'STAFF',
 ] as const;
 
-export const KINERJA_BIDANG_WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN', 'KABID', 'STAFF'] as const;
+export const KINERJA_BIDANG_WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'STAFF'] as const;
 
 export const KINERJA_BIDANG_REVIEW_ROLES = [
   'SUPER_ADMIN',
-  'ADMIN',
+  'ADMIN_BKPSDM',
   'KEPALA_BADAN',
   'SEKRETARIS',
   'KABID',
 ] as const;
 
-export const KINERJA_BIDANG_SEED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'KABID'] as const;
+export const KINERJA_BIDANG_SEED_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'] as const;

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -45,7 +46,6 @@ const WRITE_ROLES = [
   'KEPALA_BADAN',
   'KABID',
   'ANALIS_MADYA',
-  'ANALIS_MUDA',
 ] as const;
 
 // Roles that can activate/archive
@@ -59,7 +59,10 @@ const ACTION_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/sop-governance')
 export class SopGovernanceController {
-  constructor(private readonly service: SopGovernanceService) {}
+  constructor(
+    @Inject(SopGovernanceService)
+    private readonly service: SopGovernanceService,
+  ) {}
 
   // ── Records ──────────────────────────────────────────────────────────────────
 

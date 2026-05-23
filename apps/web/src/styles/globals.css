@@ -179,8 +179,31 @@ html {
     background: #ffffff !important;
   }
 
+  /* Layout-1 chrome */
+  .sidebar,
+  .header,
+  .footer,
   .no-print {
     display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Undo sidebar/header offset — match demo1.css specificity to win source-order */
+  .demo1.sidebar-fixed .wrapper,
+  .demo1.header-fixed .wrapper,
+  .demo1.sidebar-fixed.header-fixed .wrapper {
+    padding-inline-start: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* Remove all layout padding/margin so print area is full-width */
+  .wrapper,
+  main[role="content"],
+  .container-fluid {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
   }
 
   .print-page {

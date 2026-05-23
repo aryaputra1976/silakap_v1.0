@@ -135,6 +135,61 @@ export type SidataAsnQualityDashboard = {
   };
 };
 
+export type RekapJKRow = { pria: number; wanita: number; lainnya: number; total: number; persenPria: number; persenWanita: number };
+export type RekapGolonganRow = { golru: string; pria: number; wanita: number; total: number };
+export type RekapPendidikanRow = { pddkn: string; pria: number; wanita: number; total: number };
+export type RekapJenjangRow = { jenisAsn?: string; jabatan: string; pria: number; wanita: number; total: number; persenPria: number; persenWanita: number };
+export type RekapStrukturalEselonRow = { eselon: string; terisi: number; pria: number; wanita: number };
+export type RekapStrukturalPendidikanRow = { pddkn: string; ess1: number; ess2: number; ess3: number; ess4: number; total: number };
+export type RekapFungsionalRow = { namaJabatan: string; ahliPria: number; ahliWanita: number; jumlahAhli: number; terampilPria: number; terampilWanita: number; jumlahTerampil: number; jumlahTotal: number };
+export type RekapAsnResponse = {
+  allJk: RekapJKRow;
+  pnsGolonganDetail: RekapGolonganRow[];
+  pnsGolonganGroup: RekapGolonganRow[];
+  pnsPendidikanDetail: RekapPendidikanRow[];
+  pnsPendidikanGroup: RekapPendidikanRow[];
+  allJenjangJabatan: RekapJenjangRow[];
+  strukturalEselonDetail: RekapStrukturalEselonRow[];
+  strukturalEselonGroup: RekapStrukturalEselonRow[];
+  strukturalPendidikan: RekapStrukturalPendidikanRow[];
+  fungsionalJabatan: RekapFungsionalRow[];
+  pppkJk: RekapJKRow;
+  pppkGolongan: RekapGolonganRow[];
+  pppkPendidikanDetail: RekapPendidikanRow[];
+  pppkPendidikanGroup: RekapPendidikanRow[];
+  pppkParuhWaktuGolongan: RekapGolonganRow[];
+  pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[];
+  pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[];
+  pppkJenjangJabatan: RekapJenjangRow[];
+};
+
+export type RekapIkhtisarResponse = {
+  allJk: RekapJKRow;
+  pppkJk: RekapJKRow;
+  allJenjangJabatan: RekapJenjangRow[];
+  pppkJenjangJabatan: RekapJenjangRow[];
+};
+
+export type RekapPnsResponse = {
+  pnsGolonganDetail: RekapGolonganRow[];
+  pnsGolonganGroup: RekapGolonganRow[];
+  pnsPendidikanDetail: RekapPendidikanRow[];
+  pnsPendidikanGroup: RekapPendidikanRow[];
+  strukturalEselonDetail: RekapStrukturalEselonRow[];
+  strukturalEselonGroup: RekapStrukturalEselonRow[];
+  strukturalPendidikan: RekapStrukturalPendidikanRow[];
+  fungsionalJabatan: RekapFungsionalRow[];
+};
+
+export type RekapPppkResponse = {
+  pppkGolongan: RekapGolonganRow[];
+  pppkPendidikanDetail: RekapPendidikanRow[];
+  pppkPendidikanGroup: RekapPendidikanRow[];
+  pppkParuhWaktuGolongan: RekapGolonganRow[];
+  pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[];
+  pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[];
+};
+
 export const SIDATA_STATUS_ASN_OPTIONS = [
   { value: 'AKTIF', label: 'Aktif' },
   { value: 'PENSIUN', label: 'Pensiun' },
@@ -218,6 +273,22 @@ export const sidataApi = {
 
   getUnitTree(): Promise<SidataUnitTreeNode[]> {
     return apiClient.get<SidataUnitTreeNode[]>('/sidata/units/tree');
+  },
+
+  getRekapAsn(): Promise<RekapAsnResponse> {
+    return apiClient.get<RekapAsnResponse>('/sidata/rekap');
+  },
+
+  getRekapIkhtisar(): Promise<RekapIkhtisarResponse> {
+    return apiClient.get<RekapIkhtisarResponse>('/sidata/rekap/ikhtisar');
+  },
+
+  getRekapPns(): Promise<RekapPnsResponse> {
+    return apiClient.get<RekapPnsResponse>('/sidata/rekap/pns');
+  },
+
+  getRekapPppk(): Promise<RekapPppkResponse> {
+    return apiClient.get<RekapPppkResponse>('/sidata/rekap/pppk');
   },
 };
 

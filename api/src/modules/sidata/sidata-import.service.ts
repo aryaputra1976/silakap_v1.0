@@ -252,14 +252,19 @@ export class SidataImportService implements OnModuleInit {
 
     const jenisJabatanKode = this.toJenisJabatanFromImportType(batch.importType);
 
-    const jenisJabatan = await this.sidataImportRepository.findJenisJabatanByKode(
+    let jenisJabatan = await this.sidataImportRepository.findJenisJabatanByKode(
       jenisJabatanKode,
     );
 
     if (!jenisJabatan) {
-      throw new BadRequestException(
-        `Jenis jabatan ${jenisJabatanKode} belum tersedia. Jalankan seed ref_jenis_jabatan terlebih dahulu.`,
+      await this.sidataImportRepository.ensureDefaultJenisJabatan();
+      jenisJabatan = await this.sidataImportRepository.findJenisJabatanByKode(
+        jenisJabatanKode,
       );
+    }
+
+    if (!jenisJabatan) {
+      throw new BadRequestException(`Jenis jabatan ${jenisJabatanKode} belum tersedia.`);
     }
 
     let result: CommitReferenceJabatanResult;
@@ -1254,26 +1259,30 @@ export class SidataImportService implements OnModuleInit {
 
     const hNip = h(['nip', 'nip_baru', 'nip baru']);
     const hNipLama = h(['nip_lama', 'nip lama', 'niplama']);
+    const hNik = h(['nik', 'nomor_ktp', 'no_ktp', 'ktp']);
     const hNama = h(['nama', 'nama_lengkap', 'nama lengkap']);
+    const hGelarDepan = h(['gelar_depan', 'gelar depan', 'title_depan', 'gelar muka']);
+    const hGelarBelakang = h(['gelar_belakang', 'gelar belakang', 'title_belakang']);
     const hNamaJabatan = h(['nama_jabatan', 'jabatan', 'nama jabatan', 'jabatan nama', 'jabatan aktif', 'nama jabatan aktif']);
     const hJenisJabatan = h(['jenis_jabatan', 'jenis jabatan', 'jenis_jabatan_nama', 'jenis jabatan nama']);
     const hKdJabatan = h(['kd_jabatan', 'kode_jabatan', 'kd jabatan', 'kode jabatan']);
     const hKdJabatanSiasn = h([
-      'jabatan_id',
-      'jabatan id',
-      'id_jabatan',
-      'id jabatan',
-      'kd_jabatan_siasn',
-      'kd jabatan siasn',
+      'jabatan_id', 'jabatan id', 'id_jabatan', 'id jabatan',
+      'kd_jabatan_siasn', 'kd jabatan siasn',
     ]);
     const hTmtJabatan = h(['tmt_jabatan', 'tmt jabatan']);
+    const hNomorSkJabatan = h(['nomor_sk_jabatan', 'no_sk_jabatan', 'nomor sk jabatan', 'no sk jabatan']);
+    const hTanggalSkJabatan = h(['tanggal_sk_jabatan', 'tgl_sk_jabatan', 'tanggal sk jabatan']);
+    const hSiasnEselonId = h(['eselon_id', 'eselon id', 'id_eselon', 'siasn_eselon_id']);
+    const hEselonNama = h(['eselon_nama', 'eselon nama', 'nama_eselon', 'eselon']);
     const hNamaGolongan = h([
       'gol akhir nama', 'golongan akhir nama',
       'gol_akhir_nama', 'golongan_akhir_nama',
       'nama_golongan', 'golongan', 'nama golongan',
       'gol awal nama', 'golongan awal nama', 'gol_awal_nama', 'golongan_awal_nama',
     ]);
-    const hNamaRuang = h(['nama_ruang', 'ruang', 'nama ruang', 'pangkat', 'nama pangkat']);
+    const hNamaPangkat = h(['nama_pangkat', 'pangkat_nama', 'pangkat', 'nama pangkat']);
+    const hNamaRuang = h(['nama_ruang', 'ruang', 'nama ruang', 'ruang_nama']);
     const hKdGolongan = h([
       'gol akhir id', 'golongan akhir id', 'gol_akhir_id', 'golongan_akhir_id',
       'kd_golongan', 'kode_golongan', 'kd golongan', 'kode golongan',
@@ -1283,17 +1292,14 @@ export class SidataImportService implements OnModuleInit {
     const hTmtGolongan = h(['tmt_golongan', 'tmt golongan']);
     const hMasaKerjaGol = h(['masa_kerja_golongan', 'masa kerja golongan', 'mk_golongan']);
     const hMasaKerjaSeluruh = h(['masa_kerja_seluruh', 'masa kerja seluruh', 'total_masa_kerja']);
+    const hNomorSkGolongan = h(['nomor_sk_golongan', 'no_sk_golongan', 'nomor sk golongan', 'no sk golongan']);
+    const hTanggalSkGolongan = h(['tanggal_sk_golongan', 'tgl_sk_golongan', 'tanggal sk golongan']);
     const hEselon1 = h(['nama_unor_eselon1', 'unor_eselon1', 'eselon_i', 'eselon i', 'unor 1', 'eselon 1', 'eselon1', 'unor eselon 1', 'unor eselon1', 'satuan kerja']);
     const hEselon2 = h(['nama_unor_eselon2', 'unor_eselon2', 'eselon_ii', 'eselon ii', 'unor 2', 'eselon 2', 'eselon2', 'unor eselon 2']);
     const hEselon3 = h(['nama_unor_eselon3', 'unor_eselon3', 'eselon_iii', 'eselon iii', 'unor 3', 'eselon 3', 'eselon3', 'unor eselon 3']);
     const hEselon4 = h(['nama_unor_eselon4', 'unor_eselon4', 'eselon_iv', 'eselon iv', 'unor 4', 'eselon 4', 'eselon4', 'unor eselon 4']);
     const hKdUnor = h(['kd_unor', 'kode_unor', 'kd unor', 'kode unor', 'id_unor', 'id unor', 'unor id']);
-    const hTempatLahir = h([
-      'tempat_lahir_nama',
-      'tempat lahir nama',
-      'tempat_lahir',
-      'tempat lahir',
-    ]);
+    const hTempatLahir = h(['tempat_lahir_nama', 'tempat lahir nama', 'tempat_lahir', 'tempat lahir']);
     const hTanggalLahir = h(['tanggal_lahir', 'tgl_lahir', 'tgl lahir', 'tanggal lahir']);
     const hJenisKelamin = h(['jenis_kelamin', 'jenis kelamin', 'kelamin']);
     const hAgama = h(['agama_nama', 'agama nama', 'agama']);
@@ -1303,13 +1309,9 @@ export class SidataImportService implements OnModuleInit {
     const hTmtPns = h(['tmt_pns', 'tmt_cpns', 'tmt pns', 'tmt cpns', 'tmt_kerja', 'tmt kerja']);
     const hTmtPensiun = h(['tmt_pensiun', 'tmt pensiun', 'bup', 'tanggal_pensiun', 'tgl pensiun', 'tanggal bup', 'batas usia pensiun']);
     const hStatusKepeg = h([
-      'kedudukan_hukum_nama',
-      'kedudukan hukum nama',
-      'status_kepegawaian',
-      'status kepegawaian',
-      'status',
-      'status pegawai',
-      'status_pegawai',
+      'kedudukan_hukum_nama', 'kedudukan hukum nama',
+      'status_kepegawaian', 'status kepegawaian',
+      'status', 'status pegawai', 'status_pegawai',
     ]);
     const hJenisAsn = h([
       'jenis_asn', 'jenis asn',
@@ -1317,13 +1319,41 @@ export class SidataImportService implements OnModuleInit {
       'jenis asn nama', 'jenis_asn_nama',
     ]);
     const hKedudukanHukum = h([
-      'kedudukan_hukum_nama',
-      'kedudukan hukum nama',
-      'kedudukan_hukum',
-      'kedudukan hukum',
+      'kedudukan_hukum_nama', 'kedudukan hukum nama',
+      'kedudukan_hukum', 'kedudukan hukum',
     ]);
+    // PPPK contract fields
+    const hNomorPerjanjian = h([
+      'nomor_perjanjian_kerja', 'nomor perjanjian kerja',
+      'no_perjanjian', 'no perjanjian', 'nomor kontrak', 'no_kontrak',
+    ]);
+    const hTmtPerjanjian = h([
+      'tmt_perjanjian_kerja', 'tmt perjanjian kerja',
+      'tmt_perjanjian', 'tmt perjanjian', 'tmt kontrak',
+    ]);
+    const hAkhirPerjanjian = h([
+      'akhir_perjanjian_kerja', 'akhir perjanjian kerja',
+      'akhir_perjanjian', 'akhir perjanjian', 'akhir kontrak',
+      'tmt_akhir_perjanjian', 'tanggal berakhir kontrak',
+    ]);
+    const hMasaHubunganKerja = h([
+      'masa_hubungan_kerja_bulan', 'masa hubungan kerja',
+      'durasi_kontrak', 'durasi kontrak bulan',
+    ]);
+    // Generic SK fallback
     const hNoSk = h(['no_sk', 'nomor_sk', 'no sk', 'nomor sk']);
     const hTanggalSk = h(['tanggal_sk', 'tgl_sk', 'tanggal sk', 'tgl sk']);
+    // Explicit fields for contact/mk/education/unor
+    const hMkTahun = h(['mk_tahun', 'masa_kerja_tahun', 'masa kerja tahun']);
+    const hMkBulan = h(['mk_bulan', 'masa_kerja_bulan', 'masa kerja bulan']);
+    const hNomorHp = h(['nomor_hp', 'no_hp', 'hp', 'telepon', 'phone']);
+    const hEmail = h(['email']);
+    const hEmailGov = h(['email_gov', 'email gov']);
+    const hAlamat = h(['alamat', 'alamat_lengkap']);
+    const hNpwp = h(['npwp_nomor', 'npwp nomor', 'npwp']);
+    const hBpjs = h(['bpjs', 'bpjs_nomor', 'bpjs nomor']);
+    const hTahunLulus = h(['tahun_lulus', 'tahun lulus']);
+    const hUnorNama = h(['unor_nama', 'unor nama', 'nama_unor', 'nama unor']);
 
     if (!hNip) {
       throw new BadRequestException(
@@ -1363,19 +1393,29 @@ export class SidataImportService implements OnModuleInit {
         rowNumber,
         nip: this.pickString(row, hNip),
         nipLama: this.pickString(row, hNipLama),
+        nik: this.pickString(row, hNik),
         nama: this.pickString(row, hNama),
+        gelarDepan: this.pickString(row, hGelarDepan),
+        gelarBelakang: this.pickString(row, hGelarBelakang),
         namaJabatan: this.pickString(row, hNamaJabatan),
         jenisJabatan: this.pickString(row, hJenisJabatan),
         kdJabatan: this.pickString(row, hKdJabatan),
         kdJabatanSiasn: this.pickString(row, hKdJabatanSiasn),
         tmtJabatan: pickDate(hTmtJabatan, 'TMT jabatan'),
+        nomorSkJabatan: this.pickString(row, hNomorSkJabatan),
+        tanggalSkJabatan: pickDate(hTanggalSkJabatan, 'Tanggal SK jabatan'),
+        siasnEselonId: this.pickString(row, hSiasnEselonId),
+        eselonNama: this.pickString(row, hEselonNama),
         namaGolongan: this.pickString(row, hNamaGolongan),
+        namaPangkat: this.pickString(row, hNamaPangkat),
         namaRuang: this.pickString(row, hNamaRuang),
         kdGolongan: this.pickString(row, hKdGolongan),
         kdGolonganSiasn: this.pickString(row, hKdGolonganSiasn),
         tmtGolongan: pickDate(hTmtGolongan, 'TMT golongan'),
         masaKerjaGolongan: this.pickString(row, hMasaKerjaGol),
         masaKerjaSeluruh: this.pickString(row, hMasaKerjaSeluruh),
+        nomorSkGolongan: this.pickString(row, hNomorSkGolongan),
+        tanggalSkGolongan: pickDate(hTanggalSkGolongan, 'Tanggal SK golongan'),
         namaUnorEselon1: this.pickString(row, hEselon1),
         namaUnorEselon2: this.pickString(row, hEselon2),
         namaUnorEselon3: this.pickString(row, hEselon3),
@@ -1393,8 +1433,22 @@ export class SidataImportService implements OnModuleInit {
         statusKepegawaian: this.pickString(row, hStatusKepeg),
         jenisAsn: this.pickString(row, hJenisAsn),
         kedudukanHukum: this.pickString(row, hKedudukanHukum),
+        nomorPerjanjianKerja: this.pickString(row, hNomorPerjanjian),
+        tmtPerjanjianKerja: pickDate(hTmtPerjanjian, 'TMT perjanjian kerja'),
+        akhirPerjanjianKerja: pickDate(hAkhirPerjanjian, 'Akhir perjanjian kerja'),
+        masaHubunganKerjaBulan: this.pickInt(row, hMasaHubunganKerja),
         noSk: this.pickString(row, hNoSk),
         tanggalSk: pickDate(hTanggalSk, 'Tanggal SK'),
+        masaKerjaTahun: this.pickInt(row, hMkTahun),
+        masaKerjaBulan: this.pickInt(row, hMkBulan),
+        nomorHp: this.pickString(row, hNomorHp),
+        email: this.pickString(row, hEmail),
+        emailGov: this.pickString(row, hEmailGov),
+        alamat: this.pickString(row, hAlamat),
+        npwpNomor: this.pickString(row, hNpwp),
+        bpjsNomor: this.pickString(row, hBpjs),
+        tahunLulus: this.pickInt(row, hTahunLulus),
+        unorNama: this.pickString(row, hUnorNama),
         dateParseErrors,
         rawData: this.cleanRawData(row),
       };
@@ -1469,6 +1523,14 @@ export class SidataImportService implements OnModuleInit {
     return this.toNullableString(row[header]);
   }
 
+  private pickInt(row: Record<string, unknown>, header: string | null): number | null {
+    if (!header) return null;
+    const value = this.toNullableString(row[header]);
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   private pickDate(
     row: Record<string, unknown>,
     header: string | null,
@@ -1514,10 +1576,9 @@ export class SidataImportService implements OnModuleInit {
       return this.buildDateFromParts(iso[1], iso[2], iso[3]);
     }
 
-    const dayFirst = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(normalized);
-    if (dayFirst) {
-      const year = dayFirst[3].length === 2 ? `20${dayFirst[3]}` : dayFirst[3];
-      return this.buildDateFromParts(year, dayFirst[2], dayFirst[1]);
+    const numericDate = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(normalized);
+    if (numericDate) {
+      return this.parseNumericDateParts(numericDate[1], numericDate[2], numericDate[3]);
     }
 
     return this.parseIndonesianDateString(normalized);
@@ -1585,6 +1646,38 @@ export class SidataImportService implements OnModuleInit {
     const month = Number.parseInt(monthValue, 10);
     const day = Number.parseInt(dayValue, 10);
     return this.isValidDateParts(year, month, day) ? this.dateOnlyUtc(year, month, day) : null;
+  }
+
+  private parseNumericDateParts(firstValue: string, secondValue: string, yearValue: string): Date | null {
+    const first = Number.parseInt(firstValue, 10);
+    const second = Number.parseInt(secondValue, 10);
+    const year = this.normalizeTwoDigitYear(yearValue);
+
+    if (!Number.isInteger(first) || !Number.isInteger(second) || !Number.isInteger(year)) {
+      return null;
+    }
+
+    const preferMonthFirst = yearValue.length === 2 || second > 12;
+    const firstAsMonth = this.isValidDateParts(year, first, second)
+      ? this.dateOnlyUtc(year, first, second)
+      : null;
+    const firstAsDay = this.isValidDateParts(year, second, first)
+      ? this.dateOnlyUtc(year, second, first)
+      : null;
+
+    if (preferMonthFirst && firstAsMonth) return firstAsMonth;
+    if (!preferMonthFirst && firstAsDay) return firstAsDay;
+    return firstAsMonth ?? firstAsDay;
+  }
+
+  private normalizeTwoDigitYear(value: string): number {
+    if (value.length !== 2) {
+      return Number.parseInt(value, 10);
+    }
+
+    const year = Number.parseInt(value, 10);
+    const currentTwoDigitYear = new Date().getUTCFullYear() % 100;
+    return year <= currentTwoDigitYear + 1 ? 2000 + year : 1900 + year;
   }
 
   private hasDateCellValue(value: unknown): boolean {

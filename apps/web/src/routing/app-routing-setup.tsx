@@ -21,6 +21,7 @@ import { SidataRekonsiliasiPage } from '@/pages/workspace/sidata-rekonsiliasi-pa
 import { SidataReferensiPage } from '@/pages/workspace/sidata-referensi-page';
 import { SidataDokumenPage } from '@/pages/workspace/sidata-dokumen-page';
 import { SidataLaporanPage } from '@/pages/workspace/sidata-laporan-page';
+import { SidataRekapPage } from '@/pages/workspace/sidata-rekap-page';
 import { SipensiunDetailPage } from '@/pages/workspace/sipensiun-detail-page';
 import { SipensiunListPage } from '@/pages/workspace/sipensiun-list-page';
 import { ProtectedRoute } from './protected-route';
@@ -46,6 +47,7 @@ import { KinerjaBidangSopPage } from '@/pages/workspace/kinerja-bidang-sop-page'
 import { KinerjaBidangTargetsPage } from '@/pages/workspace/kinerja-bidang-targets-page';
 import { KinerjaBidangRealizationsPage } from '@/pages/workspace/kinerja-bidang-realizations-page';
 import { KinerjaBidangReportPage } from '@/pages/workspace/kinerja-bidang-report-page';
+import { KinerjaBidangMonitoringPage } from '@/pages/workspace/kinerja-bidang-monitoring-page';
 import { LayananDetailPage } from '@/pages/workspace/layanan-detail-page';
 import { LayananKepegawaianPage } from '@/pages/workspace/layanan-kepegawaian-page';
 import { LayananWorkbenchPage } from '@/pages/workspace/layanan-workbench-page';
@@ -80,6 +82,18 @@ import { WorkingCalendarPage } from '@/pages/workspace/working-calendar-page';
 import { OpdIkmSurveyPage } from '@/pages/workspace/opd-ikm-survey-page';
 import { IkmPeriodePage } from '@/pages/workspace/ikm-periode-page';
 import { IkmDataPage } from '@/pages/workspace/ikm-data-page';
+import { SiformenDashboardPage } from '@/pages/workspace/siformen-dashboard-page';
+import { SiformenJabatanPage } from '@/pages/workspace/siformen-jabatan-page';
+import { SiformenJabatanFungsionalRefPage } from '@/pages/workspace/siformen-jabatan-fungsional-ref-page';
+import { SiformenBezettingPage } from '@/pages/workspace/siformen-bezetting-page';
+import { SiformenFormasiPage } from '@/pages/workspace/siformen-formasi-page';
+import { SiformenAbkPage } from '@/pages/workspace/siformen-abk-page';
+import { SidataArsipPage } from '@/pages/workspace/sidata-arsip-page';
+import { SidataArsipDetailPage } from '@/pages/workspace/sidata-arsip-detail-page';
+import { RefGajiPokokPage } from '@/pages/workspace/ref-gaji-pokok-page';
+import { PemberhentianMonitoringPage } from '@/pages/workspace/pemberhentian-monitoring-page';
+import { PemberhentianProsesPage } from '@/pages/workspace/pemberhentian-proses-page';
+import { PemberhentianProsesDetailPage } from '@/pages/workspace/pemberhentian-proses-detail-page';
 
 export function AppRoutingSetup() {
   return (
@@ -120,6 +134,7 @@ export function AppRoutingSetup() {
           <Route path="/kinerja-bidang/targets" element={<KinerjaBidangTargetsPage />} />
           <Route path="/kinerja-bidang/realizations" element={<KinerjaBidangRealizationsPage />} />
           <Route path="/kinerja-bidang/report" element={<KinerjaBidangReportPage />} />
+          <Route path="/kinerja-bidang/monitoring-kegiatan" element={<KinerjaBidangMonitoringPage />} />
           <Route path="/kinerja-bidang/sop/map" element={<SopMapPage />} />
           <Route path="/kinerja-bidang/sop/:id" element={<SopDetailPage />} />
           <Route path="/kinerja-bidang/dashboard-rhk" element={<SopDashboardPage />} />
@@ -146,6 +161,10 @@ export function AppRoutingSetup() {
           <Route path="/sidata/referensi" element={<SidataReferensiPage />} />
           <Route path="/sidata/dokumen" element={<SidataDokumenPage />} />
           <Route path="/sidata/laporan" element={<SidataLaporanPage />} />
+          <Route path="/sidata/rekap" element={<SidataRekapPage />} />
+          <Route path="/sidata/arsip" element={<SidataArsipPage />} />
+          <Route path="/sidata/arsip/:id" element={<SidataArsipDetailPage />} />
+          <Route path="/sidata/gaji-pokok" element={<RefGajiPokokPage />} />
 
           {/* REKONSILIASI BKPSDM-BPKAD */}
           <Route path="/rekonsiliasi-bpkad" element={<Navigate to="/rekonsiliasi-bpkad/dashboard" replace />} />
@@ -170,6 +189,12 @@ export function AppRoutingSetup() {
           {/* SIPENSIUN */}
           <Route path="/sipensiun" element={<SipensiunListPage />} />
           <Route path="/sipensiun/:id" element={<SipensiunDetailPage />} />
+
+          {/* PEMBERHENTIAN */}
+          <Route path="/pemberhentian" element={<Navigate to="/pemberhentian/monitoring" replace />} />
+          <Route path="/pemberhentian/monitoring" element={<PemberhentianMonitoringPage />} />
+          <Route path="/pemberhentian/proses" element={<PemberhentianProsesPage />} />
+          <Route path="/pemberhentian/proses/:id" element={<PemberhentianProsesDetailPage />} />
 
           {/* SIANALITIK */}
           <Route path="/sianalitik" element={<SianalitikPage />} />
@@ -197,6 +222,14 @@ export function AppRoutingSetup() {
 
           {/* WORKING CALENDAR */}
           <Route path="/working-calendar" element={<WorkingCalendarPage />} />
+
+          {/* SIFORMEN — Formasi & Bezetting ASN */}
+          <Route path="/siformen" element={<SiformenDashboardPage />} />
+          <Route path="/siformen/jabatan" element={<SiformenJabatanPage />} />
+          <Route path="/siformen/jabatan-fungsional-ref" element={<SiformenJabatanFungsionalRefPage />} />
+          <Route path="/siformen/bezetting" element={<SiformenBezettingPage />} />
+          <Route path="/siformen/formasi" element={<SiformenFormasiPage />} />
+          <Route path="/siformen/abk" element={<SiformenAbkPage />} />
 
           {/* ADMIN CONTROL */}
           <Route path="/admin/rbac" element={<AdminRbacPage />} />

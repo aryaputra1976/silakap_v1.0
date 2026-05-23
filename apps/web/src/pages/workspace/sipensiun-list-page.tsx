@@ -7,7 +7,6 @@ import {
   ActionButton,
   DataTable,
   ErrorAlert,
-  FilterBar,
   formatDate,
   inputClass,
   LoadingState,
@@ -142,11 +141,11 @@ export function SipensiunListPage() {
         </>
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="min-w-0 space-y-4">
               <Toolbar>
-                <FilterBar>
-                  <div className="relative">
+                <div className="grid w-full min-w-0 gap-3 sm:grid-cols-[minmax(220px,360px)_minmax(160px,220px)]">
+                  <div className="relative min-w-0">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
                     <input
                       className={`${inputClass} w-full pl-10`}
@@ -167,7 +166,7 @@ export function SipensiunListPage() {
                       </option>
                     ))}
                   </select>
-                </FilterBar>
+                </div>
               </Toolbar>
 
               {jenisConfig && jenisConfig.dbJenisPensiun.length === 0 && (
@@ -191,9 +190,10 @@ export function SipensiunListPage() {
                       {
                         key: 'case',
                         header: 'Nomor Case',
+                        className: 'w-32',
                         render: (item) => (
                           <Link
-                            className="font-semibold text-zinc-950 underline-offset-4 hover:underline"
+                            className="font-semibold leading-5 text-zinc-950 underline-offset-4 hover:underline"
                             to={`/sipensiun/${item.id}`}
                           >
                             {item.siapCase.caseNumber}
@@ -203,20 +203,23 @@ export function SipensiunListPage() {
                       {
                         key: 'nama',
                         header: 'Nama ASN',
+                        className: 'w-36',
                         render: (item) => (
-                          <span className="font-medium text-zinc-900">{item.asn.nama}</span>
+                          <span className="font-medium leading-5 text-zinc-900">{item.asn.nama}</span>
                         ),
                       },
                       {
                         key: 'nip',
                         header: 'NIP',
+                        className: 'w-28',
                         render: (item) => (
-                          <span className="font-mono text-xs">{item.asn.nip}</span>
+                          <span className="font-mono text-xs leading-5">{item.asn.nip}</span>
                         ),
                       },
                       {
                         key: 'jenis',
                         header: 'Jenis',
+                        className: 'w-28',
                         render: (item) => (
                           <StatusBadge
                             value={sipensiunJenisLabel(item.jenisPensiun)}
@@ -227,21 +230,25 @@ export function SipensiunListPage() {
                       {
                         key: 'tmt',
                         header: 'TMT',
+                        className: 'w-24',
                         render: (item) => formatDate(item.tmtPensiun),
                       },
                       {
                         key: 'state',
                         header: 'State',
+                        className: 'w-28',
                         render: (item) => <WorkflowBadge value={item.siapCase.currentState} />,
                       },
                       {
                         key: 'status',
                         header: 'Status',
+                        className: 'w-28',
                         render: (item) => <StatusBadge value={item.siapCase.status} />,
                       },
                       {
                         key: 'action',
                         header: '',
+                        className: 'w-24',
                         render: (item) => (
                           <Link to={`/sipensiun/${item.id}`}>
                             <ActionButton icon={Eye} variant="secondary">
@@ -256,7 +263,7 @@ export function SipensiunListPage() {
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {jenisConfig && (
                 <>
                   <SipensiunSopPanel jenisKey={jenisParam} />

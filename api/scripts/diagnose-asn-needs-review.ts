@@ -144,11 +144,11 @@ async function main() {
           select: { kode: true, siasnKode: true, nama: true },
         });
         const strippedMatch = allJabatanCandidates.find((candidate) =>
-          stripPunctuation(candidate.namaNormalized) === stripped,
+          stripPunctuation(candidate.namaNormalized ?? '') === stripped,
         );
         const contains = allJabatanCandidates
           .filter((candidate) => {
-            const candidateNorm = stripPunctuation(candidate.namaNormalized);
+            const candidateNorm = stripPunctuation(candidate.namaNormalized ?? '');
             return candidateNorm.includes(stripped) || stripped.includes(candidateNorm);
           })
           .slice(0, 5)

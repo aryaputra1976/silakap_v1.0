@@ -404,198 +404,233 @@ function SopSignatureTab({ sop }: { sop: SopDetail }) {
 function SopOfficialPrintView({ sop }: { sop: SopDetail }) {
   return (
     <article className="mx-auto max-w-[980px] bg-white p-6 text-[#111827] print:max-w-none print:p-0">
-      <header className="border border-[#111827]">
-        <div className="grid grid-cols-[160px_1fr] border-b border-[#111827]">
-          <div className="flex items-center justify-center border-r border-[#111827] p-4 text-center text-sm font-bold">
-            BKPSDM
-          </div>
-          <div className="p-4 text-center">
-            <div className="text-sm font-semibold uppercase">
-              Pemerintah Daerah
-            </div>
-            <div className="text-base font-bold uppercase">
-              Badan Kepegawaian dan Pengembangan Sumber Daya Manusia
-            </div>
-            <div className="mt-1 text-xs">
-              Standar Operasional Prosedur Bidang PPIK
-            </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 text-xs">
-          <PrintInfo label="Nomor SOP" value={sop.code} />
-          <PrintInfo label="Tanggal Pembuatan" value="................................" />
-          <PrintInfo label="Tanggal Revisi" value="................................" />
-          <PrintInfo label="Tanggal Efektif" value="................................" />
-          <PrintInfo label="Disahkan oleh" value="Kepala BKPSDM" />
-          <PrintInfo
-            label="Nama SOP"
-            value={sop.title}
-            className="font-semibold"
-          />
-        </div>
-      </header>
+      {/* ── Header identitas instansi ──────────────────────────────── */}
+      <table className="w-full border-collapse border border-[#111827] text-xs">
+        <tbody>
+          <tr>
+            <td className="border border-[#111827] w-[160px] p-4 text-center align-middle">
+              <img
+                src="/media/bkpsdm/Logo_Tolitoli.png"
+                alt="Logo BKPSDM Tolitoli"
+                className="mx-auto h-24 w-auto object-contain"
+              />
+            </td>
+            <td className="border border-[#111827] p-4 text-center" colSpan={3}>
+              <div className="text-sm font-semibold uppercase">Pemerintah Kabupaten Tolitoli</div>
+              <div className="text-base font-bold uppercase">
+                Badan Kepegawaian dan Pengembangan Sumber Daya Manusia
+              </div>
+              <div className="mt-1 text-xs">Standar Operasional Prosedur Bidang PPIK</div>
+            </td>
+          </tr>
+          <tr>
+            <PrintInfoCell label="Nomor SOP" value={sop.code} />
+            <PrintInfoCell label="Tanggal Pembuatan" value="................................" />
+          </tr>
+          <tr>
+            <PrintInfoCell label="Tanggal Revisi" value="................................" />
+            <PrintInfoCell label="Tanggal Efektif" value="................................" />
+          </tr>
+          <tr>
+            <PrintInfoCell label="Disahkan oleh" value="Kepala BKPSDM" />
+            <PrintInfoCell label="Nama SOP" value={sop.title} valueClassName="font-semibold" />
+          </tr>
+        </tbody>
+      </table>
 
-      <section className="mt-4 grid grid-cols-2 border border-[#111827] text-xs">
-        <div className="border-r border-[#111827]">
-          <PrintBlockTitle title="Dasar Hukum" />
-          <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-            {sop.legalBasis.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ol>
-        </div>
+      {/* ── Dasar Hukum, Kualifikasi, Keterkaitan, dst ────────────── */}
+      <table className="mt-4 w-full border-collapse border border-[#111827] text-xs">
+        <tbody>
+          <tr>
+            <td className="w-1/2 border border-[#111827] align-top">
+              <PrintCellTitle title="Dasar Hukum" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                {sop.legalBasis.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
+            </td>
+            <td className="w-1/2 border border-[#111827] align-top">
+              <PrintCellTitle title="Kualifikasi Pelaksana" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                <li>Memahami ketentuan pengelolaan kepegawaian.</li>
+                <li>Memahami alur kerja Bidang PPIK.</li>
+                <li>Mampu mengelola dokumen dan bukti dukung kegiatan.</li>
+                <li>Mampu melakukan pencatatan, verifikasi, dan pelaporan.</li>
+              </ol>
+            </td>
+          </tr>
+          <tr>
+            <td className="border border-[#111827] align-top">
+              <PrintCellTitle title="Keterkaitan" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                <li>RHK terkait: {sop.rhkCodes.join(', ') || '-'}</li>
+                <li>DMS Bukti Dukung.</li>
+                <li>Laporan Kinerja Bidang.</li>
+                <li>Monitoring dan evaluasi layanan kepegawaian.</li>
+              </ol>
+            </td>
+            <td className="border border-[#111827] align-top">
+              <PrintCellTitle title="Peralatan / Perlengkapan" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                <li>Aplikasi SILAKAP.</li>
+                <li>Data ASN dan dokumen pendukung.</li>
+                <li>Komputer/laptop dan jaringan internet.</li>
+                <li>Format laporan, nota dinas, dan dokumen kerja bidang.</li>
+              </ol>
+            </td>
+          </tr>
+          <tr>
+            <td className="border border-[#111827] align-top">
+              <PrintCellTitle title="Peringatan" />
+              <p className="p-3 leading-5 text-[#111827]">
+                Apabila SOP ini tidak dilaksanakan secara tertib, maka proses kerja,
+                pemenuhan target RHK, pengendalian bukti dukung, dan pelaporan
+                kinerja bidang dapat terlambat atau tidak terdokumentasi dengan baik.
+              </p>
+            </td>
+            <td className="border border-[#111827] align-top">
+              <PrintCellTitle title="Pencatatan dan Pendataan" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                <li>Seluruh output dicatat dalam aplikasi SILAKAP.</li>
+                <li>Bukti dukung diunggah ke DMS sesuai kategori dan periode.</li>
+                <li>Realisasi dicatat sebagai bahan laporan bulanan/triwulan.</li>
+              </ol>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-        <div>
-          <PrintBlockTitle title="Kualifikasi Pelaksana" />
-          <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-            <li>Memahami ketentuan pengelolaan kepegawaian.</li>
-            <li>Memahami alur kerja Bidang PPIK.</li>
-            <li>Mampu mengelola dokumen dan bukti dukung kegiatan.</li>
-            <li>Mampu melakukan pencatatan, verifikasi, dan pelaporan.</li>
-          </ol>
-        </div>
+      {/* ── Identitas dan Target RHK ───────────────────────────────── */}
+      <table className="mt-4 w-full border-collapse border border-[#111827] text-xs">
+        <tbody>
+          <tr>
+            <td colSpan={4} className="border border-[#111827] bg-[#f3f4f6] px-3 py-2 font-bold uppercase">
+              Identitas dan Target RHK
+            </td>
+          </tr>
+          <tr>
+            <PrintInfoCell label="Tahap SOP" value={getSopStageLabel(sop.stage)} />
+            <PrintInfoCell
+              label="Jenis SOP"
+              value={sop.isRhkPrimary ? 'SOP Utama RHK' : 'SOP Pendukung'}
+            />
+          </tr>
+          <tr>
+            <PrintInfoCell
+              label="Target Kuantitas"
+              value={`${sop.targetQuantity} ${sop.targetUnit}`}
+            />
+            <PrintInfoCell label="Target Kualitas" value={sop.qualityTarget} />
+          </tr>
+          <tr>
+            <PrintInfoCell label="Target Waktu" value={sop.timeTarget} />
+            <PrintInfoCell label="Output" value={sop.outputs.join('; ')} />
+          </tr>
+        </tbody>
+      </table>
 
-        <div className="border-t border-r border-[#111827]">
-          <PrintBlockTitle title="Keterkaitan" />
-          <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-            <li>RHK terkait: {sop.rhkCodes.join(', ') || '-'}</li>
-            <li>DMS Bukti Dukung.</li>
-            <li>Laporan Kinerja Bidang.</li>
-            <li>Monitoring dan evaluasi layanan kepegawaian.</li>
-          </ol>
-        </div>
+      {/* ── Tujuan & Ruang Lingkup ─────────────────────────────────── */}
+      <table className="mt-4 w-full border-collapse border border-[#111827] text-xs">
+        <tbody>
+          <tr>
+            <td className="border border-[#111827]">
+              <PrintCellTitle title="Tujuan" />
+              <p className="p-3 leading-5 text-[#111827]">{sop.objective}</p>
+            </td>
+          </tr>
+          <tr>
+            <td className="border border-[#111827]">
+              <PrintCellTitle title="Ruang Lingkup" />
+              <p className="p-3 leading-5 text-[#111827]">{sop.scope}</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-        <div className="border-t border-[#111827]">
-          <PrintBlockTitle title="Peralatan / Perlengkapan" />
-          <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-            <li>Aplikasi SILAKAP.</li>
-            <li>Data ASN dan dokumen pendukung.</li>
-            <li>Komputer/laptop dan jaringan internet.</li>
-            <li>Format laporan, nota dinas, dan dokumen kerja bidang.</li>
-          </ol>
-        </div>
-
-        <div className="border-t border-r border-[#111827]">
-          <PrintBlockTitle title="Peringatan" />
-          <p className="p-3 leading-5">
-            Apabila SOP ini tidak dilaksanakan secara tertib, maka proses kerja,
-            pemenuhan target RHK, pengendalian bukti dukung, dan pelaporan
-            kinerja bidang dapat terlambat atau tidak terdokumentasi dengan baik.
-          </p>
-        </div>
-
-        <div className="border-t border-[#111827]">
-          <PrintBlockTitle title="Pencatatan dan Pendataan" />
-          <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-            <li>Seluruh output dicatat dalam aplikasi SILAKAP.</li>
-            <li>Bukti dukung diunggah ke DMS sesuai kategori dan periode.</li>
-            <li>Realisasi dicatat sebagai bahan laporan bulanan/triwulan.</li>
-          </ol>
-        </div>
-      </section>
-
-      <section className="mt-4 border border-[#111827] text-xs">
-        <PrintBlockTitle title="Identitas dan Target RHK" />
-        <div className="grid grid-cols-2">
-          <PrintInfo label="Tahap SOP" value={getSopStageLabel(sop.stage)} />
-          <PrintInfo
-            label="Jenis SOP"
-            value={sop.isRhkPrimary ? 'SOP Utama RHK' : 'SOP Pendukung'}
-          />
-          <PrintInfo
-            label="Target Kuantitas"
-            value={`${sop.targetQuantity} ${sop.targetUnit}`}
-          />
-          <PrintInfo label="Target Kualitas" value={sop.qualityTarget} />
-          <PrintInfo label="Target Waktu" value={sop.timeTarget} />
-          <PrintInfo label="Output" value={sop.outputs.join('; ')} />
-        </div>
-      </section>
-
-      <section className="mt-4 border border-[#111827] text-xs">
-        <PrintBlockTitle title="Tujuan" />
-        <p className="p-3 leading-5">{sop.objective}</p>
-
-        <PrintBlockTitle title="Ruang Lingkup" />
-        <p className="p-3 leading-5">{sop.scope}</p>
-      </section>
-
-      <section className="mt-4 text-xs">
-        <table className="w-full border-collapse border border-[#111827]">
-          <thead>
-            <tr className="bg-[#f3f4f6]">
-              <PrintTh>No</PrintTh>
-              <PrintTh>Kegiatan</PrintTh>
-              <PrintTh>Pelaksana</PrintTh>
-              <PrintTh>Input</PrintTh>
-              <PrintTh>Proses</PrintTh>
-              <PrintTh>Output</PrintTh>
-              <PrintTh>Waktu</PrintTh>
+      {/* ── Langkah Prosedur ───────────────────────────────────────── */}
+      <table className="mt-4 w-full border-collapse border border-[#111827] text-xs">
+        <thead>
+          <tr className="bg-[#f3f4f6]">
+            <PrintTh>No</PrintTh>
+            <PrintTh>Kegiatan</PrintTh>
+            <PrintTh>Pelaksana</PrintTh>
+            <PrintTh>Input</PrintTh>
+            <PrintTh>Proses</PrintTh>
+            <PrintTh>Output</PrintTh>
+            <PrintTh>Waktu</PrintTh>
+          </tr>
+        </thead>
+        <tbody>
+          {sop.procedureSteps.map((step) => (
+            <tr key={step.no}>
+              <PrintTd className="text-center">{step.no}</PrintTd>
+              <PrintTd>{step.activity}</PrintTd>
+              <PrintTd>{step.actor}</PrintTd>
+              <PrintTd>{step.input}</PrintTd>
+              <PrintTd>{step.process}</PrintTd>
+              <PrintTd>{step.output}</PrintTd>
+              <PrintTd>{step.duration}</PrintTd>
             </tr>
-          </thead>
-          <tbody>
-            {sop.procedureSteps.map((step) => (
-              <tr key={step.no}>
-                <PrintTd className="text-center">{step.no}</PrintTd>
-                <PrintTd>{step.activity}</PrintTd>
-                <PrintTd>{step.actor}</PrintTd>
-                <PrintTd>{step.input}</PrintTd>
-                <PrintTd>{step.process}</PrintTd>
-                <PrintTd>{step.output}</PrintTd>
-                <PrintTd>{step.duration}</PrintTd>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="mt-4 border border-[#111827] text-xs">
-        <PrintBlockTitle title="Contoh Bukti Dukung" />
-        <ol className="list-decimal space-y-1 p-3 pl-7 leading-5">
-          {sop.evidenceExamples.map((item) => (
-            <li key={item}>{item}</li>
           ))}
-        </ol>
-      </section>
+        </tbody>
+      </table>
 
-      <section className="mt-8 grid grid-cols-3 gap-4 text-center text-xs">
+      {/* ── Contoh Bukti Dukung ────────────────────────────────────── */}
+      <table className="mt-4 w-full border-collapse border border-[#111827] text-xs">
+        <tbody>
+          <tr>
+            <td className="border border-[#111827]">
+              <PrintCellTitle title="Contoh Bukti Dukung" />
+              <ol className="list-decimal space-y-1 p-3 pl-7 leading-5 text-[#111827]">
+                {sop.evidenceExamples.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ── Tanda Tangan ───────────────────────────────────────────── */}
+      <div className="mt-8 grid grid-cols-3 gap-4 text-center text-xs text-[#111827]">
         {sop.signatures.map((signature) => (
           <div key={signature.role} className="min-h-[150px]">
             <div className="font-semibold">{signature.role}</div>
             <div className="mt-1">{signature.namePlaceholder}</div>
-            <div className="mt-20 border-t border-[#111827] pt-2">
-              Nama / NIP
-            </div>
+            <div className="mt-20 border-t border-[#111827] pt-2">Nama / NIP</div>
           </div>
         ))}
-      </section>
+      </div>
     </article>
   );
 }
 
-function PrintInfo({
+function PrintInfoCell({
   label,
   value,
-  className = '',
+  valueClassName = '',
 }: {
   label: string;
   value: string;
-  className?: string;
+  valueClassName?: string;
 }) {
   return (
-    <div className="grid grid-cols-[150px_1fr] border-b border-[#111827] last:border-b-0">
-      <div className="border-r border-[#111827] bg-[#f9fafb] px-3 py-2 font-semibold">
+    <>
+      <td className="w-[140px] border border-[#111827] bg-[#f9fafb] px-3 py-2 font-semibold">
         {label}
-      </div>
-      <div className={`px-3 py-2 ${className}`}>{value || '-'}</div>
-    </div>
+      </td>
+      <td className={`border border-[#111827] px-3 py-2 ${valueClassName}`}>
+        {value || '-'}
+      </td>
+    </>
   );
 }
 
-function PrintBlockTitle({ title }: { title: string }) {
+function PrintCellTitle({ title }: { title: string }) {
   return (
-    <div className="border-b border-[#111827] bg-[#f3f4f6] px-3 py-2 text-xs font-bold uppercase">
+    <div className="border-b border-[#111827] bg-[#f3f4f6] px-3 py-2 font-bold uppercase">
       {title}
     </div>
   );
@@ -617,7 +652,7 @@ function PrintTd({
   className?: string;
 }) {
   return (
-    <td className={`border border-[#111827] px-2 py-2 align-top leading-5 ${className}`}>
+    <td className={`border border-[#111827] px-2 py-2 align-top leading-5 text-[#111827] ${className}`}>
       {children}
     </td>
   );

@@ -8,6 +8,27 @@ export const JENIS_JABATAN_KODE = {
 
 export type JenisJabatanKode = (typeof JENIS_JABATAN_KODE)[keyof typeof JENIS_JABATAN_KODE];
 
+export const REF_JENIS_JABATAN_DEFAULTS = [
+  {
+    kode: JENIS_JABATAN_KODE.STRUKTURAL,
+    nama: 'Jabatan Struktural',
+    deskripsi:
+      'Jabatan pimpinan tinggi, administrator, dan pengawas dalam struktur organisasi pemerintahan.',
+  },
+  {
+    kode: JENIS_JABATAN_KODE.FUNGSIONAL,
+    nama: 'Jabatan Fungsional',
+    deskripsi:
+      'Jabatan yang menjalankan fungsi pelayanan berdasarkan keahlian atau keterampilan tertentu.',
+  },
+  {
+    kode: JENIS_JABATAN_KODE.PELAKSANA,
+    nama: 'Jabatan Pelaksana',
+    deskripsi:
+      'Jabatan yang menjalankan tugas teknis, administratif, dan operasional pemerintahan.',
+  },
+] as const;
+
 export const JABATAN_SOURCE_VALUES = ['SIASN', 'MANUAL', 'IMPORT'] as const;
 export type JabatanSource = (typeof JABATAN_SOURCE_VALUES)[number];
 

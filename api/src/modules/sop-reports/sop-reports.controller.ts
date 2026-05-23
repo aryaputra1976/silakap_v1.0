@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -34,7 +34,10 @@ const WRITE_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/sop-reports')
 export class SopReportsController {
-  constructor(private readonly service: SopReportsService) {}
+  constructor(
+    @Inject(SopReportsService)
+    private readonly service: SopReportsService,
+  ) {}
 
   @Get('executive')
   @Roles(...VIEW_ROLES)

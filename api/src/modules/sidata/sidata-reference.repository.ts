@@ -2,7 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { NormalizedGenericReferenceFilters, NormalizedJabatanFilters } from './sidata-reference.types';
+import {
+  NormalizedGenericReferenceFilters,
+  NormalizedJabatanFilters,
+  REF_JENIS_JABATAN_DEFAULTS,
+} from './sidata-reference.types';
 
 const jenisJabatanSelect = {
   id: true,
@@ -47,6 +51,31 @@ export class SidataReferenceRepository {
       orderBy: { kode: 'asc' },
       select: jenisJabatanSelect,
     });
+  }
+
+  async ensureDefaultJenisJabatan(): Promise<JenisJabatanRecord[]> {
+    await this.prisma.$transaction(
+      REF_JENIS_JABATAN_DEFAULTS.map((item) =>
+        this.prisma.refJenisJabatan.upsert({
+          where: { kode: item.kode },
+          update: {
+            nama: item.nama,
+            deskripsi: item.deskripsi,
+            isActive: true,
+            deletedAt: null,
+          },
+          create: {
+            id: randomUUID(),
+            kode: item.kode,
+            nama: item.nama,
+            deskripsi: item.deskripsi,
+            isActive: true,
+          },
+        }),
+      ),
+    );
+
+    return this.findJenisJabatan();
   }
 
   async findJabatanList(filters: NormalizedJabatanFilters): Promise<{

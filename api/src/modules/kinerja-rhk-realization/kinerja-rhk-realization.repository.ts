@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { QueryRealizationDto } from './dto/query-realization.dto';
@@ -43,11 +43,11 @@ export type CreateRealizationInput = {
 
 @Injectable()
 export class KinerjaRhkRealizationRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findMany(query: QueryRealizationDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const page = normalizeInt(query.page, 1, 1, 100_000);
+    const limit = normalizeInt(query.limit, 20, 1, 100);
     const where = this.buildWhere(query);
 
     const [items, total] = await Promise.all([
@@ -225,12 +225,15 @@ export class KinerjaRhkRealizationRepository {
 
   private buildWhere(query: QueryRealizationDto): Prisma.KinerjaRhkRealizationWhereInput {
     const where: Prisma.KinerjaRhkRealizationWhereInput = {};
+    const periodYear = normalizeOptionalInt(query.periodYear, 2000, 2100);
+    const periodMonth = normalizeOptionalInt(query.periodMonth, 1, 12);
+    const periodQuarter = normalizeOptionalInt(query.periodQuarter, 1, 4);
 
     if (query.rhkCode) where.rhkCode = query.rhkCode;
     if (query.moduleKey) where.moduleKey = query.moduleKey;
-    if (query.periodYear) where.periodYear = query.periodYear;
-    if (query.periodMonth) where.periodMonth = query.periodMonth;
-    if (query.periodQuarter) where.periodQuarter = query.periodQuarter;
+    if (periodYear !== undefined) where.periodYear = periodYear;
+    if (periodMonth !== undefined) where.periodMonth = periodMonth;
+    if (periodQuarter !== undefined) where.periodQuarter = periodQuarter;
     if (query.periodType) where.periodType = query.periodType;
     if (query.status) where.status = query.status;
 
@@ -240,4 +243,37 @@ export class KinerjaRhkRealizationRepository {
 
 function roundAverage(value: number | null): number {
   return value == null ? 0 : Math.round(value);
+}
+
+function normalizeInt(
+  value: number | string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeOptionalInt(
+  value: number | string | null | undefined,
+  min: number,
+  max: number,
+) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return undefined;
+  }
+
+  return parsed;
 }

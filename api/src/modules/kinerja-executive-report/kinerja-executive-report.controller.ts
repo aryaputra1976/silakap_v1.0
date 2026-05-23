@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,7 +23,10 @@ const EXPORT_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'];
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/kinerja/executive-report')
 export class KinerjaExecutiveReportController {
-  constructor(private readonly service: KinerjaExecutiveReportService) {}
+  constructor(
+    @Inject(KinerjaExecutiveReportService)
+    private readonly service: KinerjaExecutiveReportService,
+  ) {}
 
   @Get('summary')
   @Roles(...VIEW_ROLES)

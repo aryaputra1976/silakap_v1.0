@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { SopAnalyticsRepository } from './sop-analytics.repository';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import type { AuthUser } from '../auth/auth.types';
@@ -11,7 +11,10 @@ function getPrimary(user: AuthUser): string {
 
 @Injectable()
 export class SopAnalyticsService {
-  constructor(private readonly repo: SopAnalyticsRepository) {}
+  constructor(
+    @Inject(SopAnalyticsRepository)
+    private readonly repo: SopAnalyticsRepository,
+  ) {}
 
   private assertNotBlocked(user: AuthUser) {
     const role = getPrimary(user);

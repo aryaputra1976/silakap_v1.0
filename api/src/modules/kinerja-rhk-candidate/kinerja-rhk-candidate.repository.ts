@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RhkCandidateQueryDto } from './dto/rhk-candidate-query.dto';
@@ -36,7 +36,7 @@ export type GenerateCandidateInput = {
 
 @Injectable()
 export class KinerjaRhkCandidateRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async upsertFromSubmission(input: GenerateCandidateInput): Promise<KinerjaRhkCandidateRecord> {
     return this.prisma.kinerjaRhkCandidate.upsert({
@@ -89,8 +89,8 @@ export class KinerjaRhkCandidateRepository {
   }
 
   async findMany(query: RhkCandidateQueryDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const page = normalizeInt(query.page, 1, 1, 100_000);
+    const limit = normalizeInt(query.limit, 20, 1, 100);
     const where = this.buildWhere(query);
 
     const [items, total] = await Promise.all([
@@ -191,4 +191,19 @@ export class KinerjaRhkCandidateRepository {
 
     return where;
   }
+}
+
+function normalizeInt(
+  value: number | string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
 }

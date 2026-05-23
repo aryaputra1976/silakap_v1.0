@@ -36,7 +36,18 @@ type SidataUploadedDocumentFile = {
 };
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'OPERATOR_IMPORT', 'REVIEWER_MAPPING')
+@Roles(
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'OPERATOR_IMPORT',
+  'REVIEWER_MAPPING',
+)
 @Controller('api/v1/sidata')
 export class SidataController {
   constructor(
@@ -60,6 +71,27 @@ export class SidataController {
   async getAsnQualityDashboard(@CurrentUser() user: AuthUser) {
     const dashboard = await this.sidataService.getAsnQualityDashboard(user);
     return ok(dashboard);
+  }
+
+  @Get('rekap/ikhtisar')
+  async getRekapIkhtisar(@CurrentUser() user: AuthUser) {
+    return ok(await this.sidataService.getRekapIkhtisar(user));
+  }
+
+  @Get('rekap/pns')
+  async getRekapPns(@CurrentUser() user: AuthUser) {
+    return ok(await this.sidataService.getRekapPns(user));
+  }
+
+  @Get('rekap/pppk')
+  async getRekapPppk(@CurrentUser() user: AuthUser) {
+    return ok(await this.sidataService.getRekapPppk(user));
+  }
+
+  @Get('rekap')
+  async getRekapAsn(@CurrentUser() user: AuthUser) {
+    const data = await this.sidataService.getRekapAsn(user);
+    return ok(data);
   }
 
   @Get('asn')

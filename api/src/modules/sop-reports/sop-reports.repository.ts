@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ReportQueryDto } from './dto/report-query.dto';
 
@@ -179,7 +179,10 @@ function buildRecommendations(data: {
 
 @Injectable()
 export class SopReportsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ── Shared: compute compliance rows ─────────────────────────────────────────
 

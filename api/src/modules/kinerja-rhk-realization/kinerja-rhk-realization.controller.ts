@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,7 +37,10 @@ const APPROVE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'];
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/kinerja/rhk-realizations')
 export class KinerjaRhkRealizationController {
-  constructor(private readonly service: KinerjaRhkRealizationService) {}
+  constructor(
+    @Inject(KinerjaRhkRealizationService)
+    private readonly service: KinerjaRhkRealizationService,
+  ) {}
 
   @Get()
   @Roles(...VIEW_ROLES)

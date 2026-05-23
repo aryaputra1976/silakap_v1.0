@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateHolidayDto } from './dto/create-holiday.dto';
@@ -7,7 +7,10 @@ import type { UpdateWorkingCalendarDto } from './dto/update-working-calendar.dto
 
 @Injectable()
 export class WorkingCalendarRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   findAll() {
     return this.prisma.workingCalendar.findMany({

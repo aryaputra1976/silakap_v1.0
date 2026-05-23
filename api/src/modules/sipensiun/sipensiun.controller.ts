@@ -23,8 +23,36 @@ import { SipensiunCaseListQueryDto } from './dto/sipensiun-case-list-query.dto';
 import { UpdateSipensiunLetterDataDto } from './dto/update-sipensiun-letter-data.dto';
 import { SipensiunService } from './sipensiun.service';
 
+const SIPENSIUN_VIEW_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'PPPK',
+] as const;
+
+const SIPENSIUN_INPUT_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+] as const;
+
+const SIPENSIUN_MANAGE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+] as const;
+
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
 @Controller('api/v1/sipensiun')
 export class SipensiunController {
   constructor(
@@ -33,16 +61,19 @@ export class SipensiunController {
   ) {}
 
   @Get('requirements')
+  @Roles(...SIPENSIUN_VIEW_ROLES)
   requirements() {
     return ok(this.sipensiunService.getRequirements());
   }
 
   @Get('templates')
+  @Roles(...SIPENSIUN_VIEW_ROLES)
   templates() {
     return ok(this.sipensiunService.getTemplates());
   }
 
   @Get('cases')
+  @Roles(...SIPENSIUN_VIEW_ROLES)
   async findCases(@Query() query: SipensiunCaseListQueryDto) {
     const result = await this.sipensiunService.findCases(query);
 
@@ -50,13 +81,23 @@ export class SipensiunController {
   }
 
   @Get('cases/:id/letter-preview')
+  @Roles(...SIPENSIUN_VIEW_ROLES)
   async getLetterPreview(@Param('id') id: string) {
     const result = await this.sipensiunService.getLetterPreview(id);
 
     return ok(result, 'Preview surat SIPENSIUN berhasil dimuat');
   }
 
+  @Get('cases/:id')
+  @Roles(...SIPENSIUN_VIEW_ROLES)
+  async findCaseById(@Param('id') id: string) {
+    const result = await this.sipensiunService.findCaseById(id);
+
+    return ok(result);
+  }
+
   @Patch('cases/:id/letter-data')
+  @Roles(...SIPENSIUN_INPUT_ROLES)
   async updateLetterData(
     @Param('id') id: string,
     @Body() dto: UpdateSipensiunLetterDataDto,
@@ -67,14 +108,8 @@ export class SipensiunController {
     return ok(result, 'Data surat SIPENSIUN berhasil diperbarui');
   }
 
-  @Get('cases/:id')
-  async findCaseById(@Param('id') id: string) {
-    const result = await this.sipensiunService.findCaseById(id);
-
-    return ok(result);
-  }
-
   @Post('cases')
+  @Roles(...SIPENSIUN_INPUT_ROLES)
   async createCase(
     @Body() dto: CreateSipensiunCaseDto,
     @CurrentUser() user: AuthUser,
@@ -90,6 +125,7 @@ export class SipensiunController {
   }
 
   @Post('cases/:id/submit')
+  @Roles(...SIPENSIUN_INPUT_ROLES)
   async submitCase(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
@@ -105,6 +141,7 @@ export class SipensiunController {
   }
 
   @Post('cases/:id/generate-letter')
+  @Roles(...SIPENSIUN_MANAGE_ROLES)
   async generateLetter(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,

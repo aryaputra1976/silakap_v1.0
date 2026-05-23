@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -47,7 +48,10 @@ const DASHBOARD_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/sop-checklists')
 export class SopChecklistController {
-  constructor(private readonly service: SopChecklistService) {}
+  constructor(
+    @Inject(SopChecklistService)
+    private readonly service: SopChecklistService,
+  ) {}
 
   @Get()
   @Roles(...INTERNAL_ROLES)

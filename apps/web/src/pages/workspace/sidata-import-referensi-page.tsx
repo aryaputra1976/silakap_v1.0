@@ -44,6 +44,14 @@ type SidataReferenceType =
 
 type SidataJabatanType = 'STRUKTURAL' | 'FUNGSIONAL' | 'PELAKSANA';
 
+type SidataJenisJabatanRow = {
+  id: string;
+  kode: SidataJabatanType | string;
+  nama: string;
+  deskripsi?: string | null;
+  isActive: boolean;
+};
+
 type SidataImportBatch = {
   id: string;
   fileName?: string | null;
@@ -226,6 +234,9 @@ export function SidataImportReferensiPage() {
   const [summary, setSummary] = useState<SidataImportSummary | null>(null);
 
   const [loadingBatches, setLoadingBatches] = useState(true);
+  const [jenisJabatanRows, setJenisJabatanRows] = useState<SidataJenisJabatanRow[]>([]);
+  const [loadingJenisJabatan, setLoadingJenisJabatan] = useState(true);
+  const [ensuringJenisJabatan, setEnsuringJenisJabatan] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [error, setError] = useState('');
   const [summaryError, setSummaryError] = useState('');
@@ -246,6 +257,7 @@ export function SidataImportReferensiPage() {
 
   useEffect(() => {
     void loadBatches();
+    void loadJenisJabatan();
   }, []);
 
   useEffect(() => {
@@ -297,6 +309,35 @@ export function SidataImportReferensiPage() {
       setError(getErrorMessage(caught, 'Gagal memuat riwayat batch referensi'));
     } finally {
       setLoadingBatches(false);
+    }
+  }
+
+  async function loadJenisJabatan() {
+    setLoadingJenisJabatan(true);
+    try {
+      const result = await apiClient.get<SidataJenisJabatanRow[]>(
+        '/sidata/references/jenis-jabatan',
+      );
+      setJenisJabatanRows(result);
+    } catch {
+      setJenisJabatanRows([]);
+    } finally {
+      setLoadingJenisJabatan(false);
+    }
+  }
+
+  async function ensureJenisJabatan() {
+    setEnsuringJenisJabatan(true);
+    try {
+      const result = await apiClient.post<SidataJenisJabatanRow[]>(
+        '/sidata/references/jenis-jabatan/ensure',
+      );
+      setJenisJabatanRows(result);
+      toast.success('Jenis jabatan dasar berhasil disiapkan.');
+    } catch (caught) {
+      toast.error(getErrorMessage(caught, 'Gagal menyiapkan jenis jabatan dasar'));
+    } finally {
+      setEnsuringJenisJabatan(false);
     }
   }
 
@@ -468,6 +509,15 @@ export function SidataImportReferensiPage() {
     setSelectedBatch(selectedBatch?.id === batch.id ? null : batch);
   }
 
+  const availableJenisJabatanCodes = new Set(
+    jenisJabatanRows
+      .filter((item) => item.isActive)
+      .map((item) => item.kode.toUpperCase()),
+  );
+  const missingJenisJabatan = JABATAN_TYPES.filter(
+    (item) => !availableJenisJabatanCodes.has(item.value),
+  );
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -493,6 +543,56 @@ export function SidataImportReferensiPage() {
       />
 
       {error ? <ErrorAlert message={error} /> : null}
+
+      <SectionCard
+        title="Jenis Jabatan Dasar"
+        description="Fondasi untuk commit jabatan struktural, fungsional, dan pelaksana."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge
+              value={
+                loadingJenisJabatan
+                  ? 'Memeriksa'
+                  : missingJenisJabatan.length === 0
+                    ? 'Siap'
+                    : `${missingJenisJabatan.length} Belum Ada`
+              }
+              tone={missingJenisJabatan.length === 0 ? 'success' : 'warning'}
+            />
+            <ActionButton
+              disabled={loadingJenisJabatan || ensuringJenisJabatan || missingJenisJabatan.length === 0}
+              icon={ensuringJenisJabatan ? Loader2 : ShieldCheck}
+              onClick={() => void ensureJenisJabatan()}
+              variant="secondary"
+            >
+              {ensuringJenisJabatan ? 'Menyiapkan...' : 'Siapkan Jenis Jabatan'}
+            </ActionButton>
+          </div>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          {JABATAN_TYPES.map((item) => {
+            const found = availableJenisJabatanCodes.has(item.value);
+
+            return (
+              <div
+                key={item.value}
+                className="rounded-lg border border-[#d8e5d3] bg-[#f6faf2] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-zinc-950">{item.title}</div>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
+                  <StatusBadge value={found ? 'Ada' : 'Belum Ada'} tone={found ? 'success' : 'warning'} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </SectionCard>
 
       {/* Upload Jabatan */}
       <SectionCard

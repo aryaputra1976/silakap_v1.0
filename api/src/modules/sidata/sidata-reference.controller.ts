@@ -81,6 +81,12 @@ export class SidataReferenceController {
     return ok(items);
   }
 
+  @Post('jenis-jabatan/ensure')
+  async ensureJenisJabatan(@CurrentUser() user: AuthUser) {
+    const items = await this.referenceService.ensureDefaultJenisJabatan(user);
+    return ok(items, 'Jenis jabatan dasar berhasil disiapkan');
+  }
+
   @Get('jabatan')
   async findJabatan(@Query() query: SidataJabatanQueryDto) {
     const result = await this.referenceService.findJabatanList(query);

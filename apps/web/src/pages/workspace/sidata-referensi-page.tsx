@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
+  ChevronRight,
   Database,
   Filter,
+  Folder,
+  FolderOpen,
   Layers3,
   Plus,
   RefreshCcw,
@@ -87,6 +90,16 @@ type UnitRow = {
   parentId?: string | null;
   level?: number | null;
   isActive?: boolean | null;
+};
+
+type UnitTreeNode = UnitRow & {
+  children?: UnitTreeNode[];
+  eselonLabel?: string | null;
+};
+
+type UnitTreeItem = {
+  node: UnitTreeNode;
+  depth: number;
 };
 
 type NormalizedReferenceRow = {
@@ -181,6 +194,7 @@ const ACTIVE_OPTIONS: Array<{
 ];
 
 const PAGE_LIMIT = 10;
+const JABATAN_FETCH_LIMIT = 100;
 
 function getErrorMessage(caught: unknown, fallback: string) {
   return caught instanceof ApiError ? caught.message : fallback;
@@ -200,6 +214,14 @@ function isGenericReferenceType(tab: ReferenceTab): tab is GenericReferenceType 
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? '').toLowerCase();
+}
+
+function normalizeReferenceKey(value: string | null | undefined) {
+  return normalizeText(value)
+    .replace(/\b(kepala|sekretaris|camat|lurah|kabid|kepala bidang|kepala subbagian|kasubbag|subkoordinator)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function matchesLocalSearch(row: NormalizedReferenceRow, query: string) {
@@ -230,6 +252,163 @@ function matchesActive(row: NormalizedReferenceRow, isActive: ActiveFilter) {
   }
 
   return row.isActive === (isActive === 'true');
+}
+
+function matchesUnitNode(node: UnitTreeNode, query: string, isActive: ActiveFilter) {
+  const q = query.trim().toLowerCase();
+  const searchable = [
+    node.id,
+    node.kode,
+    node.nama,
+    node.level !== null && node.level !== undefined ? `level ${node.level}` : null,
+    node.isActive === false ? 'tidak aktif inactive false' : 'aktif active true',
+  ]
+    .map(normalizeText)
+    .join(' ');
+
+  const matchesQuery = !q || searchable.includes(q);
+  const matchesStatus = !isActive || (node.isActive ?? true) === (isActive === 'true');
+
+  return matchesQuery && matchesStatus;
+}
+
+function filterUnitTree(
+  nodes: UnitTreeNode[],
+  query: string,
+  isActive: ActiveFilter,
+): UnitTreeNode[] {
+  return nodes
+    .map((node) => {
+      const children = filterUnitTree(node.children ?? [], query, isActive);
+      const selfMatches = matchesUnitNode(node, query, isActive);
+
+      if (!selfMatches && children.length === 0) {
+        return null;
+      }
+
+      return { ...node, children };
+    })
+    .filter((node): node is UnitTreeNode => Boolean(node));
+}
+
+function flattenUnitTree(nodes: UnitTreeNode[]): UnitRow[] {
+  return nodes.flatMap((node) => [
+    node,
+    ...flattenUnitTree(node.children ?? []),
+  ]);
+}
+
+function flattenVisibleUnitTree(
+  nodes: UnitTreeNode[],
+  expandedIds: Set<string>,
+  depth = 0,
+): UnitTreeItem[] {
+  return nodes.flatMap((node) => {
+    const item = { node, depth };
+
+    if (!expandedIds.has(node.id)) {
+      return [item];
+    }
+
+    return [
+      item,
+      ...flattenVisibleUnitTree(node.children ?? [], expandedIds, depth + 1),
+    ];
+  });
+}
+
+function collectUnitTreeIds(nodes: UnitTreeNode[]): string[] {
+  return nodes.flatMap((node) => [node.id, ...collectUnitTreeIds(node.children ?? [])]);
+}
+
+function buildJabatanEselonMap(rows: JabatanRow[]) {
+  const map = new Map<string, string>();
+
+  for (const item of rows) {
+    if (!item.jenjang) {
+      continue;
+    }
+
+    const names = [item.nama, item.namaNormalized, item.siasnNama];
+    for (const name of names) {
+      const key = normalizeReferenceKey(name);
+
+      if (key && !map.has(key)) {
+        map.set(key, item.jenjang);
+      }
+    }
+  }
+
+  return map;
+}
+
+function getUnitEselon(unit: UnitTreeNode, jabatanEselonMap: Map<string, string>) {
+  const unitKey = normalizeReferenceKey(unit.nama);
+  if (!unitKey) {
+    return null;
+  }
+
+  return (
+    jabatanEselonMap.get(unitKey) ??
+    jabatanEselonMap.get(`kepala ${unitKey}`) ??
+    null
+  );
+}
+
+function mergeUnitTreeDuplicates(nodes: UnitTreeNode[]): UnitTreeNode[] {
+  function cloneNode(node: UnitTreeNode): UnitTreeNode {
+    return {
+      ...node,
+      children: (node.children ?? []).map(cloneNode),
+    };
+  }
+
+  function mergeChildren(target: UnitTreeNode, incomingChildren: UnitTreeNode[]) {
+    const targetChildren = target.children ?? [];
+    const existingChildKeys = new Set(targetChildren.map((child) => normalizeReferenceKey(child.nama)));
+
+    for (const child of incomingChildren) {
+      const childKey = normalizeReferenceKey(child.nama);
+      if (!childKey || !existingChildKeys.has(childKey)) {
+        targetChildren.push(child);
+        if (childKey) existingChildKeys.add(childKey);
+      }
+    }
+
+    target.children = targetChildren;
+  }
+
+  const clonedRoots = nodes.map(cloneNode);
+  const allNodes = flattenUnitTree(clonedRoots) as UnitTreeNode[];
+  const nodeByName = new Map<string, UnitTreeNode[]>();
+
+  for (const node of allNodes) {
+    const key = normalizeReferenceKey(node.nama);
+    if (!key) continue;
+    nodeByName.set(key, [...(nodeByName.get(key) ?? []), node]);
+  }
+
+  for (const sameNameNodes of nodeByName.values()) {
+    if (sameNameNodes.length < 2) continue;
+
+    const imported = sameNameNodes.find((node) => node.kode && node.kode !== 'BKPSDM');
+    const local = sameNameNodes.find((node) => node.kode === 'BKPSDM');
+
+    if (imported && local && local.children?.length) {
+      mergeChildren(imported, local.children);
+      local.children = [];
+    }
+  }
+
+  return clonedRoots.filter((root) => root.kode !== 'BKPSDM' || (root.children?.length ?? 0) > 0);
+}
+
+function applyUnitEselon(nodes: UnitTreeNode[], jabatanEselonMap: Map<string, string>): UnitTreeNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    eselonLabel: getUnitEselon(node, jabatanEselonMap),
+    children: applyUnitEselon(node.children ?? [], jabatanEselonMap),
+  }));
 }
 
 function normalizeJenisJabatan(rows: JenisJabatanRow[]): NormalizedReferenceRow[] {
@@ -299,6 +478,75 @@ function normalizeGeneric(
   }));
 }
 
+function UnitTreeTable({
+  items,
+  expandedIds,
+  onToggle,
+}: {
+  items: UnitTreeItem[];
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  function renderItem({ node, depth }: UnitTreeItem) {
+    const children = node.children ?? [];
+    const hasChildren = children.length > 0;
+    const expanded = expandedIds.has(node.id);
+    const FolderIcon = hasChildren && expanded ? FolderOpen : Folder;
+
+    return (
+      <div key={node.id}>
+        <div className="grid grid-cols-[minmax(360px,1fr)_160px_120px] items-center gap-4 border-b border-border px-5 py-3 last:border-b-0">
+          <div className="flex min-w-0 items-start gap-2" style={{ paddingLeft: depth * 22 }}>
+            <button
+              aria-label={expanded ? 'Tutup cabang unit' : 'Buka cabang unit'}
+              className={
+                hasChildren
+                  ? 'mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border bg-white text-zinc-600 transition hover:bg-zinc-50'
+                  : 'mt-0.5 size-7 shrink-0'
+              }
+              disabled={!hasChildren}
+              type="button"
+              onClick={() => onToggle(node.id)}
+            >
+              {hasChildren ? (
+                <ChevronRight
+                  className={expanded ? 'size-4 rotate-90 transition-transform' : 'size-4 transition-transform'}
+                />
+              ) : null}
+            </button>
+            <FolderIcon className="mt-1 size-5 shrink-0 text-emerald-700" />
+            <div className="min-w-0">
+              <div className="break-words font-semibold text-zinc-900">{node.nama}</div>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>Level {node.level ?? '-'}</span>
+                {hasChildren ? <span>{children.length} sub unit</span> : null}
+              </div>
+            </div>
+          </div>
+          <StatusBadge value={node.eselonLabel ?? 'Belum termapping'} tone={node.eselonLabel ? 'info' : 'neutral'} />
+          <StatusBadge
+            value={(node.isActive ?? true) ? 'AKTIF' : 'TIDAK AKTIF'}
+            tone={(node.isActive ?? true) ? 'success' : 'warning'}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border bg-white">
+      <div className="min-w-[720px]">
+        <div className="grid grid-cols-[minmax(360px,1fr)_160px_120px] gap-4 border-b border-border bg-emerald-50/60 px-5 py-3 text-xs font-bold uppercase text-zinc-600">
+          <span>Unit Organisasi</span>
+          <span>Eselon</span>
+          <span>Status</span>
+        </div>
+        {items.map((item) => renderItem(item))}
+      </div>
+    </div>
+  );
+}
+
 export function SidataReferensiPage() {
   const [activeTab, setActiveTab] = useState<ReferenceTab>('JABATAN');
   const [q, setQ] = useState('');
@@ -306,6 +554,8 @@ export function SidataReferensiPage() {
   const [page, setPage] = useState(1);
 
   const [rows, setRows] = useState<NormalizedReferenceRow[]>([]);
+  const [unitTree, setUnitTree] = useState<UnitTreeNode[]>([]);
+  const [expandedUnitIds, setExpandedUnitIds] = useState<Set<string>>(new Set());
   const [total, setTotal] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -322,9 +572,18 @@ export function SidataReferensiPage() {
   }, [activeTab, q, isActive]);
 
   useEffect(() => {
-    void loadReferences();
+    if (activeTab !== 'UNIT_ORGANISASI') {
+      void loadReferences();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, page]);
+
+  useEffect(() => {
+    if (activeTab === 'UNIT_ORGANISASI') {
+      void loadReferences(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const filteredRows = useMemo(() => {
     if (activeTab === 'JABATAN') {
@@ -336,8 +595,41 @@ export function SidataReferensiPage() {
       .filter((item) => matchesActive(item, isActive));
   }, [activeTab, isActive, q, rows]);
 
+  const filteredUnitTree = useMemo(() => {
+    if (activeTab !== 'UNIT_ORGANISASI') {
+      return [];
+    }
+
+    return filterUnitTree(unitTree, q, isActive);
+  }, [activeTab, isActive, q, unitTree]);
+
+  const filteredUnitRows = useMemo(() => {
+    if (activeTab !== 'UNIT_ORGANISASI') {
+      return [];
+    }
+
+    return flattenUnitTree(filteredUnitTree);
+  }, [activeTab, filteredUnitTree]);
+
+  const unitDisplayExpandedIds = useMemo(() => {
+    return expandedUnitIds;
+  }, [expandedUnitIds]);
+
+  const visibleUnitItems = useMemo(() => {
+    if (activeTab !== 'UNIT_ORGANISASI') {
+      return [];
+    }
+
+    return flattenVisibleUnitTree(filteredUnitTree, unitDisplayExpandedIds);
+  }, [activeTab, filteredUnitTree, unitDisplayExpandedIds]);
+
+  const pagedUnitItems = useMemo(() => {
+    const start = (page - 1) * PAGE_LIMIT;
+    return visibleUnitItems.slice(start, start + PAGE_LIMIT);
+  }, [page, visibleUnitItems]);
+
   const pageRows = useMemo(() => {
-    if (activeTab === 'JABATAN') {
+    if (activeTab === 'JABATAN' || activeTab === 'UNIT_ORGANISASI') {
       return filteredRows;
     }
 
@@ -345,11 +637,31 @@ export function SidataReferensiPage() {
     return filteredRows.slice(start, start + PAGE_LIMIT);
   }, [activeTab, filteredRows, page]);
 
-  const effectiveTotal = activeTab === 'JABATAN' ? total : filteredRows.length;
-  const activeCount = filteredRows.filter((item) => item.isActive).length;
+  const effectiveTotal =
+    activeTab === 'JABATAN'
+      ? total
+      : activeTab === 'UNIT_ORGANISASI'
+        ? filteredUnitRows.length
+        : filteredRows.length;
+  const paginationTotal =
+    activeTab === 'UNIT_ORGANISASI' ? visibleUnitItems.length : effectiveTotal;
+  const activeCount =
+    activeTab === 'UNIT_ORGANISASI'
+      ? filteredUnitRows.filter((item) => item.isActive ?? true).length
+      : filteredRows.filter((item) => item.isActive).length;
   const inactiveCount = filteredRows.length - activeCount;
   const canPrevious = page > 1;
-  const canNext = page * PAGE_LIMIT < effectiveTotal;
+  const canNext = page * PAGE_LIMIT < paginationTotal;
+
+  useEffect(() => {
+    if (activeTab !== 'UNIT_ORGANISASI') {
+      return;
+    }
+
+    if (q.trim() || isActive) {
+      setExpandedUnitIds(new Set(collectUnitTreeIds(filteredUnitTree)));
+    }
+  }, [activeTab, filteredUnitTree, isActive, q]);
 
   async function loadReferences(pageOverride?: number) {
     setLoading(true);
@@ -387,9 +699,18 @@ export function SidataReferensiPage() {
       }
 
       if (activeTab === 'UNIT_ORGANISASI') {
-        const result = await apiClient.get<UnitRow[]>('/sidata/units');
+        const unitResult = await apiClient.get<UnitTreeNode[]>('/sidata/units/tree');
+        const structuralJabatan = await fetchAllStructuralJabatan().catch(() => []);
+        const jabatanEselonMap = buildJabatanEselonMap(structuralJabatan);
+        const displayTree = applyUnitEselon(
+          mergeUnitTreeDuplicates(unitResult),
+          jabatanEselonMap,
+        );
+        const flatRows = flattenUnitTree(displayTree);
 
-        const normalized = normalizeUnits(result);
+        const normalized = normalizeUnits(flatRows);
+        setUnitTree(displayTree);
+        setExpandedUnitIds(new Set(displayTree.map((item) => item.id)));
         setRows(normalized);
         setTotal(normalized.length);
         return;
@@ -434,6 +755,53 @@ export function SidataReferensiPage() {
     setQ('');
     setIsActive('');
     setPage(1);
+  }
+
+  function toggleUnitNode(id: string) {
+    setExpandedUnitIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }
+
+  function expandVisibleUnitTree() {
+    setExpandedUnitIds(new Set(collectUnitTreeIds(filteredUnitTree)));
+    setPage(1);
+  }
+
+  function collapseUnitTree() {
+    setExpandedUnitIds(new Set(filteredUnitTree.map((item) => item.id)));
+    setPage(1);
+  }
+
+  async function fetchAllStructuralJabatan() {
+    const first = await apiClient.get<JabatanListResponse>('/sidata/references/jabatan', {
+      jenisJabatanKode: 'STRUKTURAL',
+      isActive: 'true',
+      page: 1,
+      limit: JABATAN_FETCH_LIMIT,
+    });
+    const items = [...first.items];
+    const pages = Math.ceil(first.total / first.limit);
+
+    for (let nextPage = 2; nextPage <= pages; nextPage += 1) {
+      const result = await apiClient.get<JabatanListResponse>('/sidata/references/jabatan', {
+        jenisJabatanKode: 'STRUKTURAL',
+        isActive: 'true',
+        page: nextPage,
+        limit: JABATAN_FETCH_LIMIT,
+      });
+      items.push(...result.items);
+    }
+
+    return items;
   }
 
   async function createManualReference() {
@@ -661,6 +1029,24 @@ export function SidataReferensiPage() {
         description={getTabDescription(activeTab)}
         actions={
           <div className="flex flex-wrap gap-2">
+            {activeTab === 'UNIT_ORGANISASI' ? (
+              <>
+                <ActionButton
+                  icon={FolderOpen}
+                  onClick={expandVisibleUnitTree}
+                  variant="secondary"
+                >
+                  Buka Semua
+                </ActionButton>
+                <ActionButton
+                  icon={Folder}
+                  onClick={collapseUnitTree}
+                  variant="secondary"
+                >
+                  Tutup Semua
+                </ActionButton>
+              </>
+            ) : null}
             <StatusBadge value={`${effectiveTotal} Data`} tone="info" />
             <StatusBadge value={`${activeCount} Aktif`} tone="success" />
           </div>
@@ -668,11 +1054,23 @@ export function SidataReferensiPage() {
       >
         {loading ? (
           <LoadingState label={`Memuat referensi ${getTabLabel(activeTab)}`} />
-        ) : pageRows.length === 0 ? (
+        ) : activeTab === 'UNIT_ORGANISASI' && pagedUnitItems.length === 0 ? (
           <EmptyState
             icon={Database}
             title="Referensi tidak ditemukan"
             description="Tidak ada data referensi yang sesuai filter."
+          />
+        ) : activeTab !== 'UNIT_ORGANISASI' && pageRows.length === 0 ? (
+          <EmptyState
+            icon={Database}
+            title="Referensi tidak ditemukan"
+            description="Tidak ada data referensi yang sesuai filter."
+          />
+        ) : activeTab === 'UNIT_ORGANISASI' ? (
+          <UnitTreeTable
+            expandedIds={unitDisplayExpandedIds}
+            items={pagedUnitItems}
+            onToggle={toggleUnitNode}
           />
         ) : (
           <DataTable
@@ -742,6 +1140,7 @@ export function SidataReferensiPage() {
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 text-sm md:flex-row md:items-center md:justify-between">
         <span className="text-muted-foreground">
           Total {effectiveTotal} data, halaman {page}
+          {activeTab === 'UNIT_ORGANISASI' ? `, ${paginationTotal} baris terlihat` : ''}
         </span>
         <div className="flex gap-2">
           <ActionButton

@@ -253,19 +253,29 @@ export type ParsedSiasnAsnRow = {
   rowNumber: number;
   nip: string | null;
   nipLama: string | null;
+  nik: string | null;
   nama: string | null;
+  gelarDepan: string | null;
+  gelarBelakang: string | null;
   namaJabatan: string | null;
   jenisJabatan: string | null;
   kdJabatan: string | null;
   kdJabatanSiasn: string | null;
   tmtJabatan: Date | null;
+  nomorSkJabatan: string | null;
+  tanggalSkJabatan: Date | null;
+  siasnEselonId: string | null;
+  eselonNama: string | null;
   namaGolongan: string | null;
+  namaPangkat: string | null;
   namaRuang: string | null;
   kdGolongan: string | null;
   kdGolonganSiasn: string | null;
   tmtGolongan: Date | null;
   masaKerjaGolongan: string | null;
   masaKerjaSeluruh: string | null;
+  nomorSkGolongan: string | null;
+  tanggalSkGolongan: Date | null;
   namaUnorEselon1: string | null;
   namaUnorEselon2: string | null;
   namaUnorEselon3: string | null;
@@ -283,8 +293,22 @@ export type ParsedSiasnAsnRow = {
   statusKepegawaian: string | null;
   jenisAsn: string | null;
   kedudukanHukum: string | null;
+  nomorPerjanjianKerja: string | null;
+  tmtPerjanjianKerja: Date | null;
+  akhirPerjanjianKerja: Date | null;
+  masaHubunganKerjaBulan: number | null;
   noSk: string | null;
   tanggalSk: Date | null;
+  masaKerjaTahun: number | null;
+  masaKerjaBulan: number | null;
+  nomorHp: string | null;
+  email: string | null;
+  emailGov: string | null;
+  alamat: string | null;
+  npwpNomor: string | null;
+  bpjsNomor: string | null;
+  tahunLulus: number | null;
+  unorNama: string | null;
   dateParseErrors: string[];
   rawData: Record<string, unknown>;
 };
@@ -363,6 +387,7 @@ export type SidataAsnMappedData = {
   agamaId: string | null;
   statusKawinId: string | null;
   pendidikanId: string | null;
+  tingkatPendidikanId: string | null;
 };
 
 export type SidataAsnReferenceLookupResult = {
@@ -436,6 +461,7 @@ export type SiasnAsnMappedDataForCommit = {
   agamaId?: string | null;
   statusKawinId?: string | null;
   pendidikanId?: string | null;
+  tingkatPendidikanId?: string | null;
 };
 
 // ─── Phase 8: Audit & Review Types ────────────────────────────────────────────

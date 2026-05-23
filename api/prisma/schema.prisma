@@ -80,6 +80,41 @@ enum JenisPensiun {
   YATIM_PIATU
 }
 
+enum JenisPemberhentian {
+  // Atas Permintaan Sendiri
+  APS
+  // Tidak Atas Permintaan - Dengan Hormat
+  DH_BUP
+  DH_BERAKHIR_PPPK
+  DH_MENINGGAL
+  DH_PERAMPINGAN
+  DH_TIDAK_CAKAP
+  DH_TIDAK_KINERJA
+  // Tidak Atas Permintaan - Tidak Dengan Hormat
+  TDH_PANCASILA
+  TDH_DISIPLIN
+  TDH_PIDANA
+  TDH_PARPOL
+  // Pemberhentian Sementara
+  SEM_PEJABAT_NEGARA
+  SEM_KOMISIONER
+  SEM_CLTN
+  SEM_DITAHAN
+}
+
+enum StatusPemberhentian {
+  DRAFT
+  PENGUMPULAN_BERKAS
+  VERIFIKASI_BERKAS
+  NOTA_USUL
+  DIKIRIM_BKN
+  PROSES_BKN
+  SK_TERBIT
+  DIKEMBALIKAN
+  SELESAI
+  DIBATALKAN
+}
+
 enum DmsDocumentCategory {
   SKP
   LAPORAN_BULANAN
@@ -335,6 +370,44 @@ model Asn {
   tmtGolongan     DateTime?    @map("tmt_golongan")
   golonganRef     RefGolongan? @relation(fields: [golonganRefId], references: [id], onDelete: SetNull)
 
+  masaKerjaTahun      Int? @map("masa_kerja_tahun")
+  masaKerjaBulan      Int? @map("masa_kerja_bulan")
+  masaKerjaTotalBulan Int? @map("masa_kerja_total_bulan")
+  kelasJabatan        Int? @map("kelas_jabatan")
+
+  siasnEselonId String?    @map("siasn_eselon_id") @db.VarChar(30)
+  eselonRefId   String?    @map("eselon_ref_id") @db.VarChar(36)
+  eselonNama    String?    @map("eselon_nama") @db.VarChar(80)
+  eselonRef     RefEselon? @relation(fields: [eselonRefId], references: [id], onDelete: SetNull)
+
+  namaUnorEselon1 String? @map("nama_unor_eselon1") @db.VarChar(300)
+  namaUnorEselon2 String? @map("nama_unor_eselon2") @db.VarChar(300)
+  namaUnorEselon3 String? @map("nama_unor_eselon3") @db.VarChar(300)
+  namaUnorEselon4 String? @map("nama_unor_eselon4") @db.VarChar(300)
+
+  pangkatNama String? @map("pangkat_nama") @db.VarChar(120)
+  ruangNama   String? @map("ruang_nama") @db.VarChar(80)
+
+  nomorSk    String?   @map("nomor_sk") @db.VarChar(120)
+  tanggalSk  DateTime? @map("tanggal_sk")
+
+  nomorPerjanjianKerja   String?   @map("nomor_perjanjian_kerja") @db.VarChar(120)
+  tmtPerjanjianKerja     DateTime? @map("tmt_perjanjian_kerja")
+  akhirPerjanjianKerja   DateTime? @map("akhir_perjanjian_kerja")
+  masaHubunganKerjaBulan Int?      @map("masa_hubungan_kerja_bulan")
+
+  jenisPegawaiNama String? @map("jenis_pegawai_nama") @db.VarChar(180)
+  detailStatusNama String? @map("detail_status_nama") @db.VarChar(180)
+
+  pendidikanRefId        String?                 @map("pendidikan_ref_id") @db.VarChar(36)
+  pendidikanNama         String?                 @map("pendidikan_nama") @db.VarChar(180)
+  tingkatPendidikanRefId String?                 @map("tingkat_pendidikan_ref_id") @db.VarChar(36)
+  tingkatPendidikanNama  String?                 @map("tingkat_pendidikan_nama") @db.VarChar(120)
+  tahunLulus             Int?                    @map("tahun_lulus")
+  namaSekolah            String?                 @map("nama_sekolah") @db.VarChar(300)
+  pendidikanRef          RefPendidikan?          @relation("AsnCurrentPendidikan", fields: [pendidikanRefId], references: [id], onDelete: SetNull)
+  tingkatPendidikanRef   RefPendidikanTingkat?   @relation("AsnCurrentTingkatPendidikan", fields: [tingkatPendidikanRefId], references: [id], onDelete: SetNull)
+
   sourceBatchId String?               @map("source_batch_id") @db.VarChar(36)
   syncedAt      DateTime?             @map("synced_at")
   checksum      String?               @db.VarChar(128)
@@ -345,16 +418,19 @@ model Asn {
   deletedAt     DateTime?             @map("deleted_at")
   sourceBatch   SidataAsnImportBatch? @relation(fields: [sourceBatchId], references: [id], onDelete: SetNull)
 
-  cases          SiapCase[]
-  sipensiunCases SipensiunCase[]
-  dmsDocuments   DmsDocument[]
-  documents      Document[]
+  cases                SiapCase[]
+  sipensiunCases       SipensiunCase[]
+  dmsDocuments         DmsDocument[]
+  documents            Document[]
+  pemberhentianProses  PemberhentianProses[]
 
   siasnProfile      AsnSiasnProfile?
   importSnapshots   AsnImportSnapshot[]
   assignmentHistory AsnAssignmentHistory[]
   golonganHistory   AsnGolonganHistory[]
   pendidikanHistory AsnPendidikanHistory[]
+  monthlyChanges    AsnMonthlyChange[]
+  monthlySnapshots  AsnMonthlySnapshot[]
 
   @@index([nip])
   @@index([nama])
@@ -368,6 +444,13 @@ model Asn {
   @@index([statusAsn])
   @@index([isActive])
   @@index([tmtPensiun])
+  @@index([kelasJabatan])
+  @@index([siasnEselonId])
+  @@index([eselonRefId])
+  @@index([akhirPerjanjianKerja])
+  @@index([pendidikanRefId])
+  @@index([tingkatPendidikanRefId])
+  @@index([masaKerjaTotalBulan])
   @@index([siasnPnsId])
   @@index([siasnJabatanId])
   @@index([siasnUnorId])
@@ -511,6 +594,11 @@ model AsnAssignmentHistory {
   jenisJabatanNama    String?   @map("jenis_jabatan_nama") @db.VarChar(100)
   tmtJabatan          DateTime? @map("tmt_jabatan")
   effectiveDate       DateTime? @map("effective_date")
+  nomorSk             String?   @map("nomor_sk") @db.VarChar(120)
+  tanggalSk           DateTime? @map("tanggal_sk")
+  siasnEselonId       String?   @map("siasn_eselon_id") @db.VarChar(30)
+  eselonRefId         String?   @map("eselon_ref_id") @db.VarChar(36)
+  eselonNama          String?   @map("eselon_nama") @db.VarChar(80)
   rawData             Json?     @map("raw_data")
   checksum            String?   @db.VarChar(128)
   syncedAt            DateTime  @default(now()) @map("synced_at")
@@ -523,6 +611,7 @@ model AsnAssignmentHistory {
   unitKerja       UnitKerja?            @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
   jabatanRef      RefJabatan?           @relation(fields: [jabatanRefId], references: [id], onDelete: SetNull)
   jenisJabatanRef RefJenisJabatan?      @relation(fields: [jenisJabatanRefId], references: [id], onDelete: SetNull)
+  eselonRef       RefEselon?            @relation(fields: [eselonRefId], references: [id], onDelete: SetNull)
 
   @@unique([asnId, sourceBatchId])
   @@index([asnId])
@@ -532,6 +621,7 @@ model AsnAssignmentHistory {
   @@index([jenisJabatanRefId])
   @@index([siasnJabatanId])
   @@index([siasnUnorId])
+  @@index([eselonRefId])
   @@index([effectiveDate])
   @@index([checksum])
   @@index([syncedAt])
@@ -556,6 +646,8 @@ model AsnGolonganHistory {
   mkTahun              Int?      @map("mk_tahun")
   mkBulan              Int?      @map("mk_bulan")
   effectiveDate        DateTime? @map("effective_date")
+  nomorSk              String?   @map("nomor_sk") @db.VarChar(120)
+  tanggalSk            DateTime? @map("tanggal_sk")
   rawData              Json?     @map("raw_data")
   checksum             String?   @db.VarChar(128)
   syncedAt             DateTime  @default(now()) @map("synced_at")
@@ -1550,6 +1642,7 @@ model RefJabatan {
   siasnKode String? @map("siasn_kode") @db.VarChar(100)
   siasnNama String? @map("siasn_nama") @db.VarChar(300)
 
+  eselonLevel  String? @map("eselon_level") @db.VarChar(10)
   rumpun       String? @db.VarChar(200)
   jenjang      String? @db.VarChar(100)
   bup          Int?    @map("bup")
@@ -1573,6 +1666,7 @@ model RefJabatan {
   @@index([namaNormalized])
   @@index([siasnId])
   @@index([siasnKode])
+  @@index([eselonLevel])
   @@index([isActive])
   @@index([deletedAt])
   @@map("ref_jabatan")
@@ -1721,6 +1815,24 @@ model SidataReferenceMapping {
   @@map("sidata_reference_mappings")
 }
 
+// ─── Referensi Gaji Pokok PNS ─────────────────────────────────────────────────
+
+model RefGajiPokok {
+  id           Int      @id @default(autoincrement())
+  golonganKode String   @map("golongan_kode") @db.VarChar(10)
+  masaKerja    Int      @map("masa_kerja")
+  gajiPokok    Decimal  @map("gaji_pokok") @db.Decimal(15, 2)
+  berlakuSejak DateTime @map("berlaku_sejak") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([golonganKode, masaKerja, berlakuSejak])
+  @@index([golonganKode])
+  @@index([masaKerja])
+  @@index([berlakuSejak])
+  @@map("ref_gaji_pokok")
+}
+
 // ─── SIDATA Generic Reference Tables ──────────────────────────────────────────
 
 model RefGolongan {
@@ -1764,6 +1876,7 @@ model RefPendidikanTingkat {
 
   pendidikan        RefPendidikan[]
   pendidikanHistory AsnPendidikanHistory[]
+  currentAsn        Asn[] @relation("AsnCurrentTingkatPendidikan")
 
   @@index([kode])
   @@index([isActive])
@@ -1782,6 +1895,7 @@ model RefPendidikan {
 
   tingkatPendidikan RefPendidikanTingkat?  @relation(fields: [tingkatPendidikanId], references: [id])
   pendidikanHistory AsnPendidikanHistory[]
+  currentAsn         Asn[]                  @relation("AsnCurrentPendidikan")
 
   @@index([kode])
   @@index([tingkatPendidikanId])
@@ -1870,6 +1984,112 @@ model RefJenisAsn {
   @@map("ref_jenis_asn")
 }
 
+model RefEselon {
+  id       String  @id @default(uuid()) @db.VarChar(36)
+  kode     String  @unique @db.VarChar(10)
+  nama     String  @db.VarChar(20)
+  level    Int
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  currentAsn        Asn[]
+  assignmentHistory AsnAssignmentHistory[]
+
+  @@index([kode])
+  @@index([level])
+  @@index([isActive])
+  @@map("ref_eselon")
+}
+
+// ─── ASN Monthly Archive ─────────────────────────────────────────────────────
+
+model AsnMonthlyArchive {
+  id     String @id @default(uuid()) @db.VarChar(36)
+  bulan  Int
+  tahun  Int
+  label  String @db.VarChar(50)
+  status String @default("DRAFT") @db.VarChar(20)
+
+  batchId String? @map("batch_id") @db.VarChar(36)
+
+  totalAsn  Int @default(0) @map("total_asn")
+  totalPns  Int @default(0) @map("total_pns")
+  totalPppk Int @default(0) @map("total_pppk")
+
+  countMutasiJabatan Int @default(0) @map("count_mutasi_jabatan")
+  countMutasiUnit    Int @default(0) @map("count_mutasi_unit")
+  countNaikPangkat   Int @default(0) @map("count_naik_pangkat")
+  countPensiun       Int @default(0) @map("count_pensiun")
+  countAsnBaru       Int @default(0) @map("count_asn_baru")
+  countAsnKeluar     Int @default(0) @map("count_asn_keluar")
+  countTugasBelajar  Int @default(0) @map("count_tugas_belajar")
+  countKgb           Int @default(0) @map("count_kgb")
+  countAlihJabatan   Int @default(0) @map("count_alih_jabatan")
+  countStatusBerubah Int @default(0) @map("count_status_berubah")
+
+  archivedById String?   @map("archived_by_id") @db.VarChar(36)
+  archivedAt   DateTime? @map("archived_at")
+  finalizedAt  DateTime? @map("finalized_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  batch     SidataAsnImportBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  changes   AsnMonthlyChange[]
+  snapshots AsnMonthlySnapshot[]
+
+  @@unique([bulan, tahun])
+  @@index([tahun])
+  @@index([bulan])
+  @@index([status])
+  @@index([batchId])
+  @@map("asn_monthly_archive")
+}
+
+model AsnMonthlyChange {
+  id         String  @id @default(uuid()) @db.VarChar(36)
+  archiveId  String  @map("archive_id") @db.VarChar(36)
+  asnId      String? @map("asn_id") @db.VarChar(36)
+  nip        String  @db.VarChar(30)
+  nama       String  @db.VarChar(300)
+  changeType String  @map("change_type") @db.VarChar(50)
+
+  fieldSebelum Json? @map("field_sebelum")
+  fieldSesudah Json? @map("field_sesudah")
+
+  detectedAt DateTime @default(now()) @map("detected_at")
+
+  archive AsnMonthlyArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+  asn     Asn?              @relation(fields: [asnId], references: [id], onDelete: SetNull)
+
+  @@index([archiveId])
+  @@index([asnId])
+  @@index([changeType])
+  @@index([archiveId, changeType])
+  @@map("asn_monthly_change")
+}
+
+model AsnMonthlySnapshot {
+  id           String @id @default(uuid()) @db.VarChar(36)
+  archiveId    String @map("archive_id") @db.VarChar(36)
+  asnId        String @map("asn_id") @db.VarChar(36)
+  nip          String @db.VarChar(30)
+  nama         String @db.VarChar(300)
+  snapshotData Json   @map("snapshot_data")
+  checksum     String @db.VarChar(128)
+
+  archive AsnMonthlyArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+  asn     Asn               @relation(fields: [asnId], references: [id], onDelete: Cascade)
+
+  @@unique([archiveId, asnId])
+  @@index([archiveId])
+  @@index([asnId])
+  @@index([nip])
+  @@map("asn_monthly_snapshot")
+}
+
 // ─── SIDATA ASN Import Staging ────────────────────────────────────────────────
 
 model SidataAsnImportBatch {
@@ -1898,6 +2118,7 @@ model SidataAsnImportBatch {
   assignmentHistory AsnAssignmentHistory[]
   golonganHistory   AsnGolonganHistory[]
   pendidikanHistory AsnPendidikanHistory[]
+  monthlyArchives   AsnMonthlyArchive[]
 
   @@index([source])
   @@index([importType])
@@ -1913,9 +2134,12 @@ model SidataAsnImportStaging {
   rowNumber Int    @map("row_number")
 
   // Core identity
-  nip     String? @db.VarChar(30)
-  nipLama String? @map("nip_lama") @db.VarChar(30)
-  nama    String? @db.VarChar(300)
+  nip          String? @db.VarChar(30)
+  nipLama      String? @map("nip_lama") @db.VarChar(30)
+  nik          String? @db.VarChar(30)
+  nama         String? @db.VarChar(300)
+  gelarDepan   String? @map("gelar_depan") @db.VarChar(80)
+  gelarBelakang String? @map("gelar_belakang") @db.VarChar(120)
 
   // Jabatan
   namaJabatan    String?   @map("nama_jabatan") @db.VarChar(300)
@@ -1923,15 +2147,26 @@ model SidataAsnImportStaging {
   kdJabatan      String?   @map("kd_jabatan") @db.VarChar(50)
   kdJabatanSiasn String?   @map("kd_jabatan_siasn") @db.VarChar(50)
   tmtJabatan     DateTime? @map("tmt_jabatan")
+  nomorSkJabatan String?   @map("nomor_sk_jabatan") @db.VarChar(120)
+  tanggalSkJabatan DateTime? @map("tanggal_sk_jabatan")
+
+  // Eselon
+  siasnEselonId String? @map("siasn_eselon_id") @db.VarChar(30)
+  eselonNama    String? @map("eselon_nama") @db.VarChar(80)
 
   // Golongan / Pangkat
   namaGolongan      String?   @map("nama_golongan") @db.VarChar(100)
-  namaRuang         String?   @map("nama_ruang") @db.VarChar(100)
+  namaPangkat       String?   @map("nama_pangkat") @db.VarChar(120)
+  namaRuang         String?   @map("nama_ruang") @db.VarChar(80)
   kdGolongan        String?   @map("kd_golongan") @db.VarChar(20)
   kdGolonganSiasn   String?   @map("kd_golongan_siasn") @db.VarChar(20)
   tmtGolongan       DateTime? @map("tmt_golongan")
   masaKerjaGolongan String?   @map("masa_kerja_golongan") @db.VarChar(20)
   masaKerjaSeluruh  String?   @map("masa_kerja_seluruh") @db.VarChar(20)
+  masaKerjaTahun    Int?      @map("masa_kerja_tahun")
+  masaKerjaBulan    Int?      @map("masa_kerja_bulan")
+  nomorSkGolongan   String?   @map("nomor_sk_golongan") @db.VarChar(120)
+  tanggalSkGolongan DateTime? @map("tanggal_sk_golongan")
 
   // Unit Organisasi
   namaUnorEselon1 String? @map("nama_unor_eselon1") @db.VarChar(300)
@@ -1939,6 +2174,7 @@ model SidataAsnImportStaging {
   namaUnorEselon3 String? @map("nama_unor_eselon3") @db.VarChar(300)
   namaUnorEselon4 String? @map("nama_unor_eselon4") @db.VarChar(300)
   kdUnor          String? @map("kd_unor") @db.VarChar(50)
+  unorNama        String? @map("unor_nama") @db.VarChar(300)
 
   // Data Pribadi
   tempatLahir        String?   @map("tempat_lahir") @db.VarChar(100)
@@ -1948,6 +2184,13 @@ model SidataAsnImportStaging {
   statusKawin        String?   @map("status_kawin") @db.VarChar(50)
   pendidikanTerakhir String?   @map("pendidikan_terakhir") @db.VarChar(100)
   namaSekolah        String?   @map("nama_sekolah") @db.VarChar(300)
+  tahunLulus         Int?      @map("tahun_lulus")
+  nomorHp            String?   @map("nomor_hp") @db.VarChar(30)
+  email              String?   @db.VarChar(150)
+  emailGov           String?   @map("email_gov") @db.VarChar(150)
+  alamat             String?   @db.Text
+  npwpNomor          String?   @map("npwp_nomor") @db.VarChar(50)
+  bpjsNomor          String?   @map("bpjs_nomor") @db.VarChar(50)
 
   // Status Kepegawaian
   tmtPns            DateTime? @map("tmt_pns")
@@ -1956,8 +2199,14 @@ model SidataAsnImportStaging {
   jenisAsn          String?   @map("jenis_asn") @db.VarChar(50)
   kedudukanHukum    String?   @map("kedudukan_hukum") @db.VarChar(100)
 
-  // SK
-  noSk      String?   @map("no_sk") @db.VarChar(100)
+  // PPPK / Kontrak
+  nomorPerjanjianKerja   String?   @map("nomor_perjanjian_kerja") @db.VarChar(120)
+  tmtPerjanjianKerja     DateTime? @map("tmt_perjanjian_kerja")
+  akhirPerjanjianKerja   DateTime? @map("akhir_perjanjian_kerja")
+  masaHubunganKerjaBulan Int?      @map("masa_hubungan_kerja_bulan")
+
+  // SK (generic — fallback jika SK jabatan/golongan tidak terpisah)
+  noSk      String?   @map("no_sk") @db.VarChar(120)
   tanggalSk DateTime? @map("tanggal_sk")
 
   // Validation & Mapping
@@ -2471,3 +2720,234 @@ model IkmSurvey {
   @@map("ikm_survey")
 }
 
+// ============================================================
+// SIFORMEN — Formasi & Bezetting ASN
+// ============================================================
+
+model SiformenJabatanFungsionalRef {
+  id                     String    @id @default(uuid()) @db.VarChar(36)
+  namaJabatan            String    @map("nama_jabatan") @db.VarChar(200)
+  jenjang                String    @db.VarChar(30)
+  kategori               String    @db.VarChar(20)
+  jenjangAwal            String?   @map("jenjang_awal") @db.VarChar(30)
+  jenjangPuncak          String?   @map("jenjang_puncak") @db.VarChar(30)
+  golonganRuangAwal      String?   @map("golongan_ruang_awal") @db.VarChar(10)
+  rumpunJabatan          String?   @map("rumpun_jabatan") @db.VarChar(150)
+  ruangLingkup           String?   @map("ruang_lingkup") @db.VarChar(100)
+  kedudukan              String?   @db.Text
+  pengisianAsn           String?   @map("pengisian_asn") @db.VarChar(50)
+  instansiPembina        String?   @map("instansi_pembina") @db.VarChar(200)
+  dasarHukum             String?   @map("dasar_hukum") @db.VarChar(200)
+  tugasJabatan           String?   @map("tugas_jabatan") @db.Text
+  pendidikanPengangkatan String?   @map("pendidikan_pengangkatan") @db.Text
+  pendidikanPerpindahan  String?   @map("pendidikan_perpindahan") @db.Text
+  perpresTunjangan       String?   @map("perpres_tunjangan") @db.VarChar(200)
+  besaranTunjangan       String?   @map("besaran_tunjangan") @db.VarChar(100)
+
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  jabatan                SiformenJabatan[]
+
+  @@index([namaJabatan])
+  @@index([kategori])
+  @@index([rumpunJabatan])
+  @@map("siformen_jabatan_fungsional_ref")
+}
+
+model SiformenJabatan {
+  id                      String                       @id @default(uuid()) @db.VarChar(36)
+  kodeJabatan             String                       @unique @map("kode_jabatan") @db.VarChar(40)
+  namaJabatan             String                       @map("nama_jabatan") @db.VarChar(200)
+  jenisJabatan            String                       @map("jenis_jabatan") @db.VarChar(40)
+  eselonLevel             String?                      @map("eselon_level") @db.VarChar(10)
+  kelasJabatan            Int?                         @map("kelas_jabatan")
+  unitKerja               String                       @map("unit_kerja") @db.VarChar(200)
+  satuanKerja             String?                      @map("satuan_kerja") @db.VarChar(200)
+  kualifikasiPendidikan   String?                      @map("kualifikasi_pendidikan") @db.Text
+  isActive                Boolean                      @default(true) @map("is_active")
+
+  jabatanFungsionalRefId  String?                      @map("jabatan_fungsional_ref_id") @db.VarChar(36)
+  jabatanFungsionalRef    SiformenJabatanFungsionalRef? @relation(fields: [jabatanFungsionalRefId], references: [id], onDelete: SetNull)
+
+  createdAt               DateTime                     @default(now()) @map("created_at")
+  createdBy               String?                      @map("created_by") @db.VarChar(36)
+  updatedAt               DateTime                     @updatedAt @map("updated_at")
+  updatedBy               String?                      @map("updated_by") @db.VarChar(36)
+  deletedAt               DateTime?                    @map("deleted_at")
+
+  bezetting               SiformenBezetting[]
+  formasi                 SiformenFormasi[]
+  abk                     SiformenAbk[]
+
+  @@index([jenisJabatan])
+  @@index([unitKerja])
+  @@index([jabatanFungsionalRefId])
+  @@map("siformen_jabatan")
+}
+
+model SiformenBezetting {
+  id           String           @id @default(uuid()) @db.VarChar(36)
+  jabatanId    String?          @map("jabatan_id") @db.VarChar(36)
+  jabatan      SiformenJabatan? @relation(fields: [jabatanId], references: [id], onDelete: SetNull)
+
+  namaJabatan  String           @map("nama_jabatan") @db.VarChar(200)
+  unitKerja    String           @map("unit_kerja") @db.VarChar(200)
+  tahun        Int
+
+  nip          String?          @db.VarChar(20)
+  namaAsn      String?          @map("nama_asn") @db.VarChar(200)
+  pangkat      String?          @db.VarChar(100)
+  golongan     String?          @db.VarChar(20)
+  tmtJabatan   DateTime?        @map("tmt_jabatan")
+
+  statusIsi    String           @default("VACANT") @map("status_isi") @db.VarChar(20)
+  keterangan   String?          @db.Text
+
+  createdAt    DateTime         @default(now()) @map("created_at")
+  createdBy    String?          @map("created_by") @db.VarChar(36)
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  updatedBy    String?          @map("updated_by") @db.VarChar(36)
+
+  @@index([tahun])
+  @@index([unitKerja])
+  @@index([statusIsi])
+  @@map("siformen_bezetting")
+}
+
+model SiformenFormasi {
+  id                    String           @id @default(uuid()) @db.VarChar(36)
+  jabatanId             String?          @map("jabatan_id") @db.VarChar(36)
+  jabatan               SiformenJabatan? @relation(fields: [jabatanId], references: [id], onDelete: SetNull)
+
+  namaJabatan           String           @map("nama_jabatan") @db.VarChar(200)
+  unitKerja             String           @map("unit_kerja") @db.VarChar(200)
+  jenisFormasi          String           @map("jenis_formasi") @db.VarChar(20)
+  tahun                 Int
+  periode               String?          @db.VarChar(20)
+
+  jumlahKebutuhan       Int              @default(0) @map("jumlah_kebutuhan")
+  jumlahTersedia        Int              @default(0) @map("jumlah_tersedia")
+  jumlahUsulan          Int              @default(0) @map("jumlah_usulan")
+
+  kualifikasiPendidikan String?          @map("kualifikasi_pendidikan") @db.VarChar(200)
+  kualifikasiJurusan    String?          @map("kualifikasi_jurusan") @db.VarChar(200)
+  alasanKebutuhan       String?          @map("alasan_kebutuhan") @db.Text
+
+  status                String           @default("DRAFT") @db.VarChar(20)
+  catatanVerifikasi     String?          @map("catatan_verifikasi") @db.Text
+
+  approvedById          String?          @map("approved_by_id") @db.VarChar(36)
+  approvedAt            DateTime?        @map("approved_at")
+  submittedAt           DateTime?        @map("submitted_at")
+
+  createdAt             DateTime         @default(now()) @map("created_at")
+  createdBy             String?          @map("created_by") @db.VarChar(36)
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+  updatedBy             String?          @map("updated_by") @db.VarChar(36)
+  deletedAt             DateTime?        @map("deleted_at")
+
+  @@index([tahun])
+  @@index([jenisFormasi])
+  @@index([status])
+  @@map("siformen_formasi")
+}
+
+model SiformenAbk {
+  id               String           @id @default(uuid()) @db.VarChar(36)
+  jabatanId        String?          @map("jabatan_id") @db.VarChar(36)
+  jabatan          SiformenJabatan? @relation(fields: [jabatanId], references: [id], onDelete: SetNull)
+
+  namaJabatan      String           @map("nama_jabatan") @db.VarChar(200)
+  unitKerja        String           @map("unit_kerja") @db.VarChar(200)
+  tahun            Int
+  uraianTugas      String?          @map("uraian_tugas") @db.Text
+
+  volumeKerja      Float            @map("volume_kerja")
+  normaWaktu       Float            @map("norma_waktu")
+  bebanKerja       Float            @map("beban_kerja")
+  waktuEfektif     Float            @default(1250) @map("waktu_efektif")
+  kebutuhanPegawai Float            @map("kebutuhan_pegawai")
+  pegawaiAda       Int              @default(0) @map("pegawai_ada")
+  selisih          Float            @default(0)
+  keterangan       String?          @db.Text
+
+  createdAt        DateTime         @default(now()) @map("created_at")
+  createdBy        String?          @map("created_by") @db.VarChar(36)
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  updatedBy        String?          @map("updated_by") @db.VarChar(36)
+
+  @@index([tahun])
+  @@index([unitKerja])
+  @@map("siformen_abk")
+}
+
+// ─── Pemberhentian / Pensiun (UU No. 20 Tahun 2023) ─────────────────────────
+
+model PemberhentianProses {
+  id                 String              @id @default(uuid()) @db.VarChar(36)
+  asnId              String              @map("asn_id") @db.VarChar(36)
+  jenisPemberhentian JenisPemberhentian  @map("jenis_pemberhentian")
+  status             StatusPemberhentian @default(DRAFT)
+  tmtPemberhentian   DateTime?           @map("tmt_pemberhentian") @db.Date
+  nomorSk            String?             @map("nomor_sk") @db.VarChar(120)
+  tanggalSk          DateTime?           @map("tanggal_sk") @db.Date
+  nomorUsul          String?             @map("nomor_usul") @db.VarChar(120)
+  tanggalUsul        DateTime?           @map("tanggal_usul") @db.Date
+  nomorPengembalian  String?             @map("nomor_pengembalian") @db.VarChar(120)
+  alasanPengembalian String?             @map("alasan_pengembalian") @db.Text
+  catatan            String?             @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(36)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(36)
+  deletedAt DateTime? @map("deleted_at")
+
+  asn           Asn                          @relation(fields: [asnId], references: [id], onDelete: Cascade)
+  statusHistory PemberhentianStatusHistory[]
+  dokumen       PemberhentianDokumen[]
+
+  @@index([asnId])
+  @@index([status])
+  @@index([jenisPemberhentian])
+  @@index([tmtPemberhentian])
+  @@index([deletedAt])
+  @@map("pemberhentian_proses")
+}
+
+model PemberhentianStatusHistory {
+  id         String               @id @default(uuid()) @db.VarChar(36)
+  prosesId   String               @map("proses_id") @db.VarChar(36)
+  statusDari StatusPemberhentian? @map("status_dari")
+  statusKe   StatusPemberhentian  @map("status_ke")
+  catatan    String?              @db.Text
+  createdAt  DateTime             @default(now()) @map("created_at")
+  createdBy  String?              @map("created_by") @db.VarChar(36)
+
+  proses PemberhentianProses @relation(fields: [prosesId], references: [id], onDelete: Cascade)
+
+  @@index([prosesId])
+  @@index([createdAt])
+  @@map("pemberhentian_status_history")
+}
+
+model PemberhentianDokumen {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  prosesId     String   @map("proses_id") @db.VarChar(36)
+  jenisDokumen String   @map("jenis_dokumen") @db.VarChar(120)
+  namaFile     String   @map("nama_file") @db.VarChar(255)
+  storagePath  String   @map("storage_path") @db.VarChar(512)
+  fileSize     Int?     @map("file_size")
+  mimeType     String?  @map("mime_type") @db.VarChar(80)
+  keterangan   String?  @db.VarChar(300)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.VarChar(36)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  proses PemberhentianProses @relation(fields: [prosesId], references: [id], onDelete: Cascade)
+
+  @@index([prosesId])
+  @@index([jenisDokumen])
+  @@map("pemberhentian_dokumen")
+}

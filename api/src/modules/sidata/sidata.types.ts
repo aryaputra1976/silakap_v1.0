@@ -25,6 +25,7 @@ export const SIDATA_MAPPING_REVIEWER_ROLES = [
 ] as const;
 export const SIDATA_ALL_ACCESS_ROLES = [
   ...SIDATA_ADMIN_ROLES,
+  'KEPALA_BADAN',
   'OPERATOR_IMPORT',
   'REVIEWER_MAPPING',
 ] as const;
@@ -232,3 +233,58 @@ export class SidataAsnDocumentUploadDto {
   @MaxLength(100)
   documentType!: string;
 }
+
+export type RekapJKRow = { pria: number; wanita: number; lainnya: number; total: number; persenPria: number; persenWanita: number };
+export type RekapGolonganRow = { golru: string; pria: number; wanita: number; total: number };
+export type RekapPendidikanRow = { pddkn: string; pria: number; wanita: number; total: number };
+export type RekapJenjangRow = { jenisAsn?: string; jabatan: string; pria: number; wanita: number; total: number; persenPria: number; persenWanita: number };
+export type RekapStrukturalEselonRow = { eselon: string; terisi: number; pria: number; wanita: number };
+export type RekapStrukturalPendidikanRow = { pddkn: string; ess1: number; ess2: number; ess3: number; ess4: number; total: number };
+export type RekapFungsionalRow = { namaJabatan: string; ahliPria: number; ahliWanita: number; jumlahAhli: number; terampilPria: number; terampilWanita: number; jumlahTerampil: number; jumlahTotal: number };
+export type RekapIkhtisarResponse = {
+  allJk: RekapJKRow;
+  pppkJk: RekapJKRow;
+  allJenjangJabatan: RekapJenjangRow[];
+  pppkJenjangJabatan: RekapJenjangRow[];
+};
+
+export type RekapPnsResponse = {
+  pnsGolonganDetail: RekapGolonganRow[];
+  pnsGolonganGroup: RekapGolonganRow[];
+  pnsPendidikanDetail: RekapPendidikanRow[];
+  pnsPendidikanGroup: RekapPendidikanRow[];
+  strukturalEselonDetail: RekapStrukturalEselonRow[];
+  strukturalEselonGroup: RekapStrukturalEselonRow[];
+  strukturalPendidikan: RekapStrukturalPendidikanRow[];
+  fungsionalJabatan: RekapFungsionalRow[];
+};
+
+export type RekapPppkResponse = {
+  pppkGolongan: RekapGolonganRow[];
+  pppkPendidikanDetail: RekapPendidikanRow[];
+  pppkPendidikanGroup: RekapPendidikanRow[];
+  pppkParuhWaktuGolongan: RekapGolonganRow[];
+  pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[];
+  pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[];
+};
+
+export type RekapAsnResponse = {
+  allJk: RekapJKRow;
+  pnsGolonganDetail: RekapGolonganRow[];
+  pnsGolonganGroup: RekapGolonganRow[];
+  pnsPendidikanDetail: RekapPendidikanRow[];
+  pnsPendidikanGroup: RekapPendidikanRow[];
+  allJenjangJabatan: RekapJenjangRow[];
+  strukturalEselonDetail: RekapStrukturalEselonRow[];
+  strukturalEselonGroup: RekapStrukturalEselonRow[];
+  strukturalPendidikan: RekapStrukturalPendidikanRow[];
+  fungsionalJabatan: RekapFungsionalRow[];
+  pppkJk: RekapJKRow;
+  pppkGolongan: RekapGolonganRow[];
+  pppkPendidikanDetail: RekapPendidikanRow[];
+  pppkPendidikanGroup: RekapPendidikanRow[];
+  pppkParuhWaktuGolongan: RekapGolonganRow[];
+  pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[];
+  pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[];
+  pppkJenjangJabatan: RekapJenjangRow[];
+};

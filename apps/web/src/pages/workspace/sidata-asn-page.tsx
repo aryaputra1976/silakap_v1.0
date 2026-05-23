@@ -470,96 +470,190 @@ export function SidataAsnPage() {
       {loading ? (
         <LoadingState label="Memuat data ASN" />
       ) : (
-        <DataTable
-          items={data?.items ?? []}
-          rowKey={(item) => item.id}
-          empty={
-            hasActiveFilter
-              ? 'Tidak ada ASN yang cocok dengan filter.'
-              : 'Belum ada data ASN.'
-          }
-          columns={[
-            {
-              key: 'nip',
-              header: 'NIP',
-              render: (item) => (
-                <span className="font-mono text-xs text-zinc-700">{item.nip}</span>
-              ),
-            },
-            {
-              key: 'nama',
-              header: 'Nama',
-              render: (item) => (
-                <div>
-                  <div className="font-semibold text-zinc-950">{item.nama}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {item.jabatanNama ?? '-'}
-                  </div>
-                  <div className="mt-1 text-xs text-[#60735b]">
-                    {[item.pendidikanTingkatNama ?? item.pendidikanNama, item.usia ? `${item.usia} th` : null]
-                      .filter(Boolean)
-                      .join(' · ') || '-'}
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'jenis',
-              header: 'Jenis',
-              render: (item) => <JenisAsnBadge value={item.jenisAsn} />,
-            },
-            {
-              key: 'unit',
-              header: 'Unit Kerja',
-              render: (item) => item.unitKerja?.nama ?? '-',
-            },
-            {
-              key: 'golongan',
-              header: 'Golongan',
-              render: (item) => (
-                <div>
-                  <div className="font-semibold text-[#173c36]">{item.golonganNama ?? '-'}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    TMT {formatShortDate(item.tmtGolongan)}
-                  </div>
-                  <div className="text-xs text-[#60735b]">
-                    MK {item.masaKerjaGolongan ?? '-'}
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'status',
-              header: 'Status',
-              render: (item) => (
-                <StatusBadge value={item.statusAsn ?? '-'} />
-              ),
-            },
-            {
-              key: 'actions',
-              header: '',
-              render: (item) => (
-                <div className="flex items-center gap-2">
-                  <ActionButton
-                    icon={Eye}
-                    onClick={() => navigate(`/sidata/asn/${item.id}`)}
-                    variant="secondary"
-                  >
-                    Detail
-                  </ActionButton>
-                  <ActionButton
-                    disabled={creatingId === item.id}
-                    icon={FilePlus2}
-                    onClick={() => void handleCreateSipensiun(item)}
-                    variant="secondary"
-                  >
-                    {creatingId === item.id ? 'Membuat…' : 'Usulan'}
-                  </ActionButton>
-                </div>
-              ),
-            },
-          ]}
-        />
+        <>
+          {/* Mobile card list */}
+          <div className="block md:hidden">
+            {(data?.items ?? []).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-400">
+                {hasActiveFilter ? 'Tidak ada ASN yang cocok dengan filter.' : 'Belum ada data ASN.'}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(data?.items ?? []).map((item) => {
+                  const tmt = item.tmtPensiun ? new Date(item.tmtPensiun) : null;
+                  const now = new Date();
+                  const bulanSisa = tmt
+                    ? (tmt.getFullYear() - now.getFullYear()) * 12 + (tmt.getMonth() - now.getMonth())
+                    : null;
+                  const tmtLabel = tmt
+                    ? tmt.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })
+                    : null;
+                  const tmtUrgent = bulanSisa !== null && bulanSisa <= 6 && bulanSisa >= 0;
+                  const tmtLewat = bulanSisa !== null && bulanSisa < 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+                    >
+                      {/* Card header */}
+                      <div className="flex items-start justify-between gap-3 border-b border-zinc-100 bg-zinc-50/60 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-zinc-900">{item.nama}</p>
+                          <p className="font-mono text-xs text-zinc-400">{item.nip}</p>
+                        </div>
+                        <StatusBadge value={item.statusAsn ?? '-'} />
+                      </div>
+
+                      {/* Card body */}
+                      <div className="px-4 py-3 space-y-2 text-sm">
+                        <div className="flex items-start gap-2">
+                          <span className="w-20 shrink-0 text-xs text-zinc-400">Unit</span>
+                          <span className="text-zinc-700 leading-tight">{item.unitKerja?.nama ?? '-'}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="w-20 shrink-0 text-xs text-zinc-400">Pangkat</span>
+                          <span className="font-medium text-[#173c36]">{item.golonganNama ?? '-'}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="w-20 shrink-0 text-xs text-zinc-400">Jabatan</span>
+                          <span className="text-zinc-600 leading-tight">{item.jabatanNama ?? '-'}</span>
+                        </div>
+                        {tmtLabel && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-20 shrink-0 text-xs text-zinc-400">Pensiun</span>
+                            <span className={`font-medium ${tmtUrgent ? 'text-amber-600' : tmtLewat ? 'text-red-500' : 'text-zinc-700'}`}>
+                              {tmtLabel}
+                            </span>
+                            {tmtUrgent && <span className="text-xs text-amber-500">{bulanSisa} bln</span>}
+                            {tmtLewat && <span className="text-xs text-red-400">Lewat</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card actions */}
+                      <div className="flex gap-2 border-t border-zinc-100 px-4 py-3">
+                        <ActionButton
+                          icon={Eye}
+                          onClick={() => navigate(`/sidata/asn/${item.id}`)}
+                          variant="secondary"
+                        >
+                          Detail
+                        </ActionButton>
+                        <ActionButton
+                          disabled={creatingId === item.id}
+                          icon={FilePlus2}
+                          onClick={() => void handleCreateSipensiun(item)}
+                          variant="secondary"
+                        >
+                          {creatingId === item.id ? 'Membuat…' : 'Usulan'}
+                        </ActionButton>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <DataTable
+              items={data?.items ?? []}
+              rowKey={(item) => item.id}
+              empty={
+                hasActiveFilter
+                  ? 'Tidak ada ASN yang cocok dengan filter.'
+                  : 'Belum ada data ASN.'
+              }
+              columns={[
+                {
+                  key: 'nip_status',
+                  header: 'NIP',
+                  className: 'w-[160px]',
+                  render: (item) => (
+                    <div>
+                      <span className="whitespace-nowrap font-mono text-xs text-zinc-700">{item.nip}</span>
+                      <div className="mt-2">
+                        <StatusBadge value={item.statusAsn ?? '-'} />
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'nama_unit',
+                  header: 'Nama / Unit Kerja',
+                  render: (item) => (
+                    <div className="min-w-0">
+                      <div className="font-semibold text-zinc-950">{item.nama}</div>
+                      <div className="mt-1 text-xs text-zinc-500">{item.unitKerja?.nama ?? '-'}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'pangkat_jabatan',
+                  header: 'Pangkat / Jabatan',
+                  className: 'w-[190px]',
+                  render: (item) => (
+                    <div>
+                      <div className="font-semibold text-[#173c36]">{item.golonganNama ?? '-'}</div>
+                      <div className="mt-0.5 text-xs text-zinc-500">{item.jabatanNama ?? '-'}</div>
+                      <div className="mt-1 text-xs text-[#60735b]">MK {item.masaKerjaGolongan ?? '-'}</div>
+                      <div className="text-xs text-zinc-400">{item.pendidikanTingkatNama ?? item.pendidikanNama ?? '-'}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'tmt_pensiun',
+                  header: 'TMT Pensiun',
+                  className: 'w-[120px]',
+                  render: (item) => {
+                    if (!item.tmtPensiun) return <span className="text-xs text-zinc-400">-</span>;
+                    const tmt = new Date(item.tmtPensiun);
+                    const now = new Date();
+                    const bulanSisa = (tmt.getFullYear() - now.getFullYear()) * 12 + (tmt.getMonth() - now.getMonth());
+                    const label = tmt.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+                    const urgent = bulanSisa <= 6 && bulanSisa >= 0;
+                    const lewat = bulanSisa < 0;
+                    return (
+                      <div>
+                        <span className={`text-sm font-medium ${urgent ? 'text-amber-600' : lewat ? 'text-red-500' : 'text-zinc-700'}`}>
+                          {label}
+                        </span>
+                        {urgent && <div className="text-xs text-amber-500">{bulanSisa} bln lagi</div>}
+                        {lewat && <div className="text-xs text-red-400">Lewat</div>}
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: 'actions',
+                  header: '',
+                  className: 'w-[140px]',
+                  render: (item) => (
+                    <div className="flex flex-col items-start gap-2">
+                      <ActionButton
+                        icon={Eye}
+                        onClick={() => navigate(`/sidata/asn/${item.id}`)}
+                        variant="secondary"
+                      >
+                        Detail
+                      </ActionButton>
+                      <ActionButton
+                        disabled={creatingId === item.id}
+                        icon={FilePlus2}
+                        onClick={() => void handleCreateSipensiun(item)}
+                        variant="secondary"
+                      >
+                        {creatingId === item.id ? 'Membuat…' : 'Usulan'}
+                      </ActionButton>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        </>
       )}
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 text-sm md:flex-row md:items-center md:justify-between">

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SopChecklistInstance, SopChecklistItem, SopChecklistAuditLog } from '@prisma/client';
 import { CreateInstanceDto } from './dto/create-instance.dto';
@@ -77,7 +77,10 @@ export interface RhkProgressRow {
 
 @Injectable()
 export class SopChecklistRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   async findInstances(query: ListInstancesQueryDto): Promise<SopChecklistInstance[]> {
     return this.prisma.sopChecklistInstance.findMany({

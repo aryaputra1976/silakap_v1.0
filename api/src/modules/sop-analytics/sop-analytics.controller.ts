@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -22,7 +22,10 @@ const VIEW_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/sop-analytics')
 export class SopAnalyticsController {
-  constructor(private readonly service: SopAnalyticsService) {}
+  constructor(
+    @Inject(SopAnalyticsService)
+    private readonly service: SopAnalyticsService,
+  ) {}
 
   @Get('compliance-summary')
   @Roles(...VIEW_ROLES)

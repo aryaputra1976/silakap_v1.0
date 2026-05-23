@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
+  BarChart3,
   Bell,
   BookOpenCheck,
   CheckCircle2,
@@ -66,7 +67,7 @@ export function WorkspaceLayout() {
 
   return (
     <div className="min-h-screen bg-zinc-100 text-foreground">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
+      <aside className="no-print fixed inset-y-0 left-0 hidden w-72 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
         <div className="border-b border-border p-5">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-lg bg-zinc-900 text-white">
@@ -113,8 +114,8 @@ export function WorkspaceLayout() {
         </div>
       </aside>
 
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-border bg-white/95 backdrop-blur">
+      <div className="lg:pl-72 print:pl-0">
+        <header className="no-print sticky top-0 z-20 border-b border-border bg-white/95 backdrop-blur">
           <div className="flex min-h-16 items-center justify-between gap-4 px-4 md:px-6">
             <div className="flex items-center gap-3 lg:hidden">
               <div className="flex size-10 items-center justify-center rounded-lg bg-zinc-900 text-white">

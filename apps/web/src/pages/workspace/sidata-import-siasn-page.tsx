@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useMemo, useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -9,7 +9,9 @@ import {
   GitCompareArrows,
   Loader2,
   Network,
+  PencilLine,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
   Upload,
 } from 'lucide-react';
@@ -31,14 +33,45 @@ import {
   sidataImportApi,
   type PaginatedIssues,
   type SiasnImportBatch,
+  type SiasnImportIssueRow,
   type SiasnImportSummary,
 } from '@/lib/api/sidata-import';
+import { sidataApi, type SidataUnitKerja } from '@/lib/api/sidata';
 import { SidataSopPanel } from '@/components/workspace/sidata/sidata-sop-panel';
 import { SidataSyncStatusPanel } from '@/components/workspace/sidata/sidata-sync-status-panel';
 import { SIDATA_SOP_LIST } from '@/lib/sidata/sidata-sop-data';
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
+}
+
+function normalizeUnitSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\bsubbag\b/g, 'sub bagian')
+    .replace(/\bsub\s+bag\b/g, 'sub bagian')
+    .replace(/kepegawiaan/g, 'kepegawaian')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeIssueErrors(value: SiasnImportIssueRow['validationErrors']) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [String(value)];
+  } catch {
+    return [String(value)];
+  }
+}
+
+function canResolveUnitKerja(issue: SiasnImportIssueRow) {
+  return normalizeIssueErrors(issue.validationErrors).some((error) =>
+    error.toLowerCase().includes('unit organisasi'),
+  );
 }
 
 type IssueTab = 'issues' | 'needs-review' | 'invalid';
@@ -187,8 +220,15 @@ export function SidataImportSiasnPage() {
   const [issuesSearch, setIssuesSearch] = useState('');
 
   const [mapping, setMapping] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [unitOptions, setUnitOptions] = useState<SidataUnitKerja[]>([]);
+  const [unitSearch, setUnitSearch] = useState('');
+  const [resolvingIssue, setResolvingIssue] = useState<SiasnImportIssueRow | null>(null);
+  const [selectedUnitKerjaId, setSelectedUnitKerjaId] = useState('');
+  const [savingResolution, setSavingResolution] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const asnPollRef = useRef<(() => Promise<void>) | null>(null);
 
@@ -215,6 +255,19 @@ export function SidataImportSiasnPage() {
   }, [activeTab, issuesPage]);
 
   const summaryStatus = summary?.status ?? null;
+
+  const filteredUnitOptions = useMemo(() => {
+    const q = normalizeUnitSearchText(unitSearch);
+
+    return unitOptions
+      .filter((unit) => {
+        if (!q) return true;
+
+        const haystack = normalizeUnitSearchText(`${unit.kode} ${unit.nama}`);
+        return haystack.includes(q) || q.split(' ').every((token) => haystack.includes(token));
+      })
+      .slice(0, 40);
+  }, [unitOptions, unitSearch]);
 
   async function silentRefreshSummary() {
     if (!selectedId) return;
@@ -372,6 +425,34 @@ export function SidataImportSiasnPage() {
     }
   }
 
+  async function handleCommit() {
+    if (!selectedId || !summary) return;
+
+    const confirmed = window.confirm(
+      `Commit final ${summary.totalRows} baris ASN ke database utama? Pastikan mapping dan hasil review sudah benar.`,
+    );
+
+    if (!confirmed) return;
+
+    setCommitting(true);
+
+    try {
+      const result = await sidataImportApi.commitAsnBatch(selectedId);
+
+      toast.success(result.message ?? 'Commit final ASN diproses di background.');
+
+      await Promise.all([
+        loadSummary(selectedId),
+        loadBatches(),
+        loadIssues(selectedId, activeTab, issuesPage, issuesSearch),
+      ]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal commit final batch ASN');
+    } finally {
+      setCommitting(false);
+    }
+  }
+
   async function handleCancel() {
     if (!selectedId) return;
 
@@ -393,6 +474,52 @@ export function SidataImportSiasnPage() {
       toast.error(err instanceof Error ? err.message : 'Gagal membatalkan batch');
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function openUnitResolver(issue: SiasnImportIssueRow) {
+    setResolvingIssue(issue);
+    setSelectedUnitKerjaId('');
+    setResolutionNote('');
+    setUnitSearch(issue.unitOrganisasiNama ?? '');
+
+    try {
+      if (unitOptions.length === 0) {
+        setUnitOptions(await sidataApi.getUnits());
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memuat daftar unit kerja');
+    }
+  }
+
+  async function saveUnitResolution() {
+    if (!selectedId || !resolvingIssue?.id || !selectedUnitKerjaId) {
+      toast.error('Pilih unit kerja target terlebih dahulu.');
+      return;
+    }
+
+    setSavingResolution(true);
+
+    try {
+      await sidataImportApi.resolveUnitKerjaMapping(selectedId, resolvingIssue.id, {
+        unitKerjaId: selectedUnitKerjaId,
+        note: resolutionNote.trim() || undefined,
+      });
+
+      toast.success('Mapping unit kerja disimpan.');
+      setResolvingIssue(null);
+      setSelectedUnitKerjaId('');
+      setResolutionNote('');
+
+      await Promise.all([
+        loadSummary(selectedId),
+        loadIssues(selectedId, activeTab, issuesPage, issuesSearch),
+        loadBatches(),
+      ]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan mapping unit kerja');
+    } finally {
+      setSavingResolution(false);
     }
   }
 
@@ -436,9 +563,10 @@ export function SidataImportSiasnPage() {
     ? !['COMMITTED', 'FAILED', 'CANCELLED', 'PROCESSING'].includes(currentStatus)
     : false;
 
-  const isBusy = mapping || cancelling || uploading || extracting;
+  const isBusy = mapping || committing || cancelling || uploading || extracting;
   const commitSafe = isAsnCommitSafe(summary);
   const committed = isCommittedStatus(summary);
+  const canCommit = Boolean(summary && commitSafe && !committed);
   const showQualityGateWarning = Boolean(summary && !commitSafe && !committed);
 
   return (
@@ -696,6 +824,16 @@ export function SidataImportSiasnPage() {
                       <StatusBadge value="Commit Belum Aman" tone="warning" />
                     )}
 
+                    {canCommit && (
+                      <ActionButton
+                        icon={committing ? Loader2 : ShieldCheck}
+                        onClick={() => void handleCommit()}
+                        disabled={isBusy}
+                      >
+                        {committing ? 'Committing...' : 'Commit Final'}
+                      </ActionButton>
+                    )}
+
                     {canCancel && (
                       <ActionButton
                         variant="secondary"
@@ -881,9 +1019,7 @@ export function SidataImportSiasnPage() {
                           key: 'errors',
                           header: 'Keterangan',
                           render: (item) => {
-                            const errors = Array.isArray(item.validationErrors)
-                              ? (item.validationErrors as string[])
-                              : [];
+                            const errors = normalizeIssueErrors(item.validationErrors);
 
                             if (errors.length === 0) {
                               return <span className="text-xs text-zinc-400">—</span>;
@@ -902,6 +1038,23 @@ export function SidataImportSiasnPage() {
                               </ul>
                             );
                           },
+                        },
+                        {
+                          key: 'action',
+                          header: 'Aksi',
+                          render: (item) =>
+                            canResolveUnitKerja(item) ? (
+                              <ActionButton
+                                icon={PencilLine}
+                                onClick={() => void openUnitResolver(item)}
+                                variant="secondary"
+                              >
+                                Mapping Unit
+                              </ActionButton>
+                            ) : (
+                              <span className="text-xs text-zinc-400">-</span>
+                            ),
+                          className: 'w-40',
                         },
                       ]}
                     />
@@ -951,6 +1104,90 @@ export function SidataImportSiasnPage() {
           title="SOP Sinkronisasi SIASN"
         />
       </div>
+
+      {resolvingIssue ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-3xl rounded-lg border border-[#c9d9c4] bg-[#fbfdf8] shadow-2xl">
+            <div className="border-b border-[#d8e4d3] p-5">
+              <div className="text-lg font-semibold text-[#073b3a]">Mapping Unit Kerja</div>
+              <div className="mt-1 text-sm text-[#5b6b58]">
+                {resolvingIssue.nama ?? '-'} - {resolvingIssue.nip ?? '-'}
+              </div>
+              <div className="mt-3 rounded-md border border-[#d8e4d3] bg-white/70 p-3 text-sm text-[#445642]">
+                Unit dari ASN: {resolvingIssue.unitOrganisasiNama ?? '-'}
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <input
+                className={inputClass}
+                onChange={(event) => setUnitSearch(event.target.value)}
+                placeholder="Cari kode atau nama unit kerja..."
+                value={unitSearch}
+              />
+
+              <div className="max-h-80 overflow-auto rounded-lg border border-[#d8e4d3] bg-white">
+                {filteredUnitOptions.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">Unit kerja tidak ditemukan.</div>
+                ) : (
+                  filteredUnitOptions.map((unit) => (
+                    <label
+                      className="flex cursor-pointer items-start gap-3 border-b border-[#edf3ea] p-3 text-sm last:border-b-0 hover:bg-[#f1f7ed]"
+                      key={unit.id}
+                    >
+                      <input
+                        checked={selectedUnitKerjaId === unit.id}
+                        className="mt-1"
+                        name="unitKerjaTarget"
+                        onChange={() => setSelectedUnitKerjaId(unit.id)}
+                        type="radio"
+                      />
+                      <span>
+                        <span className="block font-semibold text-[#073b3a]">{unit.nama}</span>
+                        <span className="mt-1 block font-mono text-xs text-[#687761]">
+                          {unit.kode} - Level {unit.level}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-[#073b3a]">
+                  Catatan Mapping
+                </label>
+                <textarea
+                  className={`${inputClass} min-h-24 resize-y py-3`}
+                  onChange={(event) => setResolutionNote(event.target.value)}
+                  placeholder="Contoh: Unit SIASN menggunakan nomenklatur lama, dipetakan ke unit kerja aktif yang sesuai."
+                  value={resolutionNote}
+                />
+                <p className="mt-1 text-xs text-[#687761]">
+                  Catatan ini membantu audit dan review ulang hasil mapping manual.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#d8e4d3] p-5">
+              <ActionButton
+                disabled={savingResolution}
+                onClick={() => setResolvingIssue(null)}
+                variant="secondary"
+              >
+                Batal
+              </ActionButton>
+              <ActionButton
+                disabled={!selectedUnitKerjaId || savingResolution}
+                icon={savingResolution ? Loader2 : ShieldCheck}
+                onClick={() => void saveUnitResolution()}
+              >
+                {savingResolution ? 'Menyimpan...' : 'Simpan Mapping'}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -75,7 +76,10 @@ function assertRole(roles: string[], allowed: Set<string>): void {
 
 @Injectable()
 export class SopGovernanceService {
-  constructor(private readonly repo: SopGovernanceRepository) {}
+  constructor(
+    @Inject(SopGovernanceRepository)
+    private readonly repo: SopGovernanceRepository,
+  ) {}
 
   list(q: GovernanceListQueryDto, roles: string[]) {
     assertNotBlocked(roles);

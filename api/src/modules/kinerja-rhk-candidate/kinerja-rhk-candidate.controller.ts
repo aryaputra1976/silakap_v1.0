@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Post,
   Query,
@@ -37,7 +38,10 @@ const APPROVE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'];
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/internal/rhk-candidates')
 export class KinerjaRhkCandidateController {
-  constructor(private readonly service: KinerjaRhkCandidateService) {}
+  constructor(
+    @Inject(KinerjaRhkCandidateService)
+    private readonly service: KinerjaRhkCandidateService,
+  ) {}
 
   @Get()
   @Roles(...VIEW_ROLES)

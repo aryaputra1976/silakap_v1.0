@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { KinerjaRhkRealizationModule } from '../kinerja-rhk-realization/kinerja-rhk-realization.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -7,7 +7,7 @@ import { KinerjaRhkCandidateRepository } from './kinerja-rhk-candidate.repositor
 import { KinerjaRhkCandidateService } from './kinerja-rhk-candidate.service';
 
 @Module({
-  imports: [AuthModule, PrismaModule, forwardRef(() => KinerjaRhkRealizationModule)],
+  imports: [AuthModule, PrismaModule, KinerjaRhkRealizationModule],
   controllers: [KinerjaRhkCandidateController],
   providers: [KinerjaRhkCandidateRepository, KinerjaRhkCandidateService],
   exports: [KinerjaRhkCandidateRepository, KinerjaRhkCandidateService],

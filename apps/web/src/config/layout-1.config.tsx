@@ -1,10 +1,14 @@
 import {
   Archive,
   BarChart3,
+  BookOpen,
   BookOpenCheck,
+  Building2,
   CalendarDays,
   ClipboardCheck,
+  ClipboardList,
   Database,
+  FileCheck,
   FileText,
   FolderArchive,
   Gauge,
@@ -14,6 +18,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ThumbsUp,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import { MenuConfig } from '@/config/types';
@@ -110,7 +115,7 @@ export const MENU_SIDEBAR: MenuConfig = [
       },
       {
         title: 'Monitoring Kegiatan',
-        path: '/kinerja-bidang/realizations?status=SUBMITTED',
+        path: '/kinerja-bidang/monitoring-kegiatan',
         moduleKey: 'KINERJA_BIDANG',
         requiredPermission: 'monitor',
       },
@@ -205,82 +210,83 @@ export const MENU_SIDEBAR: MenuConfig = [
     icon: Database,
     moduleKey: 'SIDATA',
     children: [
+      // ── Semua role SIDATA ────────────────────────────────────────────
       { title: 'Dashboard', path: '/sidata/dashboard', moduleKey: 'SIDATA' },
-      { title: 'Profil ASN', path: '/sidata/asn', moduleKey: 'SIDATA' },
+      // ── Data ASN: parent read, child masing-masing filter permission ─
       {
-        title: 'Validasi Data',
-        path: '/sidata/validasi',
+        title: 'Data ASN',
         moduleKey: 'SIDATA',
-        requiredPermission: 'verify',
+        children: [
+          { title: 'Profil ASN', path: '/sidata/asn', moduleKey: 'SIDATA' },
+          { title: 'Rekapitulasi ASN', path: '/sidata/rekap', moduleKey: 'SIDATA' },
+          {
+            title: 'Validasi Data',
+            path: '/sidata/validasi',
+            moduleKey: 'SIDATA',
+            requiredPermission: 'verify',
+          },
+          {
+            title: 'Pemutakhiran',
+            path: '/sidata/pemutakhiran',
+            moduleKey: 'SIDATA',
+            requiredPermission: 'input',
+          },
+        ],
       },
-      {
-        title: 'Pemutakhiran Data',
-        path: '/sidata/pemutakhiran',
-        moduleKey: 'SIDATA',
-        requiredPermission: 'input',
-      },
+      // ── Import: parent read, child filter upload/monitor ─────────────
       {
         title: 'Import & Sinkronisasi',
         moduleKey: 'SIDATA',
-        requiredPermission: 'upload',
         children: [
           {
-            title: 'Import SIASN',
+            title: 'Import Data',
             path: '/sidata/import/siasn',
             moduleKey: 'SIDATA',
             requiredPermission: 'upload',
           },
           {
-            title: 'Import Excel',
-            path: '/sidata/import/excel',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'upload',
-          },
-          {
-            title: 'Import Referensi',
-            path: '/sidata/import/referensi',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'upload',
-          },
-          {
-            title: 'Mapping Referensi',
-            path: '/sidata/import/mapping-referensi',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'verify',
-          },
-          {
-            title: 'Riwayat Import',
+            title: 'Riwayat & Log',
             path: '/sidata/import/riwayat',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'monitor',
-          },
-          {
-            title: 'Log Sinkronisasi',
-            path: '/sidata/import/log-sinkronisasi',
             moduleKey: 'SIDATA',
             requiredPermission: 'monitor',
           },
         ],
       },
+      // ── Referensi: semua role SIDATA ─────────────────────────────────
+      { title: 'Referensi Data', path: '/sidata/referensi', moduleKey: 'SIDATA' },
+      // ── Rekonsiliasi: verify ke atas; Discrepancy sebagai tab di dalam halaman
       {
-        title: 'Rekonsiliasi Data',
+        title: 'Rekonsiliasi',
         path: '/sidata/rekonsiliasi',
         moduleKey: 'SIDATA',
         requiredPermission: 'verify',
       },
+      // ── Arsip Bulanan: monitor dan upload ────────────────────────────
       {
-        title: 'Discrepancy Data',
-        path: '/sidata/validasi?view=discrepancy',
+        title: 'Arsip Bulanan ASN',
+        path: '/sidata/arsip',
         moduleKey: 'SIDATA',
-        requiredPermission: 'verify',
+        requiredPermission: 'monitor',
       },
-      { title: 'Referensi Data', path: '/sidata/referensi', moduleKey: 'SIDATA' },
-      { title: 'Dokumen ASN', path: '/sidata/dokumen', moduleKey: 'SIDATA' },
+      // ── Gaji Pokok PNS ───────────────────────────────────────────────
       {
-        title: 'Laporan',
-        path: '/sidata/laporan',
+        title: 'Gaji Pokok PNS',
+        path: '/sidata/gaji-pokok',
         moduleKey: 'SIDATA',
-        requiredPermission: 'report',
+      },
+      // ── Dokumen & Laporan: parent read, child filter report ──────────
+      {
+        title: 'Dokumen & Laporan',
+        moduleKey: 'SIDATA',
+        children: [
+          { title: 'Dokumen ASN', path: '/sidata/dokumen', moduleKey: 'SIDATA' },
+          {
+            title: 'Laporan',
+            path: '/sidata/laporan',
+            moduleKey: 'SIDATA',
+            requiredPermission: 'report',
+          },
+        ],
       },
     ],
   },
@@ -421,42 +427,19 @@ export const MENU_SIDEBAR: MenuConfig = [
       },
       {
         title: 'Pemberhentian ASN',
-        moduleKey: 'SIPENSIUN',
+        moduleKey: 'PEMBERHENTIAN',
         children: [
           {
-            title: 'Atas Permintaan Sendiri',
-            path: '/sipensiun?jenis=APS',
-            moduleKey: 'SIPENSIUN',
+            title: 'Monitoring BUP',
+            path: '/pemberhentian/monitoring',
+            moduleKey: 'PEMBERHENTIAN',
+            requiredPermission: 'monitor',
           },
           {
-            title: 'Tidak Cakap Jasmani/Rohani',
-            path: '/sipensiun?jenis=TIDAK_CAKAP',
-            moduleKey: 'SIPENSIUN',
-          },
-          {
-            title: 'Meninggal/Tewas/Hilang',
-            path: '/sipensiun?jenis=MENINGGAL_TEWAS_HILANG',
-            moduleKey: 'SIPENSIUN',
-          },
-          {
-            title: 'Disiplin/Hukum',
-            path: '/sipensiun?jenis=DISIPLIN_HUKUM',
-            moduleKey: 'SIPENSIUN',
-          },
-          {
-            title: 'Pemberhentian Sementara',
-            path: '/sipensiun?jenis=SEMENTARA',
-            moduleKey: 'SIPENSIUN',
-          },
-          {
-            title: 'Pengaktifan Kembali',
-            path: '/sipensiun?jenis=AKTIF_KEMBALI',
-            moduleKey: 'SIPENSIUN',
-          },
-          {
-            title: 'Perampingan Organisasi',
-            path: '/sipensiun?jenis=PERAMPINGAN',
-            moduleKey: 'SIPENSIUN',
+            title: 'Proses Pemberhentian',
+            path: '/pemberhentian/proses',
+            moduleKey: 'PEMBERHENTIAN',
+            requiredPermission: 'read',
           },
         ],
       },
@@ -483,6 +466,54 @@ export const MENU_SIDEBAR: MenuConfig = [
         path: '/sipensiun?view=reports',
         moduleKey: 'SIPENSIUN',
         requiredPermission: 'report',
+      },
+    ],
+  },
+  {
+    title: 'SIFORMEN',
+    icon: Building2,
+    moduleKey: 'SIFORMEN',
+    children: [
+      {
+        title: 'Dashboard SIFORMEN',
+        path: '/siformen',
+        icon: Gauge,
+        moduleKey: 'SIFORMEN',
+      },
+      {
+        title: 'Peta Jabatan',
+        path: '/siformen/jabatan',
+        icon: Building2,
+        moduleKey: 'SIFORMEN',
+        requiredPermission: 'read',
+      },
+      {
+        title: 'Ref. Jabatan Fungsional',
+        path: '/siformen/jabatan-fungsional-ref',
+        icon: BookOpen,
+        moduleKey: 'SIFORMEN',
+        requiredPermission: 'read',
+      },
+      {
+        title: 'Analisis Beban Kerja',
+        path: '/siformen/abk',
+        icon: TrendingUp,
+        moduleKey: 'SIFORMEN',
+        requiredPermission: 'read',
+      },
+      {
+        title: 'Bezetting Jabatan',
+        path: '/siformen/bezetting',
+        icon: Users,
+        moduleKey: 'SIFORMEN',
+        requiredPermission: 'read',
+      },
+      {
+        title: 'Usulan Formasi',
+        path: '/siformen/formasi',
+        icon: FileCheck,
+        moduleKey: 'SIFORMEN',
+        requiredPermission: 'read',
       },
     ],
   },

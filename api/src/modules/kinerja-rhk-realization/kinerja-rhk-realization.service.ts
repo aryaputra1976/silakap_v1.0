@@ -1,14 +1,15 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../auth/auth.types';
-import { KinerjaRhkCandidateRepository } from '../kinerja-rhk-candidate/kinerja-rhk-candidate.repository';
 import type { KinerjaRhkCandidateRecord } from '../kinerja-rhk-candidate/kinerja-rhk-candidate.repository';
+import { PrismaService } from '../prisma/prisma.service';
 import type { ArchiveRealizationDto } from './dto/archive-realization.dto';
 import type { CreateRealizationFromCandidateDto } from './dto/create-realization-from-candidate.dto';
 import type { QueryRealizationDto } from './dto/query-realization.dto';
@@ -67,8 +68,11 @@ function ensureApprove(user: AuthUser) {
 @Injectable()
 export class KinerjaRhkRealizationService {
   constructor(
+    @Inject(KinerjaRhkRealizationRepository)
     private readonly repo: KinerjaRhkRealizationRepository,
-    private readonly candidateRepo: KinerjaRhkCandidateRepository,
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+    @Inject(AuditService)
     private readonly auditService: AuditService,
   ) {}
 
@@ -97,7 +101,10 @@ export class KinerjaRhkRealizationService {
     user: AuthUser,
   ) {
     ensureApprove(user);
-    const candidate = await this.candidateRepo.findById(candidateId);
+    const candidate = await this.prisma.kinerjaRhkCandidate.findUnique({
+      where: { id: candidateId },
+      include: { auditLogs: { orderBy: { createdAt: 'desc' }, take: 20 } },
+    });
     if (!candidate) {
       throw new NotFoundException('Kandidat RHK tidak ditemukan');
     }

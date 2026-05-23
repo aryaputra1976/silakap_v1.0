@@ -19,6 +19,10 @@ import {
 } from './sidata.repository';
 import {
   NormalizedAsnFilters,
+  RekapAsnResponse,
+  RekapIkhtisarResponse,
+  RekapPnsResponse,
+  RekapPppkResponse,
   SIDATA_ADMIN_ROLES,
   SIDATA_ALL_ACCESS_ROLES,
   SIDATA_ASN_DOCUMENT_ALLOWED_EXTENSIONS,
@@ -68,9 +72,20 @@ type AsnResponse = {
   tmtJabatan: string | null;
   tmtGolongan: string | null;
   masaKerjaGolongan: string | null;
+  masaKerjaTahun: number | null;
+  masaKerjaBulan: number | null;
+  masaKerjaTotalBulan: number | null;
+  kelasJabatan: number | null;
+  siasnEselonId: string | null;
+  eselonNama: string | null;
+  jenisPegawaiNama: string | null;
+  detailStatusNama: string | null;
   pendidikanNama: string | null;
+  pendidikanRefId: string | null;
+  tingkatPendidikanRefId: string | null;
   pendidikanTingkatNama: string | null;
   tahunLulus: number | null;
+  namaSekolah: string | null;
   usia: number | null;
   jenisAsn: string | null;
   statusAsn: string | null;
@@ -189,6 +204,47 @@ export class SidataService {
       page: filters.page,
       limit: filters.limit,
       total: result.total,
+    };
+  }
+
+  async getRekapAsn(user: AuthUser): Promise<RekapAsnResponse> {
+    void user;
+    return this.sidataRepository.findRekapAsnData();
+  }
+
+  async getRekapIkhtisar(user: AuthUser): Promise<RekapIkhtisarResponse> {
+    const rekap = await this.getRekapAsn(user);
+    return {
+      allJk: rekap.allJk,
+      pppkJk: rekap.pppkJk,
+      allJenjangJabatan: rekap.allJenjangJabatan,
+      pppkJenjangJabatan: rekap.pppkJenjangJabatan,
+    };
+  }
+
+  async getRekapPns(user: AuthUser): Promise<RekapPnsResponse> {
+    const rekap = await this.getRekapAsn(user);
+    return {
+      pnsGolonganDetail: rekap.pnsGolonganDetail,
+      pnsGolonganGroup: rekap.pnsGolonganGroup,
+      pnsPendidikanDetail: rekap.pnsPendidikanDetail,
+      pnsPendidikanGroup: rekap.pnsPendidikanGroup,
+      strukturalEselonDetail: rekap.strukturalEselonDetail,
+      strukturalEselonGroup: rekap.strukturalEselonGroup,
+      strukturalPendidikan: rekap.strukturalPendidikan,
+      fungsionalJabatan: rekap.fungsionalJabatan,
+    };
+  }
+
+  async getRekapPppk(user: AuthUser): Promise<RekapPppkResponse> {
+    const rekap = await this.getRekapAsn(user);
+    return {
+      pppkGolongan: rekap.pppkGolongan,
+      pppkPendidikanDetail: rekap.pppkPendidikanDetail,
+      pppkPendidikanGroup: rekap.pppkPendidikanGroup,
+      pppkParuhWaktuGolongan: rekap.pppkParuhWaktuGolongan,
+      pppkParuhWaktuPendidikanDetail: rekap.pppkParuhWaktuPendidikanDetail,
+      pppkParuhWaktuPendidikanGroup: rekap.pppkParuhWaktuPendidikanGroup,
     };
   }
 
@@ -915,18 +971,29 @@ export class SidataService {
       rawData && typeof rawData === 'object' && !Array.isArray(rawData)
         ? rawData as Record<string, unknown>
         : {};
-
-    return (
-      this.formatGolonganSiasnKode(
-        latestGolongan?.siasnGolonganAkhirId
-        || this.pickJsonText(raw, ['gol_akhir_id', 'golongan_akhir_id', 'Gol Akhir ID', 'Golongan Akhir ID'])
-        || asn.siasnGolonganId,
-      )
-      || latestGolongan?.golonganAkhirNama?.trim()
+    const golonganCode =
+      latestGolongan?.siasnGolonganAkhirId
+      || this.pickJsonText(raw, ['gol_akhir_id', 'golongan_akhir_id', 'Gol Akhir ID', 'Golongan Akhir ID'])
+      || asn.siasnGolonganId;
+    const golonganName =
+      latestGolongan?.golonganAkhirNama?.trim()
       || this.pickJsonText(raw, ['gol_akhir_nama', 'golongan_akhir_nama', 'Gol Akhir Nama', 'Golongan Akhir Nama'])
       || latestGolongan?.golonganNama?.trim()
-      || asn.golonganNama
+      || asn.golonganNama;
+
+    if (this.isPppkAsn(asn)) {
+      return golonganName || this.formatGolonganSiasnKode(golonganCode);
+    }
+
+    return (
+      this.formatGolonganSiasnKode(golonganCode)
+      || golonganName
     );
+  }
+
+  private isPppkAsn(asn: AsnRecord): boolean {
+    const type = `${asn.tipePegawai ?? asn.jenisAsnNama ?? ''}`.toUpperCase();
+    return type.includes('PPPK');
   }
 
   private formatGolonganSiasnKode(value: string | null | undefined): string | null {
@@ -957,6 +1024,11 @@ export class SidataService {
   }
 
   private formatMasaKerja(asn: AsnRecord): string | null {
+    if (asn.masaKerjaTahun !== null && asn.masaKerjaTahun !== undefined) {
+      const bulan = asn.masaKerjaBulan ?? 0;
+      return `${asn.masaKerjaTahun} tahun ${bulan} bulan`;
+    }
+
     const latestGolongan = asn.golonganHistory[0];
     if (latestGolongan?.mkTahun !== null && latestGolongan?.mkTahun !== undefined) {
       const bulan = latestGolongan.mkBulan ?? 0;
@@ -992,6 +1064,10 @@ export class SidataService {
   }
 
   private pickJsonText(value: Record<string, unknown>, keys: string[]): string | null {
+    const normalizedValueByKey = new Map(
+      Object.entries(value).map(([key, item]) => [this.normalizeJsonKey(key), item]),
+    );
+
     for (const key of keys) {
       const direct = value[key];
       if (direct !== null && direct !== undefined) {
@@ -999,8 +1075,7 @@ export class SidataService {
         if (text) return text;
       }
 
-      const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
-      const normalized = value[normalizedKey];
+      const normalized = normalizedValueByKey.get(this.normalizeJsonKey(key));
       if (normalized !== null && normalized !== undefined) {
         const text = String(normalized).trim();
         if (text) return text;
@@ -1008,6 +1083,14 @@ export class SidataService {
     }
 
     return null;
+  }
+
+  private normalizeJsonKey(value: string): string {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
   }
 
   private toAsnResponse(asn: AsnRecord): AsnResponse {
@@ -1026,12 +1109,23 @@ export class SidataService {
       tmtJabatan: asn.tmtJabatan?.toISOString() ?? null,
       tmtGolongan: asn.tmtGolongan?.toISOString() ?? null,
       masaKerjaGolongan: this.formatMasaKerja(asn),
-      pendidikanNama: asn.pendidikanHistory[0]?.pendidikanNama ?? null,
-      pendidikanTingkatNama: asn.pendidikanHistory[0]?.tingkatPendidikanNama ?? null,
-      tahunLulus: asn.pendidikanHistory[0]?.tahunLulus ?? null,
+      masaKerjaTahun: asn.masaKerjaTahun,
+      masaKerjaBulan: asn.masaKerjaBulan,
+      masaKerjaTotalBulan: asn.masaKerjaTotalBulan,
+      kelasJabatan: asn.kelasJabatan,
+      siasnEselonId: asn.siasnEselonId,
+      eselonNama: asn.eselonNama,
+      jenisPegawaiNama: asn.jenisPegawaiNama,
+      detailStatusNama: asn.detailStatusNama,
+      pendidikanNama: asn.pendidikanNama ?? asn.pendidikanHistory[0]?.pendidikanNama ?? null,
+      pendidikanRefId: asn.pendidikanRefId,
+      tingkatPendidikanRefId: asn.tingkatPendidikanRefId,
+      pendidikanTingkatNama: asn.tingkatPendidikanNama ?? asn.pendidikanHistory[0]?.tingkatPendidikanNama ?? null,
+      tahunLulus: asn.tahunLulus ?? asn.pendidikanHistory[0]?.tahunLulus ?? null,
+      namaSekolah: asn.namaSekolah,
       usia: this.calculateAge(asn.siasnProfile?.tanggalLahir),
-      jenisAsn: asn.tipePegawai ?? asn.jenisAsnNama,
-      statusAsn: asn.statusAsn,
+      jenisAsn: asn.tipePegawai ?? asn.jenisPegawaiNama ?? asn.jenisAsnNama,
+      statusAsn: asn.statusAsn ?? asn.detailStatusNama,
       tanggalLahir: asn.siasnProfile?.tanggalLahir?.toISOString() ?? null,
       tmtPensiun: asn.tmtPensiun?.toISOString() ?? null,
     };
@@ -1067,9 +1161,9 @@ export class SidataService {
       type: 'GOLONGAN',
       golonganRefId: item.golonganRefId,
       siasnGolonganId: item.siasnGolonganId,
-      golonganNama: this.formatGolonganSiasnKode(item.siasnGolonganAkhirId)
-        ?? item.golonganAkhirNama
-        ?? item.golonganNama,
+      golonganNama: item.golonganAkhirNama
+        ?? item.golonganNama
+        ?? this.formatGolonganSiasnKode(item.siasnGolonganAkhirId),
       pangkatNama: item.pangkatNama,
       ruangNama: item.ruangNama,
       tmtGolongan: item.tmtGolongan?.toISOString() ?? null,

@@ -27,6 +27,10 @@ import { WorkingCalendarModule } from './working-calendar/working-calendar.modul
 import { ReconciliationBpkadModule } from './reconciliation-bpkad/reconciliation-bpkad.module';
 import { AdminModule } from './admin/admin.module';
 import { IkmModule } from './ikm/ikm.module';
+import { SiformenModule } from './siformen/siformen.module';
+import { AsnMonthlyArchiveModule } from './asn-monthly-archive/asn-monthly-archive.module';
+import { RefGajiPokokModule } from './ref-gaji-pokok/ref-gaji-pokok.module';
+import { PemberhentianModule } from './pemberhentian/pemberhentian.module';
 
 @Module({
   imports: [
@@ -60,6 +64,10 @@ import { IkmModule } from './ikm/ikm.module';
     ReconciliationBpkadModule,
     AdminModule,
     IkmModule,
+    SiformenModule,
+    AsnMonthlyArchiveModule,
+    RefGajiPokokModule,
+    PemberhentianModule,
   ],
   controllers: [
     HealthController,

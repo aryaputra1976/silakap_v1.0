@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { GovernanceListQueryDto } from './dto/governance-list-query.dto';
@@ -67,7 +67,10 @@ export interface ReviewQueue {
 
 @Injectable()
 export class SopGovernanceRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
