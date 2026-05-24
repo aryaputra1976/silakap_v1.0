@@ -119,6 +119,56 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
 const BLOCKED_COMMIT_STATUSES = ['PROCESSING', 'COMMITTED', 'FAILED', 'CANCELLED'];
 const PAGE_SIZE = 20;
 
+const IMPORT_GUIDE_STEPS = [
+  {
+    title: 'Export dari SIASN',
+    description: 'Download file ASN dari SIASN sesuai jenis pegawai: PNS, PPPK, atau PPPK Paruh Waktu.',
+    icon: FileSpreadsheet,
+  },
+  {
+    title: 'Upload ke SIDATA',
+    description: 'Pilih jenis ASN yang sama dengan file, lalu upload file .xlsx ke halaman Import SIASN.',
+    icon: Upload,
+  },
+  {
+    title: 'Validasi Batch',
+    description: 'Cek total baris, valid, invalid, perlu review, dan baris yang belum punya referensi.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Ekstrak Referensi',
+    description: 'Jika ada referensi baru dari file SIASN, ekstrak dulu agar mapping jabatan/unit/golongan lebih lengkap.',
+    icon: Network,
+  },
+  {
+    title: 'Mapping Referensi',
+    description: 'Jalankan map atau remap referensi sampai tidak ada invalid, unmapped, dan needs review.',
+    icon: GitCompareArrows,
+  },
+  {
+    title: 'Review & Koreksi',
+    description: 'Buka daftar issue, perbaiki mapping unit/jabatan/golongan, lalu catat alasan bila ada koreksi manual.',
+    icon: PencilLine,
+  },
+  {
+    title: 'Commit ke Master ASN',
+    description: 'Commit hanya jika quality gate aman. Data master diperbarui dan status sinkronisasi ikut dihitung.',
+    icon: CheckCircle2,
+  },
+  {
+    title: 'Cek Dashboard & Laporan',
+    description: 'Periksa Dashboard SIDATA, Master ASN, Rekonsiliasi, Riwayat Import, dan Laporan Resmi.',
+    icon: Sparkles,
+  },
+];
+
+const IMPORT_GUIDE_CHECKLIST = [
+  'File SIASN harus .xlsx dan sesuai jenis ASN yang dipilih.',
+  'Jangan commit batch sebelum invalid, unmapped, dan needs review selesai.',
+  'Jika export SIASN berbeda dengan koreksi lokal, data akan ditandai CONFLICT untuk direview.',
+  'Setiap laporan SIDATA harus memperhatikan batch dan tanggal sinkron terakhir.',
+];
+
 function getTipePegawaiLabel(importType: string): string {
   if (importType === 'SIASN_ASN_PNS') return 'PNS';
   if (importType === 'SIASN_ASN_PPPK') return 'PPPK';
@@ -575,6 +625,55 @@ export function SidataImportSiasnPage() {
         title="Import SIASN"
         description="Upload data ASN dari BKN SIASN, petakan ke referensi lokal, lalu lanjutkan review dan commit melalui Mapping Referensi."
       />
+
+      <SectionCard
+        title="Panduan Import Data SIASN"
+        description="Ikuti alur ini agar data SIASN tidak langsung menimpa master ASN tanpa validasi, mapping, dan review."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge value="1. Import SIASN" tone="dark" />
+            <StatusBadge value="2. Mapping Referensi" tone="info" />
+            <StatusBadge value="3. Commit Master" tone="success" />
+          </div>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {IMPORT_GUIDE_STEPS.map((step, index) => {
+            const Icon = step.icon;
+
+            return (
+              <div
+                key={step.title}
+                className="rounded-lg border border-[#cfe1da] bg-[#f7fbf8] p-4"
+              >
+                <div className="mb-3 flex items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#0e7c86] text-xs font-semibold text-white">
+                    {index + 1}
+                  </span>
+                  <Icon className="size-5 text-[#0e7c86]" />
+                </div>
+                <h3 className="text-sm font-semibold text-[#18343a]">{step.title}</h3>
+                <p className="mt-2 text-sm leading-5 text-[#62766f]">{step.description}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-[#f2cf5a] bg-[#fff8dd] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#745300]">
+            <AlertTriangle className="size-4" />
+            Catatan sebelum commit
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {IMPORT_GUIDE_CHECKLIST.map((item) => (
+              <div key={item} className="flex gap-2 text-sm leading-5 text-[#745300]">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Upload Data ASN SIASN"
