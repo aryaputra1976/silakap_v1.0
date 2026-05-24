@@ -107,7 +107,7 @@ export function LayananKepegawaianPage() {
             }
           >
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+              <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
                 <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
                   Data OPD
                 </div>
@@ -115,7 +115,7 @@ export function LayananKepegawaianPage() {
                   Staff memeriksa data yang dikirim OPD tanpa input ulang.
                 </p>
               </div>
-              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+              <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
                 <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
                   Checklist SOP
                 </div>
@@ -123,7 +123,7 @@ export function LayananKepegawaianPage() {
                   Setiap pengajuan ditautkan ke checklist SOP sesuai module layanan.
                 </p>
               </div>
-              <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
+              <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
                 <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">
                   Audit Log
                 </div>

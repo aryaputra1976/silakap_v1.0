@@ -122,7 +122,7 @@ export function SopRealizationStatusActions({
       </div>
 
       {permissions.canApprove && !approveAllowed ? (
-        <div className="rounded-lg border border-[#ecd28b] bg-[#fff6d7] p-3 text-sm leading-6 text-[#7d5a00]">
+        <div className="rounded-lg border border-[#f2cf5a] bg-[#fff3c4] p-3 text-sm leading-6 text-[#7d5a00]">
           <div className="font-semibold">Approve belum dapat dilakukan:</div>
           <ul className="mt-1 list-disc ps-5">
             {blockingReasons.map((reason) => (

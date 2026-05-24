@@ -93,9 +93,9 @@ function ImportCsvModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-[#d8e5d3] bg-white shadow-xl">
-        <div className="border-b border-[#d8e5d3] px-6 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Import Tabel Gaji Pokok</h2>
+      <div className="w-full max-w-lg rounded-xl border border-[#cfe1da] bg-white shadow-xl">
+        <div className="border-b border-[#cfe1da] px-6 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Import Tabel Gaji Pokok</h2>
           <p className="mt-1 text-sm text-[#6d7e68]">
             Upload file CSV dengan format: <code className="rounded bg-[#f0f4ef] px-1 text-xs">golonganKode,masaKerja,gajiPokok</code>
           </p>
@@ -105,7 +105,7 @@ function ImportCsvModal({
           {/* Berlaku Sejak (required) */}
           <div>
             <label className="grid gap-1 text-xs">
-              <span className="font-semibold text-[#173c36]">Berlaku Sejak <span className="text-rose-500">*</span></span>
+              <span className="font-semibold text-[#18343a]">Berlaku Sejak <span className="text-rose-500">*</span></span>
               <span className="text-[#73816e]">Tanggal mulai berlakunya peraturan gaji ini (contoh: 2024-01-01 untuk PP No.5/2024)</span>
               <input
                 type="date"
@@ -117,7 +117,7 @@ function ImportCsvModal({
           </div>
 
           {/* Format hint */}
-          <div className="rounded-lg border border-[#d8e5d3] bg-[#f5faf7] px-4 py-3 text-xs text-[#4a6356]">
+          <div className="rounded-lg border border-[#cfe1da] bg-[#f5faf7] px-4 py-3 text-xs text-[#4a6356]">
             <p className="font-semibold mb-1">Format CSV (header opsional):</p>
             <pre className="font-mono leading-relaxed">
 {`golonganKode,masaKerja,gajiPokok
@@ -131,7 +131,7 @@ III/a,10,3252900`}
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-[#9dc4b0] bg-[#f5faf7] px-4 py-4 hover:border-[#2f7a5e] hover:bg-[#eaf5ef] transition-colors">
               <FileUp className="h-5 w-5 text-[#2f7a5e] shrink-0" />
               <div>
-                <p className="text-sm font-medium text-[#173c36]">
+                <p className="text-sm font-medium text-[#18343a]">
                   {fileName ? fileName : 'Pilih file CSV…'}
                 </p>
                 <p className="text-xs text-[#73816e]">Klik untuk upload, format .csv</p>
@@ -156,7 +156,7 @@ III/a,10,3252900`}
           {records.length > 0 && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-[#173c36]">
+                <span className="text-sm font-semibold text-[#18343a]">
                   Preview — {records.length} baris valid, {golonganCount} golongan
                 </span>
                 <button
@@ -177,9 +177,9 @@ III/a,10,3252900`}
                 <tbody>
                   {preview.map((r, i) => (
                     <tr key={i} className="border-b border-[#f0f4ef]">
-                      <td className="px-3 py-1.5 font-medium text-[#173c36]">{r.golonganKode}</td>
+                      <td className="px-3 py-1.5 font-medium text-[#18343a]">{r.golonganKode}</td>
                       <td className="px-3 py-1.5 text-[#4a6356]">{r.masaKerja} th</td>
-                      <td className="px-3 py-1.5 text-right text-[#173c36]">{formatRupiah(r.gajiPokok)}</td>
+                      <td className="px-3 py-1.5 text-right text-[#18343a]">{formatRupiah(r.gajiPokok)}</td>
                     </tr>
                   ))}
                   {records.length > 5 && (
@@ -195,7 +195,7 @@ III/a,10,3252900`}
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-6 py-4">
           <ActionButton variant="secondary" onClick={onClose} disabled={importing}>
             Batal
           </ActionButton>
@@ -231,13 +231,13 @@ function PeriodSelector({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#d8e5d3] bg-white px-3 py-1.5">
+    <div className="flex items-center gap-2 rounded-lg border border-[#cfe1da] bg-white px-3 py-1.5">
       <CalendarDays className="h-4 w-4 text-[#2f7a5e] shrink-0" />
       <label className="flex items-center gap-1 text-xs text-[#6d7e68]">
         <span className="font-medium">Periode:</span>
         <div className="relative flex items-center">
           <select
-            className="appearance-none bg-transparent pr-5 text-sm font-semibold text-[#173c36] focus:outline-none"
+            className="appearance-none bg-transparent pr-5 text-sm font-semibold text-[#18343a] focus:outline-none"
             value={selected}
             onChange={e => onChange(e.target.value)}
           >
@@ -272,8 +272,8 @@ function LookupWidget({ berlakuSejak }: { berlakuSejak: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-[#d8e5d3] bg-[#f5faf7] p-4">
-      <p className="mb-3 text-sm font-semibold text-[#173c36]">Cari Gaji Pokok</p>
+    <div className="rounded-xl border border-[#cfe1da] bg-[#f5faf7] p-4">
+      <p className="mb-3 text-sm font-semibold text-[#18343a]">Cari Gaji Pokok</p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="grid gap-1 text-xs">
           <span className="text-[#6d7e68]">Golongan</span>
@@ -302,7 +302,7 @@ function LookupWidget({ berlakuSejak }: { berlakuSejak: string }) {
         {result !== null && (
           <div className="rounded-lg border border-[#b8dac8] bg-white px-4 py-2">
             <span className="text-xs text-[#6d7e68]">Gaji Pokok</span>
-            <div className="text-lg font-bold text-[#173c36]">{formatRupiah(result)}</div>
+            <div className="text-lg font-bold text-[#18343a]">{formatRupiah(result)}</div>
           </div>
         )}
         {error && <span className="text-sm text-rose-600">{error}</span>}
@@ -377,7 +377,7 @@ function EditableCell({
 
   return (
     <div className="group flex items-center gap-1">
-      <span className={numVal === 0 ? 'text-[#c4d0c0]' : 'text-[#173c36]'}>{display}</span>
+      <span className={numVal === 0 ? 'text-[#c4d0c0]' : 'text-[#18343a]'}>{display}</span>
       {canEdit && numVal > 0 && (
         <button
           onClick={startEdit}
@@ -433,7 +433,7 @@ function GolonganDetailTable({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export function RefGajiPokokPage() {
+export function RefGajiPokokPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [matrix, setMatrix] = useState<GajiPokokMatrixItem[]>([]);
   const [summary, setSummary] = useState<GajiPokokSummary | null>(null);
   const [periodes, setPeriodes] = useState<string[]>([]);
@@ -485,45 +485,59 @@ export function RefGajiPokokPage() {
   const allRows = matrix.flatMap(m => m.rows);
   const minGaji = allRows.reduce((min, r) => { const v = parseFloat(r.gajiPokok); return v > 0 && v < min ? v : min; }, Infinity);
   const maxGaji = allRows.reduce((max, r) => { const v = parseFloat(r.gajiPokok); return v > max ? v : max; }, 0);
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <PeriodSelector periodes={periodes} selected={selectedPeriode} onChange={handlePeriodeChange} />
+      <ActionButton icon={loading ? Loader2 : RefreshCcw} variant="secondary" disabled={loading} onClick={() => load(selectedPeriode || undefined)}>
+        Refresh
+      </ActionButton>
+      <ActionButton icon={FileUp} onClick={() => setShowImport(true)}>
+        Import CSV
+      </ActionButton>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Tabel Gaji Pokok PNS"
-        description="Referensi gaji pokok berdasarkan golongan dan masa kerja (PP No. 5 Tahun 2024)."
-        meta={<StatusBadge value="REFERENSI" tone="dark" />}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <PeriodSelector periodes={periodes} selected={selectedPeriode} onChange={handlePeriodeChange} />
-            <ActionButton icon={loading ? Loader2 : RefreshCcw} variant="secondary" disabled={loading} onClick={() => load(selectedPeriode || undefined)}>
-              Refresh
-            </ActionButton>
-            <ActionButton icon={FileUp} onClick={() => setShowImport(true)}>
-              Import CSV
-            </ActionButton>
+      {embedded ? (
+        <SectionCard
+          title="Tabel Gaji Pokok PNS"
+          description="Referensi gaji pokok berdasarkan golongan dan masa kerja."
+          actions={headerActions}
+        >
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge value="REFERENSI" tone="dark" />
+            <StatusBadge value="GAJI POKOK" tone="info" />
           </div>
-        }
-      />
+        </SectionCard>
+      ) : (
+        <PageHeader
+          title="Tabel Gaji Pokok PNS"
+          description="Referensi gaji pokok berdasarkan golongan dan masa kerja (PP No. 5 Tahun 2024)."
+          meta={<StatusBadge value="REFERENSI" tone="dark" />}
+          actions={headerActions}
+        />
+      )}
 
       {error ? <ErrorAlert message={error} /> : null}
 
       {/* Summary cards */}
       {summary && !loading && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-[#d8e5d3] bg-white p-4">
-            <div className="text-2xl font-bold text-[#173c36]">{summary.totalGolongan}</div>
+          <div className="rounded-xl border border-[#cfe1da] bg-white p-4">
+            <div className="text-2xl font-bold text-[#18343a]">{summary.totalGolongan}</div>
             <div className="text-xs text-[#73816e]">Golongan</div>
           </div>
-          <div className="rounded-xl border border-[#d8e5d3] bg-white p-4">
-            <div className="text-2xl font-bold text-[#173c36]">{summary.totalRecords.toLocaleString('id-ID')}</div>
+          <div className="rounded-xl border border-[#cfe1da] bg-white p-4">
+            <div className="text-2xl font-bold text-[#18343a]">{summary.totalRecords.toLocaleString('id-ID')}</div>
             <div className="text-xs text-[#73816e]">Total Data</div>
           </div>
-          <div className="rounded-xl border border-[#d8e5d3] bg-white p-4">
-            <div className="text-xl font-bold text-[#087052]">{isFinite(minGaji) ? formatRupiah(minGaji) : '—'}</div>
+          <div className="rounded-xl border border-[#cfe1da] bg-white p-4">
+            <div className="text-xl font-bold text-[#12815f]">{isFinite(minGaji) ? formatRupiah(minGaji) : '—'}</div>
             <div className="text-xs text-[#73816e]">Gaji Terendah</div>
           </div>
-          <div className="rounded-xl border border-[#d8e5d3] bg-white p-4">
-            <div className="text-xl font-bold text-[#173c36]">{formatRupiah(maxGaji)}</div>
+          <div className="rounded-xl border border-[#cfe1da] bg-white p-4">
+            <div className="text-xl font-bold text-[#18343a]">{formatRupiah(maxGaji)}</div>
             <div className="text-xs text-[#73816e]">Gaji Tertinggi</div>
           </div>
         </div>
@@ -561,7 +575,7 @@ export function RefGajiPokokPage() {
                     key={item.golonganKode}
                     onClick={() => setSelectedGolongan(item.golonganKode)}
                     className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
-                      isSelected ? 'bg-[#e6f6ee] text-[#173c36]' : 'hover:bg-[#f5faf7] text-[#4a6356]'
+                      isSelected ? 'bg-[#e4f8ef] text-[#18343a]' : 'hover:bg-[#f5faf7] text-[#4a6356]'
                     }`}
                   >
                     <div className="font-semibold text-sm">{item.golonganKode}</div>

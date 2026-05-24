@@ -52,13 +52,13 @@ function AsnSearchResult({
   return (
     <button
       onClick={() => onSelect(asn)}
-      className="flex w-full items-center gap-3 rounded border border-[#d8e5d3] p-3 text-left hover:bg-[#f4f8ef] transition-colors"
+      className="flex w-full items-center gap-3 rounded border border-[#cfe1da] p-3 text-left hover:bg-[#f4f8ef] transition-colors"
     >
       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8f0e5] text-[#3a6b52]">
         <User className="h-4 w-4" />
       </div>
       <div>
-        <p className="text-sm font-medium text-[#102f2b]">{asn.nama}</p>
+        <p className="text-sm font-medium text-[#18343a]">{asn.nama}</p>
         <p className="text-xs text-[#687967]">{asn.nip} · {asn.jabatanNama ?? '—'} · {asn.golonganNama ?? '—'}</p>
       </div>
     </button>
@@ -140,16 +140,16 @@ function CreateProsesModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-[#d8e5d3] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Buat Proses Pemberhentian</h2>
-          <button onClick={onClose} className="text-[#687967] hover:text-[#102f2b]"><X className="h-5 w-5" /></button>
+        <div className="flex items-center justify-between border-b border-[#cfe1da] px-5 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Buat Proses Pemberhentian</h2>
+          <button onClick={onClose} className="text-[#687967] hover:text-[#18343a]"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="space-y-4 px-5 py-4">
           {/* Step: Pilih ASN */}
           {!selectedAsn ? (
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-[#102f2b]">Cari ASN</label>
+              <label className="block text-sm font-medium text-[#18343a]">Cari ASN</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#687967]" />
                 <input
@@ -177,7 +177,7 @@ function CreateProsesModal({
             <div className="rounded-lg border border-[#c8d8c3] bg-[#f4f8ef] p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-[#102f2b]">{selectedAsn.nama}</p>
+                  <p className="font-medium text-[#18343a]">{selectedAsn.nama}</p>
                   <p className="text-xs text-[#687967]">{selectedAsn.nip} · {selectedAsn.jabatanNama ?? '—'}</p>
                 </div>
                 <button onClick={() => setSelectedAsn(null)} className="text-xs text-[#3a6b52] hover:underline">Ganti</button>
@@ -189,13 +189,13 @@ function CreateProsesModal({
             <>
               {/* Kategori */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-[#102f2b]">Kategori Pemberhentian</label>
+                <label className="block text-sm font-medium text-[#18343a]">Kategori Pemberhentian</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(JENIS_BY_KATEGORI) as KategoriPemberhentian[]).map((k) => (
                     <button
                       key={k}
                       onClick={() => setKategori(k)}
-                      className={`rounded border px-3 py-2 text-xs font-medium text-left transition-colors ${kategori === k ? 'border-[#3a6b52] bg-[#e8f0e5] text-[#3a6b52]' : 'border-[#d8e5d3] text-[#687967] hover:bg-[#f4f8ef]'}`}
+                      className={`rounded border px-3 py-2 text-xs font-medium text-left transition-colors ${kategori === k ? 'border-[#3a6b52] bg-[#e8f0e5] text-[#3a6b52]' : 'border-[#cfe1da] text-[#687967] hover:bg-[#f4f8ef]'}`}
                     >
                       {KATEGORI_LABEL[k]}
                     </button>
@@ -205,7 +205,7 @@ function CreateProsesModal({
 
               {/* Jenis */}
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-[#102f2b]">Jenis Pemberhentian</label>
+                <label className="block text-sm font-medium text-[#18343a]">Jenis Pemberhentian</label>
                 <select
                   value={jenis}
                   onChange={(e) => setJenis(e.target.value as JenisPemberhentian)}
@@ -219,13 +219,13 @@ function CreateProsesModal({
 
               {/* TMT */}
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-[#102f2b]">TMT Pemberhentian <span className="text-[#687967] font-normal">(opsional)</span></label>
+                <label className="block text-sm font-medium text-[#18343a]">TMT Pemberhentian <span className="text-[#687967] font-normal">(opsional)</span></label>
                 <input type="date" value={tmt} onChange={(e) => setTmt(e.target.value)} className={inputClass} />
               </div>
 
               {/* Catatan */}
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-[#102f2b]">Catatan <span className="text-[#687967] font-normal">(opsional)</span></label>
+                <label className="block text-sm font-medium text-[#18343a]">Catatan <span className="text-[#687967] font-normal">(opsional)</span></label>
                 <textarea
                   value={catatan}
                   onChange={(e) => setCatatan(e.target.value)}
@@ -238,7 +238,7 @@ function CreateProsesModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-5 py-3">
           <button onClick={onClose} className="rounded border border-[#c8d8c3] px-4 py-2 text-sm text-[#687967] hover:bg-[#f4f8ef]">Batal</button>
           {selectedAsn && (
             <button
@@ -275,13 +275,13 @@ function ProsesRow({ proses }: { proses: ProsesListItem }) {
             <User className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-medium text-[#102f2b]">{proses.asn.nama}</p>
+            <p className="text-sm font-medium text-[#18343a]">{proses.asn.nama}</p>
             <p className="text-xs text-[#687967]">{proses.asn.nip}</p>
           </div>
         </div>
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs font-medium text-[#102f2b]">{proses.jenisLabel}</p>
+        <p className="text-xs font-medium text-[#18343a]">{proses.jenisLabel}</p>
         <p className="text-xs text-[#687967]">{KATEGORI_LABEL[proses.kategori]}</p>
       </td>
       <td className="px-4 py-3 text-xs text-[#3a3a3a]">{proses.asn.jabatanNama ?? '—'}</td>
@@ -400,7 +400,7 @@ export function PemberhentianProsesPage() {
         {(q || status || jenis) && (
           <button
             onClick={() => setSearchParams(new URLSearchParams())}
-            className="flex items-center gap-1 text-sm text-[#687967] hover:text-[#102f2b]"
+            className="flex items-center gap-1 text-sm text-[#687967] hover:text-[#18343a]"
           >
             <X className="h-4 w-4" />Reset
           </button>
@@ -428,7 +428,7 @@ export function PemberhentianProsesPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px] text-sm">
                 <thead>
-                  <tr className="border-b border-[#d8e5d3] text-xs text-[#687967]">
+                  <tr className="border-b border-[#cfe1da] text-xs text-[#687967]">
                     <th className="px-4 py-2 text-left font-medium">ASN</th>
                     <th className="px-4 py-2 text-left font-medium">Jenis Pemberhentian</th>
                     <th className="px-4 py-2 text-left font-medium">Jabatan</th>

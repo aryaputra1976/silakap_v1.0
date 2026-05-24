@@ -26,7 +26,7 @@ export function SopProgressTable({
 
             return (
               <div>
-                <div className="font-semibold text-[#173c36]">
+                <div className="font-semibold text-[#18343a]">
                   {sop?.title ?? item.sopId}
                 </div>
                 <div className="mt-1 text-xs text-[#6d7e68]">
@@ -56,12 +56,12 @@ export function SopProgressTable({
           header: 'Capaian',
           render: (item) => (
             <div className="min-w-40">
-              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#173c36]">
+              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#18343a]">
                 <span>{item.progressPercent}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-[#dce8d6]">
                 <div
-                  className="h-full rounded-full bg-[#0f766e]"
+                  className="h-full rounded-full bg-[#0e7c86]"
                   style={{ width: `${item.progressPercent}%` }}
                 />
               </div>

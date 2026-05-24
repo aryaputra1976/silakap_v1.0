@@ -30,7 +30,7 @@ export function SopReportBackendRhkTable({ rows }: { rows: KinerjaBidangRhkRepor
           header: 'SOP / Kegiatan',
           render: (item) => (
             <div>
-              <div className="font-semibold text-[#173c36]">{item.sopTitle}</div>
+              <div className="font-semibold text-[#18343a]">{item.sopTitle}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">{item.sopCode}</div>
             </div>
           ),

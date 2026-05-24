@@ -50,7 +50,7 @@ export function Main() {
       <div className="wrapper flex min-w-0 grow flex-col overflow-x-hidden">
         <Header />
 
-        <main className="min-w-0 grow overflow-x-hidden bg-[#eef4ec] py-5" role="content">
+        <main className="min-w-0 grow overflow-x-hidden bg-[#f5f8f8] py-5" role="content">
           <div className="container-fluid max-w-[1440px] min-w-0 overflow-x-hidden">
             <Outlet />
           </div>

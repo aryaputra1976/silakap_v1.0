@@ -5,6 +5,7 @@ import { ApiError, apiClient } from '@/lib/api/client';
 import {
   formatJenisAsn,
   sidataApi,
+  type SidataAsnChangeLog,
   type SidataAsnHistory,
 } from '@/lib/api/sidata';
 import type { AsnRecord, SipensiunCaseDetail } from '@/lib/api/types';
@@ -40,17 +41,24 @@ function formatDateTime(value: string | null): string {
   });
 }
 
+function formatChangeValue(value: string | null): string {
+  if (!value) return '-';
+  return value.length > 80 ? `${value.slice(0, 77)}...` : value;
+}
+
 function InfoRow({
   label,
   value,
 }: {
   label: string;
-  value: string | null | undefined;
+  value: React.ReactNode | null | undefined;
 }) {
+  const displayValue = typeof value === 'string' ? (value || '-') : (value ?? '-');
+
   return (
-    <div className="flex gap-3 border-b border-zinc-100 py-2.5 last:border-0">
-      <span className="w-40 shrink-0 text-sm text-zinc-500">{label}</span>
-      <span className="text-sm font-medium text-zinc-900">{value || '-'}</span>
+    <div className="flex gap-3 border-b border-[#e4eeea] py-2.5 last:border-0">
+      <span className="w-40 shrink-0 text-sm text-[#62766f]">{label}</span>
+      <span className="min-w-0 text-sm font-medium text-[#18343a]">{displayValue}</span>
     </div>
   );
 }
@@ -63,9 +71,11 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-5">
-      <h3 className="mb-3 text-sm font-semibold text-zinc-700">{title}</h3>
-      {children}
+    <div className="overflow-hidden rounded-lg border border-[#cfe1da] bg-white shadow-[0_12px_28px_rgba(14,124,134,0.08)]">
+      <div className="border-b border-[#cfe1da] bg-[linear-gradient(90deg,#eef8f6_0%,#ffffff_100%)] px-5 py-4">
+        <h3 className="text-sm font-semibold uppercase tracking-normal text-[#075e66]">{title}</h3>
+      </div>
+      <div className="p-5">{children}</div>
     </div>
   );
 }
@@ -77,6 +87,9 @@ export function SidataAsnDetailPage() {
   const [asn, setAsn] = useState<AsnRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<SidataAsnHistory | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [changeLogs, setChangeLogs] = useState<SidataAsnChangeLog[]>([]);
+  const [changeLogsLoaded, setChangeLogsLoaded] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [error, setError] = useState('');
@@ -90,6 +103,8 @@ export function SidataAsnDetailPage() {
     golonganNama: '',
     statusAsn: '',
     tmtPensiun: '',
+    changeReason: '',
+    reviewNote: '',
   });
 
   const isMounted = useRef(true);
@@ -124,6 +139,8 @@ export function SidataAsnDetailPage() {
             golonganNama: result.golonganNama ?? '',
             statusAsn: result.statusAsn ?? '',
             tmtPensiun: result.tmtPensiun ? result.tmtPensiun.slice(0, 10) : '',
+            changeReason: '',
+            reviewNote: result.reviewNote ?? '',
           });
         }
       })
@@ -146,7 +163,7 @@ export function SidataAsnDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!id || activeTab !== 'riwayat' || history) {
+    if (!id || activeTab !== 'riwayat' || (historyLoaded && changeLogsLoaded)) {
       return;
     }
 
@@ -154,10 +171,17 @@ export function SidataAsnDetailPage() {
     setLoadingHistory(true);
     setHistoryError('');
 
-    sidataApi
-      .getAsnHistory(id)
-      .then((result) => {
-        if (active) setHistory(result);
+    Promise.all([
+      historyLoaded ? Promise.resolve(history) : sidataApi.getAsnHistory(id),
+      changeLogsLoaded ? Promise.resolve(changeLogs) : sidataApi.getAsnChangeLogs(id),
+    ])
+      .then(([historyResult, logResult]) => {
+        if (active) {
+          setHistory(historyResult);
+          setHistoryLoaded(true);
+          setChangeLogs(logResult);
+          setChangeLogsLoaded(true);
+        }
       })
       .catch((caught) => {
         if (active) {
@@ -175,7 +199,7 @@ export function SidataAsnDetailPage() {
     return () => {
       active = false;
     };
-  }, [activeTab, history, id]);
+  }, [activeTab, changeLogs, changeLogsLoaded, history, historyLoaded, id]);
 
   async function handleCreateSipensiun() {
     if (!asn) return;
@@ -217,8 +241,18 @@ export function SidataAsnDetailPage() {
         golonganNama: form.golonganNama,
         statusAsn: form.statusAsn,
         tmtPensiun: form.tmtPensiun,
+        changeReason: form.changeReason,
+        needsReview: true,
+        reviewNote: form.reviewNote,
       });
       setAsn(updated);
+      setForm((current) => ({
+        ...current,
+        changeReason: '',
+        reviewNote: updated.reviewNote ?? '',
+      }));
+      setChangeLogs([]);
+      setChangeLogsLoaded(false);
       setActiveTab('profil');
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Gagal menyimpan ASN');
@@ -261,7 +295,7 @@ export function SidataAsnDetailPage() {
     <div className="space-y-5">
       <PageHeader
         title={asn.nama}
-        description={`NIP ${asn.nip}${asn.unitKerja ? ` · ${asn.unitKerja.nama}` : ''}`}
+        description={`NIP ${asn.nip}${asn.unitKerja ? ` / ${asn.unitKerja.nama}` : ''}`}
         meta={
           <div className="flex items-center gap-2">
             {asn.jenisAsn ? (
@@ -276,6 +310,7 @@ export function SidataAsnDetailPage() {
               </span>
             ) : null}
             <StatusBadge value={asn.statusAsn ?? '-'} />
+            <StatusBadge value={asn.syncStatus ?? 'NEED_REVIEW'} />
           </div>
         }
       />
@@ -286,8 +321,8 @@ export function SidataAsnDetailPage() {
         <button
           className={
             activeTab === 'profil'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-zinc-900 px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-100'
+              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
+              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
           }
           type="button"
           onClick={() => setActiveTab('profil')}
@@ -298,8 +333,8 @@ export function SidataAsnDetailPage() {
         <button
           className={
             activeTab === 'riwayat'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-zinc-900 px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-100'
+              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
+              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
           }
           type="button"
           onClick={() => setActiveTab('riwayat')}
@@ -310,8 +345,8 @@ export function SidataAsnDetailPage() {
         <button
           className={
             activeTab === 'edit'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-zinc-900 px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-100'
+              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
+              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
           }
           type="button"
           onClick={() => setActiveTab('edit')}
@@ -338,6 +373,16 @@ export function SidataAsnDetailPage() {
             <InfoRow label="Email" value={asn.email} />
             <InfoRow label="Telepon" value={asn.phone} />
           </SectionCard>
+
+          <SectionCard title="Status Sinkronisasi">
+            <InfoRow label="Status" value={<StatusBadge value={asn.syncStatus ?? 'NEED_REVIEW'} />} />
+            <InfoRow label="Batch SIASN" value={asn.lastSiasnBatchId ?? asn.sourceBatchId} />
+            <InfoRow label="Sinkron Terakhir" value={formatDateTime(asn.lastSiasnSyncedAt ?? asn.syncedAt)} />
+            <InfoRow label="Koreksi Lokal" value={formatDateTime(asn.localCorrectionAt)} />
+            <InfoRow label="Alasan Koreksi" value={asn.localCorrectionReason} />
+            <InfoRow label="Perlu Review" value={asn.needsReview ? 'Ya' : 'Tidak'} />
+            <InfoRow label="Catatan Review" value={asn.reviewNote} />
+          </SectionCard>
         </div>
       ) : activeTab === 'edit' ? (
         <SectionCard title="Edit Individual ASN">
@@ -353,13 +398,32 @@ export function SidataAsnDetailPage() {
               <label key={field} className="block text-sm">
                 <span className="mb-1 block font-medium text-zinc-700">{label}</span>
                 <input
-                  className="h-10 w-full rounded-md border border-border px-3 text-sm outline-none focus:border-zinc-900"
+                  className="h-10 w-full rounded-md border border-border px-3 text-sm outline-none focus:border-[#0e7c86]"
                   type={field === 'tmtPensiun' ? 'date' : 'text'}
                   value={form[field as keyof typeof form]}
                   onChange={(event) => updateForm(field as keyof typeof form, event.target.value)}
                 />
               </label>
             ))}
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="block text-sm md:col-span-2">
+              <span className="mb-1 block font-medium text-zinc-700">Alasan Perubahan</span>
+              <textarea
+                className="min-h-24 w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-[#0e7c86]"
+                value={form.changeReason}
+                onChange={(event) => updateForm('changeReason', event.target.value)}
+                placeholder="Contoh: TMT pensiun diperbaiki berdasarkan SK Pensiun."
+              />
+            </label>
+            <label className="block text-sm md:col-span-2">
+              <span className="mb-1 block font-medium text-zinc-700">Catatan Review Internal</span>
+              <textarea
+                className="min-h-20 w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-[#0e7c86]"
+                value={form.reviewNote}
+                onChange={(event) => updateForm('reviewNote', event.target.value)}
+              />
+            </label>
           </div>
           <div className="mt-4">
             <ActionButton icon={Save} onClick={() => void handleSaveAsn()} disabled={saving}>
@@ -374,6 +438,54 @@ export function SidataAsnDetailPage() {
             <LoadingState label="Memuat riwayat ASN" />
           ) : history ? (
             <>
+              <SectionCard title="Audit Perubahan ASN">
+                {changeLogs.length === 0 ? (
+                  <EmptyState
+                    icon={History}
+                    title="Belum ada audit perubahan"
+                    description="Audit terbentuk dari koreksi manual atau commit import SIASN."
+                  />
+                ) : (
+                  <DataTable
+                    items={changeLogs}
+                    empty="Belum ada audit perubahan"
+                    rowKey={(item) => item.id}
+                    columns={[
+                      {
+                        key: 'changedAt',
+                        header: 'Waktu',
+                        render: (item) => formatDateTime(item.changedAt),
+                      },
+                      {
+                        key: 'field',
+                        header: 'Field',
+                        render: (item) => (
+                          <div>
+                            <div className="font-semibold text-zinc-900">{item.fieldName}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">{item.reason ?? '-'}</div>
+                          </div>
+                        ),
+                      },
+                      {
+                        key: 'source',
+                        header: 'Sumber',
+                        render: (item) => <StatusBadge value={item.source} />,
+                      },
+                      {
+                        key: 'old',
+                        header: 'Nilai Lama',
+                        render: (item) => formatChangeValue(item.oldValue),
+                      },
+                      {
+                        key: 'new',
+                        header: 'Nilai Baru',
+                        render: (item) => formatChangeValue(item.newValue),
+                      },
+                    ]}
+                  />
+                )}
+              </SectionCard>
+
               <SectionCard title="Riwayat Jabatan & Unit Kerja">
                 {history.assignment.length === 0 ? (
                   <EmptyState
@@ -501,7 +613,7 @@ export function SidataAsnDetailPage() {
             disabled={!!creatingId}
             variant="secondary"
           >
-            {creatingId ? 'Membuat usulan…' : 'Buat Usulan Pensiun'}
+            {creatingId ? 'Membuat usulan...' : 'Buat Usulan Pensiun'}
           </ActionButton>
         )}
       </div>

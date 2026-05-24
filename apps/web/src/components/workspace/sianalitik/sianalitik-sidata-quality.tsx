@@ -8,10 +8,10 @@ interface Props {
 
 function QualityGauge({ score }: { score: number }) {
   const color =
-    score >= 80 ? 'text-[#087052]' : score >= 60 ? 'text-amber-600' : 'text-rose-600';
+    score >= 80 ? 'text-[#12815f]' : score >= 60 ? 'text-amber-600' : 'text-rose-600';
   const bg =
     score >= 80
-      ? 'bg-[#087052]'
+      ? 'bg-[#12815f]'
       : score >= 60
         ? 'bg-amber-500'
         : 'bg-rose-500';
@@ -87,7 +87,7 @@ export function SianalitikSidataQuality({ quality }: Props) {
       )}
 
       <div className="border-t border-slate-100 pt-2">
-        <Link to="/sidata" className="text-xs font-medium text-[#087052] hover:underline">
+        <Link to="/sidata" className="text-xs font-medium text-[#12815f] hover:underline">
           Kelola data SIDATA →
         </Link>
       </div>

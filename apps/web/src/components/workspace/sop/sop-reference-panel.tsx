@@ -61,7 +61,7 @@ export function SopReferencePanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-[#173c36]">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-[#18343a]">
           <BookOpen className="h-4 w-4" />
           <span>Referensi SOP BKPSDM</span>
         </div>
@@ -220,7 +220,7 @@ function SopReferenceRow({
               {item.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-[#d8e5d3] bg-[#f4f8ef] px-1.5 py-0.5 text-xs text-[#51614c]"
+                  className="rounded-full border border-[#cfe1da] bg-[#f4f8ef] px-1.5 py-0.5 text-xs text-[#51614c]"
                 >
                   {tag}
                 </span>

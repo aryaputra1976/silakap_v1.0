@@ -1107,7 +1107,7 @@ export function SidataImportSiasnPage() {
 
       {resolvingIssue ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-3xl rounded-lg border border-[#c9d9c4] bg-[#fbfdf8] shadow-2xl">
+          <div className="w-full max-w-3xl rounded-lg border border-[#cfe1da] bg-[#fbfdf8] shadow-2xl">
             <div className="border-b border-[#d8e4d3] p-5">
               <div className="text-lg font-semibold text-[#073b3a]">Mapping Unit Kerja</div>
               <div className="mt-1 text-sm text-[#5b6b58]">

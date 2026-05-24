@@ -18,7 +18,7 @@ const JENIS_LABEL: Record<string, string> = {
 };
 
 const BAR_COLORS = [
-  'bg-[#087052]',
+  'bg-[#12815f]',
   'bg-[#1e4620]',
   'bg-teal-500',
   'bg-amber-500',
@@ -70,7 +70,7 @@ export function SianalitikSipensiunStatus({ analytics }: Props) {
       )}
 
       <div className="border-t border-slate-100 pt-2">
-        <Link to="/sipensiun" className="text-xs font-medium text-[#087052] hover:underline">
+        <Link to="/sipensiun" className="text-xs font-medium text-[#12815f] hover:underline">
           Lihat detail SIPENSIUN →
         </Link>
       </div>

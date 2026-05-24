@@ -12,6 +12,7 @@ import {
   RefreshCcw,
   ShieldAlert,
   ShieldCheck,
+  SquarePen,
   UserCheck,
   UserRoundX,
   Users,
@@ -101,6 +102,11 @@ export function SidataDashboardPage() {
 
   const jenisAsnBreakdown = useMemo(
     () => (qualityDashboard?.breakdown.byJenisAsn ?? []).map(mapBreakdownRow),
+    [qualityDashboard],
+  );
+
+  const syncStatusBreakdown = useMemo(
+    () => (qualityDashboard?.breakdown.bySyncStatus ?? []).map(mapBreakdownRow),
     [qualityDashboard],
   );
 
@@ -331,6 +337,34 @@ export function SidataDashboardPage() {
               tone={getIssueTone(issueRows)}
               description="Jumlah ASN yang belum lengkap pada field inti."
             />
+            <StatCard
+              icon={ShieldCheck}
+              label="Sinkron SIASN"
+              value={qualityDashboard.sync.synced}
+              tone="success"
+              description="Data sesuai batch SIASN terakhir."
+            />
+            <StatCard
+              icon={SquarePen}
+              label="Koreksi Lokal"
+              value={qualityDashboard.sync.localCorrection}
+              tone={qualityDashboard.sync.localCorrection > 0 ? 'warning' : 'success'}
+              description="Data sudah dikoreksi di SIDATA dan perlu jejak audit."
+            />
+            <StatCard
+              icon={ShieldAlert}
+              label="Konflik SIASN"
+              value={qualityDashboard.sync.conflict}
+              tone={qualityDashboard.sync.conflict > 0 ? 'danger' : 'success'}
+              description="Export SIASN berbeda dengan koreksi lokal SIDATA."
+            />
+            <StatCard
+              icon={AlertTriangle}
+              label="Perlu Review"
+              value={qualityDashboard.sync.needReview}
+              tone={qualityDashboard.sync.needReview > 0 ? 'warning' : 'success'}
+              description="Data ASN perlu pemeriksaan operator/analis."
+            />
           </div>
         </SectionCard>
       ) : null}
@@ -399,6 +433,48 @@ export function SidataDashboardPage() {
                     key: 'label',
                     header: 'Jenis ASN',
                     render: (item) => <StatusBadge value={item.label} tone="dark" />,
+                  },
+                  {
+                    key: 'total',
+                    header: 'Total',
+                    render: (item) => (
+                      <span className="font-mono text-sm font-semibold">{item.total}</span>
+                    ),
+                  },
+                  {
+                    key: 'percentage',
+                    header: 'Persentase',
+                    render: (item) => (
+                      <span className="text-sm text-muted-foreground">
+                        {item.displayPercentage}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Breakdown Status Sinkronisasi"
+            description="Status kendali data ASN terhadap export SIASN dan koreksi lokal."
+          >
+            {syncStatusBreakdown.length === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                title="Belum ada status sinkronisasi"
+                description="Status sinkronisasi akan tampil setelah migrasi dan import berjalan."
+              />
+            ) : (
+              <DataTable
+                empty="Belum ada data sinkronisasi"
+                items={syncStatusBreakdown}
+                rowKey={(item) => item.key}
+                columns={[
+                  {
+                    key: 'label',
+                    header: 'Status',
+                    render: (item) => <StatusBadge value={item.label} />,
                   },
                   {
                     key: 'total',

@@ -145,6 +145,7 @@ export function AppRoutingSetup() {
           <Route path="/kinerja-bidang/laporan" element={<SopReportPage />} />
 
           {/* SIDATA ASN */}
+          <Route path="/sidata" element={<Navigate to="/sidata/dashboard" replace />} />
           <Route path="/sidata/dashboard" element={<SidataDashboardPage />} />
           <Route path="/sidata/asn" element={<SidataAsnPage />} />
           <Route path="/sidata/asn/:id" element={<SidataAsnDetailPage />} />

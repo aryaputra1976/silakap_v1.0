@@ -129,7 +129,7 @@ export function OpdSubmissionDetailPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
       {success ? (
-        <div className="rounded-lg border border-[#9ed9c4] bg-[#e6f6ee] p-4 text-sm font-medium text-[#087052]">
+        <div className="rounded-lg border border-[#91d9bf] bg-[#e4f8ef] p-4 text-sm font-medium text-[#12815f]">
           {success}
         </div>
       ) : null}
@@ -198,11 +198,11 @@ export function OpdSubmissionDetailPage() {
               {submission.documents.map((document) => (
                 <div
                   key={document.id}
-                  className="rounded-lg border border-[#d8e5d3] bg-white p-4"
+                  className="rounded-lg border border-[#cfe1da] bg-white p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-[#173c36]">
+                      <div className="font-semibold text-[#18343a]">
                         {document.title}
                       </div>
                       <div className="mt-1 text-xs text-[#687967]">

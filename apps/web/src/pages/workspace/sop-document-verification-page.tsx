@@ -167,8 +167,8 @@ export function SopDocumentVerificationPage() {
                 <button
                   className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
                     activeView === 'asn'
-                      ? 'border-[#0f766e] bg-[#0f766e] text-white'
-                      : 'border-[#c9d9c4] bg-white text-[#173c36] hover:bg-[#eef7ec]'
+                      ? 'border-[#0e7c86] bg-[#0e7c86] text-white'
+                      : 'border-[#cfe1da] bg-white text-[#18343a] hover:bg-[#eef8f6]'
                   }`}
                   onClick={() => setActiveView('asn')}
                   type="button"
@@ -178,8 +178,8 @@ export function SopDocumentVerificationPage() {
                 <button
                   className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
                     activeView === 'documents'
-                      ? 'border-[#0f766e] bg-[#0f766e] text-white'
-                      : 'border-[#c9d9c4] bg-white text-[#173c36] hover:bg-[#eef7ec]'
+                      ? 'border-[#0e7c86] bg-[#0e7c86] text-white'
+                      : 'border-[#cfe1da] bg-white text-[#18343a] hover:bg-[#eef8f6]'
                   }`}
                   onClick={() => setActiveView('documents')}
                   type="button"

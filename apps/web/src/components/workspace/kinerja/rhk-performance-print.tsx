@@ -2,7 +2,7 @@ import type { KinerjaRhkPrintSummary } from '@/lib/kinerja-rhk-realizations/type
 
 export function RhkPerformancePrint({ summary }: { summary: KinerjaRhkPrintSummary }) {
   return (
-    <div className="rounded-lg border border-[#d8e5d3] bg-white p-5 text-sm text-[#173c36]">
+    <div className="rounded-lg border border-[#cfe1da] bg-white p-5 text-sm text-[#18343a]">
       <div className="text-lg font-semibold">{summary.title}</div>
       <div className="mt-1 text-[#6d7e68]">{summary.periodLabel}</div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">

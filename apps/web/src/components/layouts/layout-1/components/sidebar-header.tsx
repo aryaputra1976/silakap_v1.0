@@ -15,7 +15,7 @@ export function SidebarHeader() {
   return (
     <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
       <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-1.5 shadow-sm ring-1 ring-border">
+        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-1.5 shadow-sm shadow-[#9fbfb7]/30 ring-1 ring-[#cfe1da]">
           <img
             alt="Logo BKPSDM"
             className="size-full object-contain"
@@ -23,10 +23,10 @@ export function SidebarHeader() {
           />
         </span>
         <span className="default-logo min-w-0">
-          <span className="block text-base font-semibold leading-none text-mono">
+          <span className="block text-base font-semibold leading-none text-[#075e66]">
             SILAKAP
           </span>
-          <span className="mt-1 block text-xs font-medium text-muted-foreground">
+          <span className="mt-1 block text-xs font-medium text-[#62766f]">
             BKPSDM Workspace
           </span>
         </span>

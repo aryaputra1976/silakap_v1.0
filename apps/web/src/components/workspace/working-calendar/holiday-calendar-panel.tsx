@@ -111,7 +111,7 @@ export function HolidayCalendarPanel({ role }: { role: AppRole }) {
           <Loader2 className="h-4 w-4 animate-spin text-[#6d7e68]" />
         ) : (
           <select
-            className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+            className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
           >
@@ -121,7 +121,7 @@ export function HolidayCalendarPanel({ role }: { role: AppRole }) {
           </select>
         )}
         <input
-          className="h-10 w-28 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-10 w-28 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           placeholder="Tahun"
           value={year}
           onChange={(e) => setYear(e.target.value)}
@@ -129,12 +129,12 @@ export function HolidayCalendarPanel({ role }: { role: AppRole }) {
       </div>
 
       {canManage ? (
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-[#d8e5d3] bg-[#f9fdf6] p-3">
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-[#cfe1da] bg-[#f9fdf6] p-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-[#6d7e68]">Tanggal</label>
             <input
               type="date"
-              className="h-9 rounded-md border border-[#c9d9c4] bg-white px-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+              className="h-9 rounded-md border border-[#cfe1da] bg-white px-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
             />
@@ -142,7 +142,7 @@ export function HolidayCalendarPanel({ role }: { role: AppRole }) {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-[#6d7e68]">Nama Hari Libur</label>
             <input
-              className="h-9 w-52 rounded-md border border-[#c9d9c4] bg-white px-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+              className="h-9 w-52 rounded-md border border-[#cfe1da] bg-white px-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
               placeholder="cth. Hari Kemerdekaan"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}

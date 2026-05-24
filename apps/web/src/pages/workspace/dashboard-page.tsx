@@ -149,7 +149,7 @@ export function DashboardPage() {
             <StatCard
               label="Active Cases"
               value={formatNumber(analytics.activeCases.totalActive)}
-              description={`${analytics.activeCases.draft} draft · ${analytics.activeCases.submitted} submitted`}
+              description={`${analytics.activeCases.draft} draft / ${analytics.activeCases.submitted} submitted`}
               icon={FolderKanban}
               tone="warning"
             />
@@ -181,25 +181,25 @@ export function DashboardPage() {
           <section className="grid gap-4 xl:grid-cols-3">
             <SectionCard title="Current User" description="Sesi aktif">
               <div className="space-y-4">
-                <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 text-white">
+                <div className="flex items-center gap-3 rounded-lg border border-[#cfe1da] bg-[linear-gradient(135deg,#f6fbfa_0%,#ffffff_100%)] p-4 shadow-sm shadow-[#9fbfb7]/20">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#0e7c86] bg-[#0e7c86] text-white shadow-sm">
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-semibold text-zinc-900">
+                    <p className="font-semibold text-[#18343a]">
                       {user?.name ?? '-'}
                     </p>
-                    <p className="text-sm text-zinc-500">
+                    <p className="text-sm text-[#62766f]">
                       @{user?.username ?? '-'}
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-[#8b9a95]">
                     Unit Kerja
                   </p>
-                  <p className="mt-1 text-sm font-medium text-zinc-700">
+                  <p className="mt-1 text-sm font-medium text-[#18343a]">
                     {user?.unitKerja?.nama ?? 'Belum terhubung unit kerja'}
                   </p>
                 </div>
@@ -223,17 +223,17 @@ export function DashboardPage() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="group rounded-2xl border border-zinc-100 bg-white p-4 transition hover:border-zinc-300 hover:shadow-sm"
+                      className="group rounded-lg border border-[#cfe1da] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfa_100%)] p-4 shadow-sm shadow-[#9fbfb7]/20 transition duration-200 hover:-translate-y-0.5 hover:border-[#9accc7] hover:shadow-[0_14px_28px_rgba(14,124,134,0.12)]"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 transition group-hover:bg-zinc-900 group-hover:text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#dceae5] bg-[#eef8f6] text-[#0e7c86] transition group-hover:border-[#f2cf5a] group-hover:bg-[#fff3c4] group-hover:text-[#745300]">
                           <Icon className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="font-semibold text-zinc-900">
+                          <p className="font-semibold text-[#18343a]">
                             {item.label}
                           </p>
-                          <p className="mt-1 text-sm text-zinc-500">
+                          <p className="mt-1 text-sm text-[#62766f]">
                             {item.description}
                           </p>
                         </div>
@@ -350,7 +350,7 @@ function DistributionCard({
     <SectionCard
       title={title}
       description={description}
-      actions={<Icon className="h-5 w-5 text-zinc-400" />}
+      actions={<Icon className="h-5 w-5 text-[#0e7c86]" />}
     >
       {items.length > 0 ? (
         <div className="space-y-4">
@@ -361,13 +361,13 @@ function DistributionCard({
               <div key={item.key} className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <StatusBadge value={item.label} />
-                  <span className="text-sm font-semibold text-zinc-800">
+                  <span className="text-sm font-semibold text-[#18343a]">
                     {formatNumber(item.total)}
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                <div className="h-2 overflow-hidden rounded-full bg-[#eef8f6]">
                   <div
-                    className="h-full rounded-full bg-zinc-900"
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#0e7c86_0%,#f2b705_100%)]"
                     style={{ width: `${width}%` }}
                   />
                 </div>
@@ -408,12 +408,12 @@ function SimpleGroupList({
       {items.map((item) => (
         <div
           key={item.key}
-          className="flex items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3"
+          className="flex items-center justify-between rounded-lg border border-[#cfe1da] bg-[#f8fbfa] px-4 py-3"
         >
-          <span className="text-sm font-medium text-zinc-700">
+          <span className="text-sm font-medium text-[#4c625c]">
             {item.label}
           </span>
-          <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-zinc-900 shadow-sm">
+          <span className="rounded-md border border-[#dceae5] bg-white px-3 py-1 text-sm font-semibold text-[#18343a] shadow-sm">
             {formatNumber(item.total)}
           </span>
         </div>
@@ -434,31 +434,31 @@ function RecentTimeline({ items }: { items: AnalyticsRecentTimeline[] }) {
   }
 
   return (
-    <div className="divide-y divide-zinc-100">
+    <div className="divide-y divide-[#dceae5]">
       {items.map((item) => (
         <div key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
+          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#cfe1da] bg-[#eef8f6] text-[#0e7c86]">
             <Activity className="h-4 w-4" />
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold text-zinc-900">{item.title}</p>
+              <p className="font-semibold text-[#18343a]">{item.title}</p>
               <StatusBadge value={item.eventType} />
               <StatusBadge value={item.currentState} />
             </div>
 
-            <p className="mt-1 text-sm text-zinc-500">
-              {item.caseNumber} · {item.serviceType}
-              {item.actorName ? ` · oleh ${item.actorName}` : ''}
+            <p className="mt-1 text-sm text-[#62766f]">
+              {item.caseNumber} / {item.serviceType}
+              {item.actorName ? ` / oleh ${item.actorName}` : ''}
             </p>
 
             {item.description ? (
-              <p className="mt-2 text-sm text-zinc-600">{item.description}</p>
+              <p className="mt-2 text-sm text-[#4c625c]">{item.description}</p>
             ) : null}
           </div>
 
-          <div className="hidden text-right text-xs text-zinc-400 md:block">
+          <div className="hidden text-right text-xs text-[#8b9a95] md:block">
             {formatDateTime(item.createdAt)}
           </div>
         </div>
@@ -477,13 +477,13 @@ function CompactMetric({
   tone: 'neutral' | 'success' | 'warning';
 }) {
   const toneClass = {
-    neutral: 'bg-zinc-50 text-zinc-800',
-    success: 'bg-emerald-50 text-emerald-700',
-    warning: 'bg-amber-50 text-amber-800',
+    neutral: 'border-[#cfe1da] bg-[#f8fbfa] text-[#18343a]',
+    success: 'border-[#91d9bf] bg-[#e4f8ef] text-[#12815f]',
+    warning: 'border-[#f2cf5a] bg-[#fff3c4] text-[#745300]',
   }[tone];
 
   return (
-    <div className={`rounded-2xl px-4 py-3 ${toneClass}`}>
+    <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">{label}</p>
         {tone === 'success' ? (

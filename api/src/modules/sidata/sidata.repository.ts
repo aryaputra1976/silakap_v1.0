@@ -160,6 +160,21 @@ const asnDocumentSelect = {
   createdAt: true,
 } satisfies Prisma.DocumentSelect;
 
+const asnChangeLogSelect = {
+  id: true,
+  asnId: true,
+  fieldName: true,
+  oldValue: true,
+  newValue: true,
+  changedBy: true,
+  changedAt: true,
+  reason: true,
+  evidenceDocumentId: true,
+  source: true,
+  sourceBatchId: true,
+  metadata: true,
+} satisfies Prisma.AsnChangeLogSelect;
+
 export type UnitKerjaRecord = Prisma.UnitKerjaGetPayload<{
   select: typeof unitSelect;
 }>;
@@ -179,6 +194,10 @@ export type AsnGolonganHistoryRecord = Prisma.AsnGolonganHistoryGetPayload<{
 
 export type AsnDocumentRecord = Prisma.DocumentGetPayload<{
   select: typeof asnDocumentSelect;
+}>;
+
+export type AsnChangeLogRecord = Prisma.AsnChangeLogGetPayload<{
+  select: typeof asnChangeLogSelect;
 }>;
 
 type OrderedAsnIdRow = {
@@ -217,6 +236,11 @@ type AsnQualityAggregateSqlRow = {
   bupNext12MonthsRows: RawCountValue;
   bupOverdueActiveRows: RawCountValue;
   completeCoreRows: RawCountValue;
+  syncedRows: RawCountValue;
+  localCorrectionRows: RawCountValue;
+  needReviewRows: RawCountValue;
+  pendingSiasnUpdateRows: RawCountValue;
+  conflictRows: RawCountValue;
 };
 
 type AsnQualityBreakdownSqlRow = {
@@ -241,6 +265,11 @@ export type SidataAsnQualityAggregateRecord = {
   bupNext12MonthsRows: number;
   bupOverdueActiveRows: number;
   completeCoreRows: number;
+  syncedRows: number;
+  localCorrectionRows: number;
+  needReviewRows: number;
+  pendingSiasnUpdateRows: number;
+  conflictRows: number;
 };
 
 export type SidataAsnQualityBreakdownRecord = {
@@ -252,6 +281,7 @@ export type SidataAsnQualityDashboardRecord = {
   aggregate: SidataAsnQualityAggregateRecord;
   byStatusAsn: SidataAsnQualityBreakdownRecord[];
   byJenisAsn: SidataAsnQualityBreakdownRecord[];
+  bySyncStatus: SidataAsnQualityBreakdownRecord[];
 };
 
 @Injectable()
@@ -342,6 +372,25 @@ export class SidataRepository {
       where: { id },
       data,
       include: asnInclude,
+    });
+  }
+
+  async createAsnChangeLogs(
+    logs: Prisma.AsnChangeLogCreateManyInput[],
+  ): Promise<{ count: number }> {
+    if (logs.length === 0) {
+      return { count: 0 };
+    }
+
+    return this.prisma.asnChangeLog.createMany({ data: logs });
+  }
+
+  async findAsnChangeLogs(asnId: string): Promise<AsnChangeLogRecord[]> {
+    return this.prisma.asnChangeLog.findMany({
+      where: { asnId },
+      orderBy: { changedAt: 'desc' },
+      take: 100,
+      select: asnChangeLogSelect,
     });
   }
 
@@ -539,7 +588,13 @@ export class SidataRepository {
            AND sp.id IS NOT NULL
            AND sp.tanggal_lahir IS NOT NULL THEN 1
           ELSE 0
-        END) AS completeCoreRows
+        END) AS completeCoreRows,
+
+        SUM(CASE WHEN a.sync_status = 'SYNCED' THEN 1 ELSE 0 END) AS syncedRows,
+        SUM(CASE WHEN a.sync_status = 'LOCAL_CORRECTION' THEN 1 ELSE 0 END) AS localCorrectionRows,
+        SUM(CASE WHEN a.sync_status = 'NEED_REVIEW' THEN 1 ELSE 0 END) AS needReviewRows,
+        SUM(CASE WHEN a.sync_status = 'PENDING_SIASN_UPDATE' THEN 1 ELSE 0 END) AS pendingSiasnUpdateRows,
+        SUM(CASE WHEN a.sync_status = 'CONFLICT' THEN 1 ELSE 0 END) AS conflictRows
 
       FROM asn a
       LEFT JOIN asn_siasn_profile sp
@@ -574,6 +629,19 @@ export class SidataRepository {
       ORDER BY total DESC, label ASC
     `);
 
+    const syncRows = await this.prisma.$queryRaw<AsnQualityBreakdownSqlRow[]>(Prisma.sql`
+      SELECT
+        COALESCE(NULLIF(a.sync_status, ''), 'NEED_REVIEW') AS label,
+        COUNT(*) AS total
+      FROM asn a
+      LEFT JOIN asn_siasn_profile sp
+        ON sp.asn_id = a.id
+       AND sp.deleted_at IS NULL
+      WHERE ${whereSql}
+      GROUP BY COALESCE(NULLIF(a.sync_status, ''), 'NEED_REVIEW')
+      ORDER BY total DESC, label ASC
+    `);
+
     const aggregate = aggregateRows[0];
 
     return {
@@ -584,6 +652,10 @@ export class SidataRepository {
       })),
       byJenisAsn: jenisRows.map((row) => ({
         label: row.label ?? 'TIDAK_DIISI',
+        total: this.toRawCountNumber(row.total),
+      })),
+      bySyncStatus: syncRows.map((row) => ({
+        label: row.label ?? 'NEED_REVIEW',
         total: this.toRawCountNumber(row.total),
       })),
     };
@@ -624,6 +696,11 @@ export class SidataRepository {
       bupNext12MonthsRows: this.toRawCountNumber(row?.bupNext12MonthsRows),
       bupOverdueActiveRows: this.toRawCountNumber(row?.bupOverdueActiveRows),
       completeCoreRows: this.toRawCountNumber(row?.completeCoreRows),
+      syncedRows: this.toRawCountNumber(row?.syncedRows),
+      localCorrectionRows: this.toRawCountNumber(row?.localCorrectionRows),
+      needReviewRows: this.toRawCountNumber(row?.needReviewRows),
+      pendingSiasnUpdateRows: this.toRawCountNumber(row?.pendingSiasnUpdateRows),
+      conflictRows: this.toRawCountNumber(row?.conflictRows),
     };
   }
 
@@ -649,6 +726,10 @@ export class SidataRepository {
 
     if (filters.jenisAsn) {
       where.tipePegawai = filters.jenisAsn;
+    }
+
+    if (filters.syncStatus) {
+      where.syncStatus = filters.syncStatus;
     }
 
     if (filters.q) {
@@ -877,6 +958,10 @@ export class SidataRepository {
 
     if (filters.jenisAsn) {
       clauses.push(Prisma.sql`a.tipe_pegawai = ${filters.jenisAsn}`);
+    }
+
+    if (filters.syncStatus) {
+      clauses.push(Prisma.sql`a.sync_status = ${filters.syncStatus}`);
     }
 
     if (filters.q) {

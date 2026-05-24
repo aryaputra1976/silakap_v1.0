@@ -156,7 +156,7 @@ export function AdminUsersPage() {
                 className: 'w-[260px]',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">
+                    <div className="font-semibold text-[#18343a]">
                       {item.name}
                     </div>
                     <div className="mt-1 text-xs text-[#6d7e68]">

@@ -144,7 +144,7 @@ export function SopRealizationPage() {
       >
         <div className="max-w-xs">
           <input
-            className="h-10 w-full rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+            className="h-10 w-full rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
             inputMode="numeric"
             maxLength={4}
             value={year}
@@ -155,24 +155,24 @@ export function SopRealizationPage() {
 
       <SectionCard title="Alur Realisasi" description="Panduan singkat status realisasi SOP/RHK.">
         <div className="grid gap-3 text-sm leading-6 text-[#51614c] md:grid-cols-5">
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-3">
-            <strong className="text-[#173c36]">Draft</strong>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-3">
+            <strong className="text-[#18343a]">Draft</strong>
             <p>Input awal dan masih bisa diedit.</p>
           </div>
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-3">
-            <strong className="text-[#173c36]">Submitted</strong>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-3">
+            <strong className="text-[#18343a]">Submitted</strong>
             <p>Dikirim untuk review.</p>
           </div>
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-3">
-            <strong className="text-[#173c36]">Reviewed</strong>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-3">
+            <strong className="text-[#18343a]">Reviewed</strong>
             <p>Sudah diperiksa reviewer.</p>
           </div>
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-3">
-            <strong className="text-[#173c36]">Approved</strong>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-3">
+            <strong className="text-[#18343a]">Approved</strong>
             <p>Final dan terkunci.</p>
           </div>
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-3">
-            <strong className="text-[#173c36]">Perlu Revisi</strong>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-3">
+            <strong className="text-[#18343a]">Perlu Revisi</strong>
             <p>Dikembalikan untuk perbaikan.</p>
           </div>
         </div>

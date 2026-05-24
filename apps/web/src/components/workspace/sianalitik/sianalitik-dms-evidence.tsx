@@ -17,9 +17,9 @@ export function SianalitikDmsEvidence({ dms }: Props) {
   return (
     <SectionCard title="Bukti Dukung DMS" className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-[#9ed9c4] bg-[#e6f6ee] p-3 text-center">
-          <p className="text-2xl font-bold text-[#087052]">{verified}</p>
-          <p className="mt-0.5 text-xs text-[#087052]">Terverifikasi</p>
+        <div className="rounded-lg border border-[#91d9bf] bg-[#e4f8ef] p-3 text-center">
+          <p className="text-2xl font-bold text-[#12815f]">{verified}</p>
+          <p className="mt-0.5 text-xs text-[#12815f]">Terverifikasi</p>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
           <p className="text-2xl font-bold text-amber-700">{waiting}</p>
@@ -30,11 +30,11 @@ export function SianalitikDmsEvidence({ dms }: Props) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-600">Tingkat Verifikasi</span>
-          <span className="font-semibold text-[#087052]">{verifiedPct}%</span>
+          <span className="font-semibold text-[#12815f]">{verifiedPct}%</span>
         </div>
         <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-[#087052] transition-all"
+            className="h-full rounded-full bg-[#12815f] transition-all"
             style={{ width: `${verifiedPct}%` }}
           />
         </div>
@@ -71,7 +71,7 @@ export function SianalitikDmsEvidence({ dms }: Props) {
       )}
 
       <div className="border-t border-slate-100 pt-2">
-        <Link to="/dms" className="text-xs font-medium text-[#087052] hover:underline">
+        <Link to="/dms" className="text-xs font-medium text-[#12815f] hover:underline">
           Kelola dokumen DMS →
         </Link>
       </div>

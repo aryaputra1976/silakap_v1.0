@@ -290,8 +290,8 @@ export function SidataAsnPage() {
     return (
       <div key={node.id}>
         <div
-          className={`flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-[#eef7ec] ${
-            isSelected ? 'bg-[#e7f4ef] text-[#0f766e]' : 'text-[#173c36]'
+          className={`flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-[#eef8f6] ${
+            isSelected ? 'bg-[#e7f4ef] text-[#0e7c86]' : 'text-[#18343a]'
           }`}
           style={{ paddingLeft: `${8 + depth * 18}px` }}
         >
@@ -413,7 +413,7 @@ export function SidataAsnPage() {
               </button>
 
               {unitComboOpen ? (
-                <div className="absolute left-0 right-0 z-30 mt-2 rounded-lg border border-[#c9d9c4] bg-[#fbfdf8] p-2 shadow-xl">
+                <div className="absolute left-0 right-0 z-30 mt-2 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-2 shadow-xl">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
                     <input
@@ -426,8 +426,8 @@ export function SidataAsnPage() {
 
                   <div className="mt-2 max-h-80 overflow-auto rounded-md border border-[#d8e4d3] bg-white p-1">
                     <button
-                      className={`flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-[#eef7ec] ${
-                        !unitKerjaId ? 'font-semibold text-[#0f766e]' : 'text-[#173c36]'
+                      className={`flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-[#eef8f6] ${
+                        !unitKerjaId ? 'font-semibold text-[#0e7c86]' : 'text-[#18343a]'
                       }`}
                       onClick={() => {
                         setPage(1);
@@ -513,7 +513,7 @@ export function SidataAsnPage() {
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="w-20 shrink-0 text-xs text-zinc-400">Pangkat</span>
-                          <span className="font-medium text-[#173c36]">{item.golonganNama ?? '-'}</span>
+                          <span className="font-medium text-[#18343a]">{item.golonganNama ?? '-'}</span>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="w-20 shrink-0 text-xs text-zinc-400">Jabatan</span>
@@ -596,7 +596,7 @@ export function SidataAsnPage() {
                   className: 'w-[190px]',
                   render: (item) => (
                     <div>
-                      <div className="font-semibold text-[#173c36]">{item.golonganNama ?? '-'}</div>
+                      <div className="font-semibold text-[#18343a]">{item.golonganNama ?? '-'}</div>
                       <div className="mt-0.5 text-xs text-zinc-500">{item.jabatanNama ?? '-'}</div>
                       <div className="mt-1 text-xs text-[#60735b]">MK {item.masaKerjaGolongan ?? '-'}</div>
                       <div className="text-xs text-zinc-400">{item.pendidikanTingkatNama ?? item.pendidikanNama ?? '-'}</div>

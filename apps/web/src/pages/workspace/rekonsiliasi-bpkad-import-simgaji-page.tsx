@@ -248,7 +248,7 @@ export function RekonsiliasiBpkadImportSimgajiPage() {
                 header: 'File',
                 render: (item) => (
                   <button
-                    className="text-left font-semibold text-[#0f766e] hover:underline"
+                    className="text-left font-semibold text-[#0e7c86] hover:underline"
                     onClick={() => setSelectedBatchId(item.id)}
                     type="button"
                   >
@@ -336,7 +336,7 @@ export function RekonsiliasiBpkadImportSimgajiPage() {
                 header: 'ASN',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">{item.nama ?? '-'}</div>
+                    <div className="font-semibold text-[#18343a]">{item.nama ?? '-'}</div>
                     <div className="text-xs text-[#6d7e68]">{item.nip ?? '-'}</div>
                   </div>
                 ),

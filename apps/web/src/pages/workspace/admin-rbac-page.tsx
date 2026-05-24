@@ -178,10 +178,10 @@ export function AdminRbacPage() {
               {ACTIVE_APP_ROLES.map((role) => (
                 <div
                   key={role}
-                  className="grid min-w-0 gap-3 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4 xl:grid-cols-[220px_minmax(0,1fr)]"
+                  className="grid min-w-0 gap-3 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4 xl:grid-cols-[220px_minmax(0,1fr)]"
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-[#173c36]">
+                    <div className="font-semibold text-[#18343a]">
                       {ROLE_LABELS[role]}
                     </div>
                     <div className="mt-1 break-words text-xs text-[#6d7e68]">
@@ -215,7 +215,7 @@ export function AdminRbacPage() {
                     header: 'Role',
                     render: (item) => (
                       <div>
-                        <div className="font-semibold text-[#173c36]">
+                        <div className="font-semibold text-[#18343a]">
                           {item.name}
                         </div>
                         <div className="mt-1 text-xs text-[#6d7e68]">
@@ -261,9 +261,9 @@ export function AdminRbacPage() {
                   {resourceGroups.map((item) => (
                     <div
                       key={item.resource}
-                      className="flex items-center justify-between rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] px-4 py-3"
+                      className="flex items-center justify-between rounded-lg border border-[#cfe1da] bg-[#fbfdf8] px-4 py-3"
                     >
-                      <span className="font-semibold text-[#173c36]">
+                      <span className="font-semibold text-[#18343a]">
                         {item.resource}
                       </span>
                       <StatusBadge value={`${item.total} permission`} />
@@ -296,7 +296,7 @@ function ModuleAccessCard({
 
   if (permissions.length === 0) {
     return (
-      <div className="min-w-0 rounded-lg border border-dashed border-[#d8e5d3] bg-[#f4f8ef] p-3">
+      <div className="min-w-0 rounded-lg border border-dashed border-[#cfe1da] bg-[#f4f8ef] p-3">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="truncate text-xs font-semibold uppercase text-[#60735b]">
             {MODULE_LABELS[moduleKey]}
@@ -309,9 +309,9 @@ function ModuleAccessCard({
   }
 
   return (
-    <div className="min-w-0 rounded-lg border border-[#d8e5d3] bg-white p-3 shadow-sm shadow-[#bfd0bb]/30">
+    <div className="min-w-0 rounded-lg border border-[#cfe1da] bg-white p-3 shadow-sm shadow-[#bfd0bb]/30">
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="truncate text-xs font-semibold uppercase text-[#173c36]">
+        <span className="truncate text-xs font-semibold uppercase text-[#18343a]">
           {MODULE_LABELS[moduleKey]}
         </span>
         <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
@@ -320,7 +320,7 @@ function ModuleAccessCard({
         {permissions.map((permission) => (
           <span
             key={permission}
-            className="max-w-full truncate rounded-md border border-[#d8e5d3] bg-[#f4f8ef] px-1.5 py-0.5 text-[11px] font-semibold text-[#51614c]"
+            className="max-w-full truncate rounded-md border border-[#cfe1da] bg-[#f4f8ef] px-1.5 py-0.5 text-[11px] font-semibold text-[#51614c]"
           >
             {PERMISSION_LABELS[permission]}
           </span>

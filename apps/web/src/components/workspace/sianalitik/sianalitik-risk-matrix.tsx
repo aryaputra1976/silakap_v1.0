@@ -22,7 +22,7 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; icon: typeo
     high: { label: 'Tinggi', color: 'text-rose-700 bg-rose-50 border-rose-200', icon: AlertTriangle },
     medium: { label: 'Sedang', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: AlertCircle },
     low: { label: 'Rendah', color: 'text-[#096672] bg-[#e7f6f5] border-[#9fd6dc]', icon: Info },
-    ok: { label: 'Aman', color: 'text-[#087052] bg-[#e6f6ee] border-[#9ed9c4]', icon: CheckCircle2 },
+    ok: { label: 'Aman', color: 'text-[#12815f] bg-[#e4f8ef] border-[#91d9bf]', icon: CheckCircle2 },
   };
 
 function buildRisks(

@@ -19,6 +19,7 @@ export type SidataAsnListQuery = {
   unitKerjaId?: string;
   statusAsn?: string;
   jenisAsn?: string;
+  syncStatus?: string;
   page?: number;
   limit?: number;
 };
@@ -38,7 +39,26 @@ export type SidataUpdateAsnPayload = Partial<{
   tmtGolongan: string;
   tmtPensiun: string;
   isActive: boolean;
+  changeReason: string;
+  evidenceDocumentId: string;
+  needsReview: boolean;
+  reviewNote: string;
 }>;
+
+export type SidataAsnChangeLog = {
+  id: string;
+  asnId: string;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string | null;
+  changedAt: string;
+  reason: string | null;
+  evidenceDocumentId: string | null;
+  source: string;
+  sourceBatchId: string | null;
+  metadata: unknown;
+};
 
 export type SidataAsnHistoryBatch = {
   id: string;
@@ -129,9 +149,17 @@ export type SidataAsnQualityDashboard = {
     issueRows: number;
     qualityScore: number;
   };
+  sync: {
+    synced: number;
+    localCorrection: number;
+    needReview: number;
+    pendingSiasnUpdate: number;
+    conflict: number;
+  };
   breakdown: {
     byStatusAsn: SidataAsnQualityBreakdownItem[];
     byJenisAsn: SidataAsnQualityBreakdownItem[];
+    bySyncStatus: SidataAsnQualityBreakdownItem[];
   };
 };
 
@@ -215,6 +243,7 @@ export const sidataApi = {
       unitKerjaId: query.unitKerjaId,
       statusAsn: query.statusAsn,
       jenisAsn: query.jenisAsn,
+      syncStatus: query.syncStatus,
       page: query.page,
       limit: query.limit,
     });
@@ -230,6 +259,10 @@ export const sidataApi = {
 
   getAsnHistory(id: string): Promise<SidataAsnHistory> {
     return apiClient.get<SidataAsnHistory>(`/sidata/asn/${id}/history`);
+  },
+
+  getAsnChangeLogs(id: string): Promise<SidataAsnChangeLog[]> {
+    return apiClient.get<SidataAsnChangeLog[]>(`/sidata/asn/${id}/change-logs`);
   },
 
   updateAsn(id: string, payload: SidataUpdateAsnPayload): Promise<AsnRecord> {
@@ -264,6 +297,7 @@ export const sidataApi = {
       unitKerjaId: query.unitKerjaId,
       statusAsn: query.statusAsn,
       jenisAsn: query.jenisAsn,
+      syncStatus: query.syncStatus,
     });
   },
 

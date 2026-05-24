@@ -57,7 +57,7 @@ export function KinerjaBidangTargetsPage() {
       <SectionCard title="Filter Tahun" description="Pilih tahun target.">
         <div className="max-w-xs">
           <input
-            className="h-10 w-full rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+            className="h-10 w-full rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
             inputMode="numeric"
             maxLength={4}
             value={year}
@@ -81,7 +81,7 @@ export function KinerjaBidangTargetsPage() {
                 header: 'SOP',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">{item.sop.title}</div>
+                    <div className="font-semibold text-[#18343a]">{item.sop.title}</div>
                     <div className="mt-1 text-xs text-[#6d7e68]">{item.sop.code}</div>
                   </div>
                 ),

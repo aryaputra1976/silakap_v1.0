@@ -52,12 +52,12 @@ export function ServiceDocumentPanel({
         <div className="grid gap-3">
           {documents.map((document) => (
             <div
-              className="rounded-lg border border-[#d8e5d3] bg-white p-4"
+              className="rounded-lg border border-[#cfe1da] bg-white p-4"
               key={document.id}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold text-[#173c36]">
+                  <div className="font-semibold text-[#18343a]">
                     {document.title}
                   </div>
                   <div className="mt-1 text-xs text-[#687967]">

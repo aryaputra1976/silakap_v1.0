@@ -101,13 +101,13 @@ export function RhkPerformanceReportPanel({ refreshKey = 0 }: { refreshKey?: num
       {error ? <ErrorAlert message={error} /> : null}
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <input
-          className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           inputMode="numeric"
           value={year}
           onChange={(event) => setYear(event.target.value)}
         />
         <select
-          className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={month}
           onChange={(event) => setMonth(event.target.value)}
         >
@@ -116,7 +116,7 @@ export function RhkPerformanceReportPanel({ refreshKey = 0 }: { refreshKey?: num
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={quarter}
           onChange={(event) => setQuarter(event.target.value)}
         >
@@ -128,9 +128,9 @@ export function RhkPerformanceReportPanel({ refreshKey = 0 }: { refreshKey?: num
       </div>
 
       {monthly ? (
-        <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
+        <div className="rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-[#173c36]">{monthly.periodLabel}</h3>
+            <h3 className="font-semibold text-[#18343a]">{monthly.periodLabel}</h3>
             <StatusBadge value={`${monthly.averageFinalScore}%`} tone="success" />
           </div>
           <p className="mt-2 text-sm leading-6 text-[#51614c]">{monthly.narrativeSummary}</p>
@@ -143,8 +143,8 @@ export function RhkPerformanceReportPanel({ refreshKey = 0 }: { refreshKey?: num
       ) : null}
 
       {quarterly ? (
-        <div className="mt-4 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
-          <h3 className="font-semibold text-[#173c36]">{quarterly.quarterLabel}</h3>
+        <div className="mt-4 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4">
+          <h3 className="font-semibold text-[#18343a]">{quarterly.quarterLabel}</h3>
           <p className="mt-2 text-sm leading-6 text-[#51614c]">{quarterly.strategicSummary}</p>
           <p className="mt-1 text-sm text-[#6d7e68]">{quarterly.trendNotes}</p>
           <p className="mt-1 text-sm text-[#6d7e68]">{quarterly.leadershipRecommendation}</p>

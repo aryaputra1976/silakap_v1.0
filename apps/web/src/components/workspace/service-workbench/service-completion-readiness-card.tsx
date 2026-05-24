@@ -135,7 +135,7 @@ export function ServiceCompletionReadinessCard({
               Catatan Override (wajib jika ada syarat belum terpenuhi)
             </label>
             <textarea
-              className="w-full rounded-md border border-[#c9d9c4] bg-white px-3 py-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+              className="w-full rounded-md border border-[#cfe1da] bg-white px-3 py-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
               placeholder="Alasan override penyelesaian..."
               rows={2}
               value={overrideNote}

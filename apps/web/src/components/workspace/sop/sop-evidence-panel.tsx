@@ -129,8 +129,8 @@ export function SopEvidencePanel({ sop }: { sop: SopDetail }) {
         }
       >
         <div className="space-y-4">
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
-            <div className="mb-2 font-semibold text-[#173c36]">Format tagging bukti dukung:</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
+            <div className="mb-2 font-semibold text-[#18343a]">Format tagging bukti dukung:</div>
             <div className="flex flex-wrap gap-2">
               <StatusBadge value={`[SOP:${sop.code}]`} tone="dark" />
               {primaryRhkCode ? <StatusBadge value={`[RHK:${primaryRhkCode}]`} tone="info" /> : null}
@@ -173,7 +173,7 @@ export function SopEvidencePanel({ sop }: { sop: SopDetail }) {
                   header: 'Dokumen',
                   render: (item) => (
                     <div>
-                      <div className="font-semibold text-[#173c36]">{item.title}</div>
+                      <div className="font-semibold text-[#18343a]">{item.title}</div>
                       <div className="mt-1 text-xs leading-5 text-[#6d7e68]">
                         {item.originalFileName ?? item.fileName ?? 'Belum ada file'}
                       </div>

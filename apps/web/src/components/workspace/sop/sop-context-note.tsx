@@ -9,9 +9,9 @@ export function SopContextNote() {
       className="no-print"
     >
       <div className="grid gap-4 text-sm leading-6 text-[#51614c] xl:grid-cols-3">
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
-            <Info className="size-4 text-[#0f766e]" />
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
+            <Info className="size-4 text-[#0e7c86]" />
             Kinerja Bidang
           </div>
           <p>
@@ -23,9 +23,9 @@ export function SopContextNote() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
-            <Info className="size-4 text-[#0f766e]" />
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
+            <Info className="size-4 text-[#0e7c86]" />
             SIDATA ASN
           </div>
           <p>
@@ -37,9 +37,9 @@ export function SopContextNote() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
-            <Info className="size-4 text-[#0f766e]" />
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
+            <Info className="size-4 text-[#0e7c86]" />
             DMS Bukti Dukung
           </div>
           <p>

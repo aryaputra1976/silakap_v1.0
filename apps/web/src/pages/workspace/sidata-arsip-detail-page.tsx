@@ -87,7 +87,7 @@ function FieldDiff({ sebelum, sesudah }: {
               <>
                 <span className="text-rose-600 line-through">{beforeStr}</span>
                 {' → '}
-                <span className="font-medium text-[#087052]">{afterStr}</span>
+                <span className="font-medium text-[#12815f]">{afterStr}</span>
               </>
             ) : (
               <span>{afterStr}</span>
@@ -131,7 +131,7 @@ function ChangesTab({ archiveId, changeType }: { archiveId: string; changeType: 
     <div className="space-y-3">
       <div className="flex gap-2">
         <input
-          className="h-9 w-64 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+          className="h-9 w-64 rounded-md border border-[#cfe1da] bg-[#fbfdf8] px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
           placeholder="Cari NIP / Nama..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
@@ -157,7 +157,7 @@ function ChangesTab({ archiveId, changeType }: { archiveId: string; changeType: 
                 render: (item) => (
                   <div>
                     <div className="font-mono text-xs">{item.nip}</div>
-                    <div className="mt-0.5 font-semibold text-[#173c36]">{item.nama}</div>
+                    <div className="mt-0.5 font-semibold text-[#18343a]">{item.nama}</div>
                   </div>
                 ),
               },
@@ -226,9 +226,9 @@ function MendekatiPensiunTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-[#173c36]">Tampilkan ASN pensiun dalam</span>
+        <span className="text-sm font-medium text-[#18343a]">Tampilkan ASN pensiun dalam</span>
         <select
-          className="h-9 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 rounded-md border border-[#cfe1da] bg-[#fbfdf8] px-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={bulanKedepan}
           onChange={(e) => setBulanKedepan(Number(e.target.value))}
         >
@@ -253,7 +253,7 @@ function MendekatiPensiunTab() {
               render: (item) => (
                 <div>
                   <div className="font-mono text-xs">{item.nip}</div>
-                  <div className="mt-0.5 font-semibold text-[#173c36]">{item.nama}</div>
+                  <div className="mt-0.5 font-semibold text-[#18343a]">{item.nama}</div>
                 </div>
               ),
             },
@@ -381,7 +381,7 @@ export function SidataArsipDetailPage() {
               </ActionButton>
             )}
             {archive.status === 'FINAL' && (
-              <div className="flex items-center gap-1.5 rounded-md border border-[#9ed9c4] bg-[#e6f6ee] px-3 py-2 text-sm font-semibold text-[#087052]">
+              <div className="flex items-center gap-1.5 rounded-md border border-[#91d9bf] bg-[#e4f8ef] px-3 py-2 text-sm font-semibold text-[#12815f]">
                 <CheckCircle2 className="size-4" />
                 Final {formatDate(archive.finalizedAt)}
               </div>
@@ -406,21 +406,21 @@ export function SidataArsipDetailPage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`min-w-0 rounded-lg border px-4 py-3 text-left transition-colors hover:border-[#0f766e] hover:bg-[#f0f9f7] ${
-              activeTab === tab.key ? 'border-[#0f766e] bg-[#e7f6f5]' : 'border-[#d8e5d3] bg-[#fbfdf8]'
+            className={`min-w-0 rounded-lg border px-4 py-3 text-left transition-colors hover:border-[#0e7c86] hover:bg-[#f0f9f7] ${
+              activeTab === tab.key ? 'border-[#0e7c86] bg-[#e7f6f5]' : 'border-[#cfe1da] bg-[#fbfdf8]'
             }`}
           >
-            <div className="text-xl font-semibold text-[#173c36]">{getCount(tab)}</div>
+            <div className="text-xl font-semibold text-[#18343a]">{getCount(tab)}</div>
             <div className="mt-0.5 text-xs font-medium text-[#73816e]">{tab.label}</div>
           </button>
         ))}
         <button
           onClick={() => setActiveTab('MENDEKATI_PENSIUN')}
-          className={`min-w-0 rounded-lg border px-4 py-3 text-left transition-colors hover:border-[#0f766e] hover:bg-[#f0f9f7] ${
-            activeTab === 'MENDEKATI_PENSIUN' ? 'border-[#0f766e] bg-[#e7f6f5]' : 'border-[#d8e5d3] bg-[#fbfdf8]'
+          className={`min-w-0 rounded-lg border px-4 py-3 text-left transition-colors hover:border-[#0e7c86] hover:bg-[#f0f9f7] ${
+            activeTab === 'MENDEKATI_PENSIUN' ? 'border-[#0e7c86] bg-[#e7f6f5]' : 'border-[#cfe1da] bg-[#fbfdf8]'
           }`}
         >
-          <div className="flex items-center gap-1.5 text-[#173c36]">
+          <div className="flex items-center gap-1.5 text-[#18343a]">
             <Clock className="size-4" />
           </div>
           <div className="mt-0.5 text-xs font-medium text-[#73816e]">Mendekati Pensiun</div>
@@ -428,20 +428,20 @@ export function SidataArsipDetailPage() {
       </div>
 
       {/* Tab header */}
-      <div className="flex overflow-x-auto border-b border-[#d8e5d3]">
+      <div className="flex overflow-x-auto border-b border-[#cfe1da]">
         {CHANGE_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === tab.key
-                ? 'border-[#0f766e] text-[#0f766e]'
-                : 'border-transparent text-[#73816e] hover:text-[#173c36]'
+                ? 'border-[#0e7c86] text-[#0e7c86]'
+                : 'border-transparent text-[#73816e] hover:text-[#18343a]'
             }`}
           >
             {tab.label}
             {tab.countKey && archive[tab.countKey] ? (
-              <span className="ml-1.5 rounded bg-[#d8f0e8] px-1.5 py-0.5 text-xs text-[#087052]">
+              <span className="ml-1.5 rounded bg-[#d8f0e8] px-1.5 py-0.5 text-xs text-[#12815f]">
                 {archive[tab.countKey] as number}
               </span>
             ) : null}

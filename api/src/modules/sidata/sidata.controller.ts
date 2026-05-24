@@ -124,6 +124,15 @@ export class SidataController {
     return ok(history);
   }
 
+  @Get('asn/:id/change-logs')
+  async findAsnChangeLogs(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const logs = await this.sidataService.findAsnChangeLogs(id, user);
+    return ok(logs);
+  }
+
   @Get('asn/:id/documents')
   async findAsnDocuments(
     @Param('id') id: string,

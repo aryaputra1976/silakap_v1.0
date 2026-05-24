@@ -154,7 +154,7 @@ export function RhkCandidateDetailPanel({
           <FileMeta
             label="Skor Keseluruhan"
             value={
-              <span className="text-lg font-bold text-[#173c36]">
+              <span className="text-lg font-bold text-[#18343a]">
                 {formatScore(candidate.overallScore)}
               </span>
             }
@@ -207,7 +207,7 @@ export function RhkCandidateDetailPanel({
         >
           <div className="space-y-3">
             <textarea
-              className="w-full rounded-md border border-[#c9d9c4] bg-white px-3 py-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+              className="w-full rounded-md border border-[#cfe1da] bg-white px-3 py-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
               placeholder="Catatan validasi (wajib untuk Tolak)..."
               rows={2}
               value={note}
@@ -215,9 +215,9 @@ export function RhkCandidateDetailPanel({
             />
             <div className="grid gap-3 md:grid-cols-4">
               <label className="grid gap-1.5 text-sm">
-                <span className="font-semibold text-[#173c36]">Tipe periode</span>
+                <span className="font-semibold text-[#18343a]">Tipe periode</span>
                 <select
-                  className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                  className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
                   value={periodType}
                   onChange={(event) => setPeriodType(event.target.value as KinerjaRhkPeriodType)}
                 >
@@ -227,9 +227,9 @@ export function RhkCandidateDetailPanel({
                 </select>
               </label>
               <label className="grid gap-1.5 text-sm">
-                <span className="font-semibold text-[#173c36]">Tahun</span>
+                <span className="font-semibold text-[#18343a]">Tahun</span>
                 <input
-                  className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                  className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
                   inputMode="numeric"
                   value={periodYear}
                   onChange={(event) => setPeriodYear(event.target.value)}
@@ -237,9 +237,9 @@ export function RhkCandidateDetailPanel({
               </label>
               {periodType === 'MONTHLY' ? (
                 <label className="grid gap-1.5 text-sm">
-                  <span className="font-semibold text-[#173c36]">Bulan</span>
+                  <span className="font-semibold text-[#18343a]">Bulan</span>
                   <select
-                    className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                    className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
                     value={periodMonth}
                     onChange={(event) => setPeriodMonth(event.target.value)}
                   >
@@ -251,9 +251,9 @@ export function RhkCandidateDetailPanel({
               ) : null}
               {periodType === 'QUARTERLY' ? (
                 <label className="grid gap-1.5 text-sm">
-                  <span className="font-semibold text-[#173c36]">Triwulan</span>
+                  <span className="font-semibold text-[#18343a]">Triwulan</span>
                   <select
-                    className="h-10 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+                    className="h-10 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
                     value={periodQuarter}
                     onChange={(event) => setPeriodQuarter(event.target.value)}
                   >
@@ -307,7 +307,7 @@ export function RhkCandidateDetailPanel({
                 className="rounded-lg border border-[#e5ede0] bg-[#f9fdf6] p-3 text-sm"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-[#173c36]">{log.action}</span>
+                  <span className="font-medium text-[#18343a]">{log.action}</span>
                   <span className="text-xs text-[#6d7e68]">{formatDateTime(log.createdAt)}</span>
                 </div>
                 {log.actorRole ? (

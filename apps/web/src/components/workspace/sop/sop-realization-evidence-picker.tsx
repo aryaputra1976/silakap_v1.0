@@ -228,7 +228,7 @@ export function SopRealizationEvidencePicker({
 
         <div className="grid gap-5 xl:grid-cols-2">
           <div>
-            <h3 className="mb-3 text-sm font-semibold uppercase text-[#173c36]">
+            <h3 className="mb-3 text-sm font-semibold uppercase text-[#18343a]">
               Hasil Pencarian DMS
             </h3>
 
@@ -245,7 +245,7 @@ export function SopRealizationEvidencePicker({
                     header: 'Dokumen',
                     render: (item) => (
                       <div>
-                        <div className="font-semibold text-[#173c36]">
+                        <div className="font-semibold text-[#18343a]">
                           {item.title}
                         </div>
                         <div className="mt-1 text-xs text-[#6d7e68]">
@@ -284,7 +284,7 @@ export function SopRealizationEvidencePicker({
           </div>
 
           <div>
-            <h3 className="mb-3 text-sm font-semibold uppercase text-[#173c36]">
+            <h3 className="mb-3 text-sm font-semibold uppercase text-[#18343a]">
               Bukti Terpilih
             </h3>
 
@@ -298,7 +298,7 @@ export function SopRealizationEvidencePicker({
                   header: 'Dokumen',
                   render: (item) => (
                     <div>
-                      <div className="font-semibold text-[#173c36]">
+                      <div className="font-semibold text-[#18343a]">
                         {item.documentTitle ?? item.label ?? item.dmsDocumentId}
                       </div>
                       <div className="mt-1 text-xs text-[#6d7e68]">
@@ -312,7 +312,7 @@ export function SopRealizationEvidencePicker({
                   header: 'Utama',
                   render: (item) => (
                     <button
-                      className="rounded-md border border-[#c9d9c4] bg-white px-2 py-1 text-xs font-semibold text-[#173c36] disabled:opacity-60"
+                      className="rounded-md border border-[#cfe1da] bg-white px-2 py-1 text-xs font-semibold text-[#18343a] disabled:opacity-60"
                       disabled={disabled || item.isPrimary}
                       onClick={() => setPrimary(item.dmsDocumentId)}
                       type="button"

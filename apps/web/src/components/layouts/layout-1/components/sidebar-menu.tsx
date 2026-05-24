@@ -41,12 +41,12 @@ export function SidebarMenu() {
     root: 'lg:ps-1 space-y-3',
     group: 'gap-px',
     label:
-      'uppercase text-xs font-medium text-muted-foreground/70 pt-2.25 pb-px',
+      'uppercase text-xs font-medium text-[#62766f] pt-2.25 pb-px',
     separator: '',
-    item: 'h-8 hover:bg-transparent text-accent-foreground hover:text-primary data-[selected=true]:text-primary data-[selected=true]:bg-muted data-[selected=true]:font-medium',
+    item: 'h-8 rounded-md hover:bg-[#eef8f6] text-[#4c625c] hover:text-[#0e7c86] data-[selected=true]:text-[#075e66] data-[selected=true]:bg-[#d8f0ed] data-[selected=true]:shadow-[inset_4px_0_0_#f2b705] data-[selected=true]:font-medium',
     sub: '',
     subTrigger:
-      'h-8 hover:bg-transparent text-accent-foreground hover:text-primary data-[selected=true]:text-primary data-[selected=true]:bg-muted data-[selected=true]:font-medium',
+      'h-8 rounded-md hover:bg-[#eef8f6] text-[#4c625c] hover:text-[#0e7c86] data-[selected=true]:text-[#075e66] data-[selected=true]:bg-[#d8f0ed] data-[selected=true]:shadow-[inset_4px_0_0_#f2b705] data-[selected=true]:font-medium',
     subContent: 'py-0',
     indicator: '',
   };

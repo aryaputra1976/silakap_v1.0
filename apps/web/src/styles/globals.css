@@ -8,58 +8,58 @@
 
 /** Colors - https://tailwindcss.com/docs/colors **/
 :root {
-  --background: var(--color-white);
-  --foreground: var(--color-zinc-950);
+  --background: #f5f8f8;
+  --foreground: #18343a;
   --card: var(--color-white);
-  --card-foreground: var(--color-zinc-950);
+  --card-foreground: #18343a;
   --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-950);
-  --primary: var(--color-zinc-900);
+  --popover-foreground: #18343a;
+  --primary: #0e7c86;
   --primary-foreground: var(--color-white);
-  --secondary: var(--color-zinc-100);
-  --secondary-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-100);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --destructive: var(--color-red-600);
+  --secondary: #eaf4ef;
+  --secondary-foreground: #18343a;
+  --muted: #edf5ef;
+  --muted-foreground: #62766f;
+  --accent: #fff3c4;
+  --accent-foreground: #6a4a00;
+  --destructive: #d94f70;
   --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: oklch(94% 0.004 286.32); /* between --color-zinc-100 and --color-zinc-200 */
-  --input: var(--color-zinc-200);
-  --ring: var(--color-zinc-400);
+  --chart-1: #0e7c86;
+  --chart-2: #f2b705;
+  --chart-3: #5267d8;
+  --chart-4: #d94f70;
+  --chart-5: #12815f;
+  --border: #cfe1da;
+  --input: #c1d6cf;
+  --ring: #0e7c86;
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: var(--color-zinc-950);
-  --foreground: var(--color-zinc-50);
-  --card: var(--color-zinc-950);
-  --card-foreground: var(--color-zinc-50);
-  --popover: var(--color-zinc-950);
-  --popover-foreground: var(--color-zinc-50);
-  --primary: var(--color-zinc-300);
-  --primary-foreground: var(--color-zinc-950);
-  --secondary: var(--color-zinc-800);
-  --secondary-foreground: var(--color-zinc-50);
-  --muted: var(--color-zinc-900);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-900);
-  --accent-foreground: var(--color-zinc-50);
-  --destructive: var(--color-red-600);
+  --background: #10272b;
+  --foreground: #edf7f4;
+  --card: #123034;
+  --card-foreground: #edf7f4;
+  --popover: #123034;
+  --popover-foreground: #edf7f4;
+  --primary: #68d4dc;
+  --primary-foreground: #062f35;
+  --secondary: #1e3d3f;
+  --secondary-foreground: #edf7f4;
+  --muted: #18383a;
+  --muted-foreground: #9ab0aa;
+  --accent: #f2b705;
+  --accent-foreground: #2d2100;
+  --destructive: #ff7d9b;
   --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: var(--color-zinc-800);
-  --input: var(--color-zinc-800);
-  --ring: var(--color-zinc-600);
+  --chart-1: #68d4dc;
+  --chart-2: #f2b705;
+  --chart-3: #91a0ff;
+  --chart-4: #ff7d9b;
+  --chart-5: #5ed4a8;
+  --border: #285052;
+  --input: #285052;
+  --ring: #68d4dc;
 }
 
 /** Theme Setup **/

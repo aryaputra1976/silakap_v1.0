@@ -26,7 +26,7 @@ export function SopDocumentVerificationAsnTable({
           header: 'ASN',
           render: (item) => (
             <div>
-              <div className="font-semibold text-[#173c36]">{item.name}</div>
+              <div className="font-semibold text-[#18343a]">{item.name}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">NIP. {item.nip}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">{item.unitKerjaName}</div>
             </div>
@@ -67,10 +67,10 @@ export function SopDocumentVerificationAsnTable({
           header: 'Kelengkapan',
           render: (item) => (
             <div className="min-w-36">
-              <div className="mb-1 text-xs font-semibold text-[#173c36]">{item.completenessPercent}%</div>
+              <div className="mb-1 text-xs font-semibold text-[#18343a]">{item.completenessPercent}%</div>
               <div className="h-2 overflow-hidden rounded-full bg-[#dce8d6]">
                 <div
-                  className="h-full rounded-full bg-[#0f766e]"
+                  className="h-full rounded-full bg-[#0e7c86]"
                   style={{ width: `${item.completenessPercent}%` }}
                 />
               </div>

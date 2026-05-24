@@ -26,8 +26,8 @@ export function SopWorkspaceNav() {
               key={item.path}
               className={`group min-w-0 rounded-lg border p-4 text-left transition ${
                 active
-                  ? 'border-[#0f766e] bg-[#e7f6f5] shadow-sm'
-                  : 'border-[#d8e5d3] bg-white hover:-translate-y-0.5 hover:border-[#9bc9bf] hover:bg-[#fbfdf8] hover:shadow-sm'
+                  ? 'border-[#0e7c86] bg-[#e7f6f5] shadow-sm'
+                  : 'border-[#cfe1da] bg-white hover:-translate-y-0.5 hover:border-[#9bc9bf] hover:bg-[#fbfdf8] hover:shadow-sm'
               }`}
               onClick={() => navigate(item.path)}
               type="button"
@@ -36,8 +36,8 @@ export function SopWorkspaceNav() {
                 <div
                   className={`flex size-9 items-center justify-center rounded-lg border ${
                     active
-                      ? 'border-[#0f766e] bg-[#0f766e] text-white'
-                      : 'border-[#d8e5d3] bg-[#f5faf1] text-[#0f766e]'
+                      ? 'border-[#0e7c86] bg-[#0e7c86] text-white'
+                      : 'border-[#cfe1da] bg-[#eef8f6] text-[#0e7c86]'
                   }`}
                 >
                   <Icon className="size-4" />
@@ -45,7 +45,7 @@ export function SopWorkspaceNav() {
                 <ChevronRight className="size-4 text-[#7a8b74] transition group-hover:translate-x-0.5" />
               </div>
 
-              <div className="break-words font-semibold text-[#173c36]">{item.title}</div>
+              <div className="break-words font-semibold text-[#18343a]">{item.title}</div>
               <p className="mt-1 line-clamp-3 text-xs leading-5 text-[#6d7e68]">
                 {item.description}
               </p>

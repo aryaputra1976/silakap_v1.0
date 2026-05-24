@@ -26,7 +26,7 @@ export function SopReportEvidenceTable({
           header: 'SOP',
           render: (item) => (
             <div>
-              <div className="font-semibold text-[#173c36]">{item.sopTitle}</div>
+              <div className="font-semibold text-[#18343a]">{item.sopTitle}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">{item.sopCode}</div>
             </div>
           ),
@@ -46,7 +46,7 @@ export function SopReportEvidenceTable({
           key: 'tag',
           header: 'Tag DMS',
           render: (item) => (
-            <div className="max-w-xs rounded-md border border-[#d8e5d3] bg-white px-3 py-2 font-mono text-xs text-[#51614c]">
+            <div className="max-w-xs rounded-md border border-[#cfe1da] bg-white px-3 py-2 font-mono text-xs text-[#51614c]">
               {item.dmsTag}
             </div>
           ),

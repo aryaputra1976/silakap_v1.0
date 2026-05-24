@@ -38,6 +38,7 @@ type JabatanResponse = {
   siasnNama: string | null;
   rumpun: string | null;
   jenjang: string | null;
+  bup: number | null;
   kelasJabatan: number | null;
   source: string | null;
   isActive: boolean;
@@ -282,6 +283,7 @@ export class SidataReferenceService {
       siasnNama: item.siasnNama,
       rumpun: item.rumpun,
       jenjang: item.jenjang,
+      bup: item.bup,
       kelasJabatan: item.kelasJabatan,
       source: item.source,
       isActive: item.isActive,

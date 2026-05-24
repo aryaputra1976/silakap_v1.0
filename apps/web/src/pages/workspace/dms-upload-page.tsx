@@ -157,8 +157,8 @@ export function DmsUploadPage() {
       />
 
       {isSopEvidenceUpload ? (
-        <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4 text-sm leading-6 text-[#51614c] shadow-sm">
-          <div className="font-semibold text-[#173c36]">Upload Bukti Dukung SOP/RHK</div>
+        <div className="rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4 text-sm leading-6 text-[#51614c] shadow-sm">
+          <div className="font-semibold text-[#18343a]">Upload Bukti Dukung SOP/RHK</div>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <div>
               <span className="font-semibold">Kode SOP:</span> {sopCodeFromQuery}

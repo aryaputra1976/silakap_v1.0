@@ -70,13 +70,13 @@ export function RhkRealizationTable({ refreshKey = 0 }: { refreshKey?: number })
       {error ? <ErrorAlert message={error} /> : null}
       <FilterBar>
         <input
-          className="h-9 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           inputMode="numeric"
           value={query.periodYear ?? ''}
           onChange={(event) => updateQuery({ periodYear: event.target.value })}
         />
         <select
-          className="h-9 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={query.periodType ?? ''}
           onChange={(event) => updateQuery({ periodType: event.target.value as KinerjaRhkRealizationQuery['periodType'] })}
         >
@@ -86,7 +86,7 @@ export function RhkRealizationTable({ refreshKey = 0 }: { refreshKey?: number })
           <option value="YEARLY">Tahunan</option>
         </select>
         <select
-          className="h-9 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={query.status ?? ''}
           onChange={(event) => updateQuery({ status: event.target.value as KinerjaRhkRealizationQuery['status'] })}
         >
@@ -110,7 +110,7 @@ export function RhkRealizationTable({ refreshKey = 0 }: { refreshKey?: number })
                 header: 'RHK / Layanan',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">{item.title}</div>
+                    <div className="font-semibold text-[#18343a]">{item.title}</div>
                     <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-[#6d7e68]">
                       <StatusBadge value={item.rhkCode} tone="info" />
                       {item.sopCode ? <StatusBadge value={item.sopCode} tone="neutral" /> : null}

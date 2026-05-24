@@ -25,7 +25,7 @@ export function SopDashboardBackendProgressTable({
           className: 'w-[34%]',
           render: (item) => (
             <div className="min-w-0">
-              <div className="break-words font-semibold leading-6 text-[#173c36]">
+              <div className="break-words font-semibold leading-6 text-[#18343a]">
                 {item.sopTitle}
               </div>
               <div className="mt-1 break-words text-xs leading-5 text-[#6d7e68]">
@@ -62,12 +62,12 @@ export function SopDashboardBackendProgressTable({
           className: 'w-[18%]',
           render: (item) => (
             <div className="w-full min-w-0 max-w-48">
-              <div className="mb-1 text-xs font-semibold text-[#173c36]">
+              <div className="mb-1 text-xs font-semibold text-[#18343a]">
                 {item.progressPercent}%
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-[#dce8d6]">
                 <div
-                  className="h-full rounded-full bg-[#0f766e]"
+                  className="h-full rounded-full bg-[#0e7c86]"
                   style={{ width: `${item.progressPercent}%` }}
                 />
               </div>

@@ -6,7 +6,6 @@ import {
   Building2,
   CalendarDays,
   ClipboardCheck,
-  ClipboardList,
   Database,
   FileCheck,
   FileText,
@@ -210,78 +209,53 @@ export const MENU_SIDEBAR: MenuConfig = [
     icon: Database,
     moduleKey: 'SIDATA',
     children: [
-      // ── Semua role SIDATA ────────────────────────────────────────────
       { title: 'Dashboard', path: '/sidata/dashboard', moduleKey: 'SIDATA' },
-      // ── Data ASN: parent read, child masing-masing filter permission ─
+      { title: 'Master ASN', path: '/sidata/asn', moduleKey: 'SIDATA' },
       {
-        title: 'Data ASN',
+        title: 'Kualitas & Pemutakhiran',
+        path: '/sidata/validasi',
         moduleKey: 'SIDATA',
-        children: [
-          { title: 'Profil ASN', path: '/sidata/asn', moduleKey: 'SIDATA' },
-          { title: 'Rekapitulasi ASN', path: '/sidata/rekap', moduleKey: 'SIDATA' },
-          {
-            title: 'Validasi Data',
-            path: '/sidata/validasi',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'verify',
-          },
-          {
-            title: 'Pemutakhiran',
-            path: '/sidata/pemutakhiran',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'input',
-          },
-        ],
+        requiredPermission: 'verify',
       },
-      // ── Import: parent read, child filter upload/monitor ─────────────
       {
-        title: 'Import & Sinkronisasi',
+        title: 'Import SIASN',
+        path: '/sidata/import/siasn',
+        moduleKey: 'SIDATA',
+        requiredPermission: 'upload',
+      },
+      {
+        title: 'Pengaturan Data',
         moduleKey: 'SIDATA',
         children: [
           {
-            title: 'Import Data',
-            path: '/sidata/import/siasn',
-            moduleKey: 'SIDATA',
-            requiredPermission: 'upload',
-          },
-          {
-            title: 'Riwayat & Log',
+            title: 'Riwayat Import',
             path: '/sidata/import/riwayat',
             moduleKey: 'SIDATA',
             requiredPermission: 'monitor',
           },
+          { title: 'Referensi', path: '/sidata/referensi', moduleKey: 'SIDATA' },
         ],
       },
-      // ── Referensi: semua role SIDATA ─────────────────────────────────
-      { title: 'Referensi Data', path: '/sidata/referensi', moduleKey: 'SIDATA' },
-      // ── Rekonsiliasi: verify ke atas; Discrepancy sebagai tab di dalam halaman
       {
         title: 'Rekonsiliasi',
         path: '/sidata/rekonsiliasi',
         moduleKey: 'SIDATA',
         requiredPermission: 'verify',
       },
-      // ── Arsip Bulanan: monitor dan upload ────────────────────────────
       {
-        title: 'Arsip Bulanan ASN',
-        path: '/sidata/arsip',
-        moduleKey: 'SIDATA',
-        requiredPermission: 'monitor',
-      },
-      // ── Gaji Pokok PNS ───────────────────────────────────────────────
-      {
-        title: 'Gaji Pokok PNS',
-        path: '/sidata/gaji-pokok',
-        moduleKey: 'SIDATA',
-      },
-      // ── Dokumen & Laporan: parent read, child filter report ──────────
-      {
-        title: 'Dokumen & Laporan',
+        title: 'Laporan & Arsip',
         moduleKey: 'SIDATA',
         children: [
+          { title: 'Rekap ASN', path: '/sidata/rekap', moduleKey: 'SIDATA' },
+          {
+            title: 'Arsip Bulanan',
+            path: '/sidata/arsip',
+            moduleKey: 'SIDATA',
+            requiredPermission: 'monitor',
+          },
           { title: 'Dokumen ASN', path: '/sidata/dokumen', moduleKey: 'SIDATA' },
           {
-            title: 'Laporan',
+            title: 'Laporan Resmi',
             path: '/sidata/laporan',
             moduleKey: 'SIDATA',
             requiredPermission: 'report',

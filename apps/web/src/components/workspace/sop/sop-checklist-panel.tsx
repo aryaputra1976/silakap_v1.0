@@ -378,8 +378,8 @@ function ChecklistPanelInner({
 
           {/* Approval section */}
           {capability.canApprove && !isFinal ? (
-            <div className="mt-5 space-y-3 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
-              <p className="text-sm font-semibold text-[#173c36]">Persetujuan / Review</p>
+            <div className="mt-5 space-y-3 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4">
+              <p className="text-sm font-semibold text-[#18343a]">Persetujuan / Review</p>
               <textarea
                 className={`${inputClass} min-h-20 py-2`}
                 placeholder="Catatan persetujuan atau alasan penolakan (opsional)..."

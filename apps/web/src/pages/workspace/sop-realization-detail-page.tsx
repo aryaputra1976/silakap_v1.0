@@ -191,34 +191,34 @@ export function SopRealizationDetailPage() {
 
       <SectionCard title="Uraian Realisasi">
         <div className="grid gap-4 text-sm leading-6 text-[#51614c] xl:grid-cols-2">
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">SOP/RHK</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">SOP/RHK</div>
             <p>{realization.sop.title}</p>
             <p className="mt-1 text-xs text-[#6d7e68]">{realization.sop.code}</p>
           </div>
 
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">Status Waktu</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">Status Waktu</div>
             <p>{realization.timeStatus ?? '-'}</p>
           </div>
 
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">Deskripsi</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">Deskripsi</div>
             <p>{realization.description ?? '-'}</p>
           </div>
 
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">Kendala</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">Kendala</div>
             <p>{realization.constraint ?? '-'}</p>
           </div>
 
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">Tindak Lanjut</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">Tindak Lanjut</div>
             <p>{realization.followUp ?? '-'}</p>
           </div>
 
-          <div className="rounded-lg border border-[#d8e5d3] bg-white p-4">
-            <div className="mb-1 font-semibold text-[#173c36]">Catatan Review</div>
+          <div className="rounded-lg border border-[#cfe1da] bg-white p-4">
+            <div className="mb-1 font-semibold text-[#18343a]">Catatan Review</div>
             <p>{realization.reviewNote ?? '-'}</p>
           </div>
         </div>
@@ -238,7 +238,7 @@ export function SopRealizationDetailPage() {
               header: 'Dokumen',
               render: (item) => (
                 <div>
-                  <div className="font-semibold text-[#173c36]">
+                  <div className="font-semibold text-[#18343a]">
                     {item.dmsDocument.title}
                   </div>
                   <div className="mt-1 text-xs text-[#6d7e68]">

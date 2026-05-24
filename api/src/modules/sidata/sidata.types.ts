@@ -14,6 +14,16 @@ export const SIDATA_JENIS_ASN_VALUES = ['PNS', 'PPPK', 'PPPK_PARUH_WAKTU'] as co
 
 export type SidataJenisAsn = (typeof SIDATA_JENIS_ASN_VALUES)[number];
 
+export const SIDATA_ASN_SYNC_STATUS_VALUES = [
+  'SYNCED',
+  'LOCAL_CORRECTION',
+  'NEED_REVIEW',
+  'PENDING_SIASN_UPDATE',
+  'CONFLICT',
+] as const;
+
+export type SidataAsnSyncStatus = (typeof SIDATA_ASN_SYNC_STATUS_VALUES)[number];
+
 export const SIDATA_ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM'] as const;
 export const SIDATA_IMPORT_OPERATOR_ROLES = [
   ...SIDATA_ADMIN_ROLES,
@@ -112,9 +122,17 @@ export type SidataAsnQualityDashboardResponse = {
     issueRows: number;
     qualityScore: number;
   };
+  sync: {
+    synced: number;
+    localCorrection: number;
+    needReview: number;
+    pendingSiasnUpdate: number;
+    conflict: number;
+  };
   breakdown: {
     byStatusAsn: SidataAsnQualityBreakdownItem[];
     byJenisAsn: SidataAsnQualityBreakdownItem[];
+    bySyncStatus: SidataAsnQualityBreakdownItem[];
   };
 };
 
@@ -137,6 +155,10 @@ export class SidataAsnQueryDto {
   jenisAsn?: string;
 
   @IsOptional()
+  @IsIn([...SIDATA_ASN_SYNC_STATUS_VALUES])
+  syncStatus?: string;
+
+  @IsOptional()
   @IsNumberString({ no_symbols: true })
   page?: string;
 
@@ -150,6 +172,7 @@ export type NormalizedAsnFilters = {
   unitKerjaId?: string;
   statusAsn?: string;
   jenisAsn?: string;
+  syncStatus?: string;
   page: number;
   limit: number;
 };
@@ -226,7 +249,40 @@ export class SidataUpdateAsnDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  changeReason?: string;
+
+  @IsOptional()
+  @IsUUID()
+  evidenceDocumentId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  needsReview?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  reviewNote?: string;
 }
+
+export type SidataAsnChangeLogResponse = {
+  id: string;
+  asnId: string;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string | null;
+  changedAt: string;
+  reason: string | null;
+  evidenceDocumentId: string | null;
+  source: string;
+  sourceBatchId: string | null;
+  metadata: unknown;
+};
 
 export class SidataAsnDocumentUploadDto {
   @IsString()

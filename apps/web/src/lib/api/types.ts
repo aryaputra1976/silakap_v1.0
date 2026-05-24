@@ -66,6 +66,16 @@ export type AsnRecord = {
   statusAsn: string | null;
   tanggalLahir: string | null;
   tmtPensiun: string | null;
+  syncStatus: string;
+  lastSiasnBatchId: string | null;
+  lastSiasnSyncedAt: string | null;
+  localCorrectionAt: string | null;
+  localCorrectionBy: string | null;
+  localCorrectionReason: string | null;
+  needsReview: boolean;
+  reviewNote: string | null;
+  sourceBatchId: string | null;
+  syncedAt: string | null;
 };
 
 export type SidataAsnDocument = {

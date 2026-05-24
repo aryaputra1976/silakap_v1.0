@@ -42,7 +42,7 @@ export function SopRealizationTable({
           header: 'Realisasi',
           render: (item) => (
             <div>
-              <div className="font-semibold text-[#173c36]">{item.title}</div>
+              <div className="font-semibold text-[#18343a]">{item.title}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">
                 {item.sop.title} • {item.rhkCode}
               </div>

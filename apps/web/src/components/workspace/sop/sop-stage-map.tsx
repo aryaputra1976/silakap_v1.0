@@ -47,8 +47,8 @@ export function SopStageMap() {
         </section>
       ))}
 
-      <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4 text-sm leading-6 text-[#51614c] shadow-sm">
-        <strong className="text-[#173c36]">Pola hubungan:</strong> Tahap 1 mengatur cara kerja bidang,
+      <div className="rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4 text-sm leading-6 text-[#51614c] shadow-sm">
+        <strong className="text-[#18343a]">Pola hubungan:</strong> Tahap 1 mengatur cara kerja bidang,
         Tahap 2 mengatur alur layanan, dan Tahap 3 mengeksekusi fungsi teknis yang langsung mendukung
         capaian RHK.
       </div>

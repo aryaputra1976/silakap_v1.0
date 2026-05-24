@@ -38,11 +38,11 @@ export function SianalitikLayananSla({ analytics }: Props) {
           </p>
           <p className="mt-0.5 text-xs text-rose-600">Tugas Terlambat</p>
         </div>
-        <div className="rounded-lg border border-[#9ed9c4] bg-[#e6f6ee] p-3">
-          <p className="text-2xl font-bold text-[#087052]">
+        <div className="rounded-lg border border-[#91d9bf] bg-[#e4f8ef] p-3">
+          <p className="text-2xl font-bold text-[#12815f]">
             {onTimeItem?.total ?? analytics.summary.completedTasks}
           </p>
-          <p className="mt-0.5 text-xs text-[#087052]">Selesai / Tepat Waktu</p>
+          <p className="mt-0.5 text-xs text-[#12815f]">Selesai / Tepat Waktu</p>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export function SianalitikLayananSla({ analytics }: Props) {
                 <div className="flex flex-1 items-center gap-2">
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full bg-[#087052]"
+                      className="h-full rounded-full bg-[#12815f]"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -78,7 +78,7 @@ export function SianalitikLayananSla({ analytics }: Props) {
       )}
 
       <div className="border-t border-slate-100 pt-2">
-        <Link to="/layanan/sla" className="text-xs font-medium text-[#087052] hover:underline">
+        <Link to="/layanan/sla" className="text-xs font-medium text-[#12815f] hover:underline">
           Lihat detail SLA →
         </Link>
       </div>

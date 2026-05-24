@@ -90,14 +90,14 @@ export function KinerjaEvidenceBundlePanel() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         <input
-          className="h-9 w-24 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 w-24 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           inputMode="numeric"
           placeholder="Tahun"
           value={query.periodYear ?? ''}
           onChange={(e) => setQuery((prev) => ({ ...prev, periodYear: e.target.value }))}
         />
         <select
-          className="h-9 rounded-md border border-[#c9d9c4] bg-white px-2 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 rounded-md border border-[#cfe1da] bg-white px-2 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           value={query.periodMonth ?? ''}
           onChange={(e) => setQuery((prev) => ({ ...prev, periodMonth: e.target.value || undefined }))}
         >
@@ -107,7 +107,7 @@ export function KinerjaEvidenceBundlePanel() {
           ))}
         </select>
         <input
-          className="h-9 flex-1 rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e]"
+          className="h-9 flex-1 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86]"
           placeholder="Filter kode RHK..."
           value={query.rhkCode ?? ''}
           onChange={(e) => setQuery((prev) => ({ ...prev, rhkCode: e.target.value || undefined }))}
@@ -131,7 +131,7 @@ export function KinerjaEvidenceBundlePanel() {
                 header: 'Realisasi',
                 render: (item) => (
                   <div>
-                    <div className="font-medium text-[#173c36]">{item.title}</div>
+                    <div className="font-medium text-[#18343a]">{item.title}</div>
                     <div className="mt-0.5 text-xs text-[#6d7e68]">
                       {item.moduleKey}
                       {item.sopCode ? ` · ${item.sopCode}` : ''}
@@ -152,7 +152,7 @@ export function KinerjaEvidenceBundlePanel() {
                 key: 'score',
                 header: 'Skor',
                 render: (item) => (
-                  <span className="font-semibold text-[#173c36]">
+                  <span className="font-semibold text-[#18343a]">
                     {formatScore(item.finalScore)}
                   </span>
                 ),

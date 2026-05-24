@@ -36,14 +36,14 @@ export function Header() {
   return (
     <header
       className={cn(
-        'header no-print fixed top-0 z-10 start-0 flex items-stretch shrink-0 border-b border-transparent bg-background end-0 pe-[var(--removed-body-scroll-bar-size,0px)]',
-        headerSticky && 'border-b border-border',
+        'header no-print fixed top-0 z-10 start-0 flex items-stretch shrink-0 border-b border-transparent bg-white/95 backdrop-blur end-0 pe-[var(--removed-body-scroll-bar-size,0px)] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-[#0e7c86]',
+        headerSticky && 'border-b border-[#cfe1da] shadow-sm shadow-[#9fbfb7]/20',
       )}
     >
       <div className="container-fluid flex justify-between items-stretch lg:gap-4">
         {/* HeaderLogo */}
         <div className="flex lg:hidden items-center gap-2.5">
-          <Link to="/dashboard" className="shrink-0 text-base font-semibold text-mono">
+          <Link to="/dashboard" className="shrink-0 text-base font-semibold text-[#075e66]">
             SILAKAP
           </Link>
           <div className="flex items-center">
@@ -73,12 +73,12 @@ export function Header() {
         </div>
 
         {!mobileMode && (
-          <nav className="flex items-center gap-5 text-sm font-medium text-secondary-foreground">
-            <Link to="/dashboard" className="hover:text-primary">Workspace</Link>
-            <Link to="/siap/tasks" className="hover:text-primary">SIAP</Link>
-            <Link to="/sidata/asn" className="hover:text-primary">SIDATA</Link>
-            <Link to="/sipensiun" className="hover:text-primary">SIPENSIUN</Link>
-            <Link to="/dashboard" className="hover:text-primary">Analytics</Link>
+          <nav className="flex items-center gap-5 text-sm font-medium text-[#4c625c]">
+            <Link to="/dashboard" className="hover:text-[#0e7c86]">Workspace</Link>
+            <Link to="/siap/tasks" className="hover:text-[#0e7c86]">SIAP</Link>
+            <Link to="/sidata/asn" className="hover:text-[#0e7c86]">SIDATA</Link>
+            <Link to="/sipensiun" className="hover:text-[#0e7c86]">SIPENSIUN</Link>
+            <Link to="/dashboard" className="hover:text-[#0e7c86]">Analytics</Link>
           </nav>
         )}
 
@@ -87,7 +87,7 @@ export function Header() {
 
           {user ? (
             <div className="hidden min-w-0 text-right text-sm md:block">
-              <div className="font-semibold text-mono">{user.name}</div>
+              <div className="font-semibold text-[#18343a]">{user.name}</div>
               <div className="mt-1 flex max-w-96 flex-wrap justify-end gap-1.5">
                 {user.roles.slice(0, 2).map((role) => (
                   <RoleBadge key={role} role={role} />

@@ -11,7 +11,7 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        'sidebar no-print bg-background lg:border-e lg:border-border lg:fixed lg:top-0 lg:bottom-0 lg:z-20 lg:flex flex-col items-stretch shrink-0',
+        'sidebar no-print bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfa_62%,#eff8f6_100%)] lg:border-e lg:border-[#cfe1da] lg:fixed lg:top-0 lg:bottom-0 lg:z-20 lg:flex flex-col items-stretch shrink-0',
         (sidebarTheme === 'dark' || pathname.includes('dark-sidebar')) &&
           'dark',
       )}

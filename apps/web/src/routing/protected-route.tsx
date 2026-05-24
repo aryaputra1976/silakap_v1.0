@@ -36,9 +36,9 @@ export function ProtectedRoute() {
 function ForbiddenState() {
   return (
     <div className="p-6">
-      <div className="rounded-lg border border-[#d8e5d3] bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-[#cfe1da] bg-white p-6 shadow-sm">
         <StatusBadge value="Akses Ditolak" tone="danger" />
-        <h1 className="mt-4 text-xl font-semibold text-[#173c36]">
+        <h1 className="mt-4 text-xl font-semibold text-[#18343a]">
           Anda tidak memiliki akses ke halaman ini.
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[#51614c]">

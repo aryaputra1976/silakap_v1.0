@@ -151,14 +151,14 @@ export function AdminSettingsPage() {
                 return (
                   <div
                     key={item.label}
-                    className="flex min-w-0 items-start justify-between gap-4 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4"
+                    className="flex min-w-0 items-start justify-between gap-4 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4"
                   >
                     <div className="flex min-w-0 gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#d8e5d3] bg-[#eef7ec] text-[#173c36]">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#cfe1da] bg-[#eef8f6] text-[#18343a]">
                         <Icon className="size-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-semibold text-[#173c36]">
+                        <div className="font-semibold text-[#18343a]">
                           {item.label}
                         </div>
                         <p className="mt-1 text-sm leading-5 text-[#6d7e68]">
@@ -221,9 +221,9 @@ function ScopeItem({
   tone: 'dark' | 'info' | 'success';
 }) {
   return (
-    <div className="rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
+    <div className="rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4">
       <StatusBadge value={label} tone={tone} />
-      <div className="mt-3 text-sm font-semibold text-[#173c36]">{value}</div>
+      <div className="mt-3 text-sm font-semibold text-[#18343a]">{value}</div>
     </div>
   );
 }

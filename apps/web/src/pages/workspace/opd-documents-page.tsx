@@ -106,7 +106,7 @@ export function OpdDocumentsPage({
                 header: 'Dokumen',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">
+                    <div className="font-semibold text-[#18343a]">
                       {item.title}
                     </div>
                     <div className="mt-1 text-xs text-[#687967]">

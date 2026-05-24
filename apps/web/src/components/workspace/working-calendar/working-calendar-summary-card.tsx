@@ -43,7 +43,7 @@ export function WorkingCalendarSummaryCard() {
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-[#173c36]">{defaultCal.name}</span>
+            <span className="font-semibold text-[#18343a]">{defaultCal.name}</span>
             {defaultCal.isDefault ? (
               <StatusBadge value="Default" tone="success" />
             ) : null}

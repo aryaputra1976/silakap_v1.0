@@ -9,10 +9,10 @@ export function OpdUploadGuidanceCard() {
       actions={<StatusBadge value="Tidak otomatis jadi realisasi" tone="warning" />}
     >
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="flex items-start gap-3 rounded-lg border border-[#d8e5d3] bg-white p-4">
-          <FileCheck2 className="mt-0.5 size-5 shrink-0 text-[#0f766e]" />
+        <div className="flex items-start gap-3 rounded-lg border border-[#cfe1da] bg-white p-4">
+          <FileCheck2 className="mt-0.5 size-5 shrink-0 text-[#0e7c86]" />
           <div>
-            <div className="text-sm font-semibold text-[#173c36]">
+            <div className="text-sm font-semibold text-[#18343a]">
               Format yang disarankan
             </div>
             <p className="mt-1 text-sm leading-6 text-[#687967]">
@@ -21,10 +21,10 @@ export function OpdUploadGuidanceCard() {
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-3 rounded-lg border border-[#d8e5d3] bg-white p-4">
+        <div className="flex items-start gap-3 rounded-lg border border-[#cfe1da] bg-white p-4">
           <Info className="mt-0.5 size-5 shrink-0 text-[#096672]" />
           <div>
-            <div className="text-sm font-semibold text-[#173c36]">
+            <div className="text-sm font-semibold text-[#18343a]">
               Status dokumen
             </div>
             <p className="mt-1 text-sm leading-6 text-[#687967]">

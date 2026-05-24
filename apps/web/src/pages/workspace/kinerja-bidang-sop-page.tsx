@@ -217,7 +217,7 @@ export function KinerjaBidangSopPage() {
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#6d7e68]" />
             <input
-              className="h-10 w-full rounded-md border border-[#c9d9c4] bg-white pl-9 pr-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+              className="h-10 w-full rounded-md border border-[#cfe1da] bg-white pl-9 pr-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
               placeholder="Cari kode SOP, judul, atau deskripsi..."
               value={filter.q}
               onChange={(event) => updateFilter({ q: event.target.value })}
@@ -225,7 +225,7 @@ export function KinerjaBidangSopPage() {
           </label>
 
           <select
-            className="h-10 w-full rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+            className="h-10 w-full rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
             value={filter.stage}
             onChange={(event) =>
               updateFilter({ stage: event.target.value as KinerjaSopStage | '' })
@@ -238,7 +238,7 @@ export function KinerjaBidangSopPage() {
           </select>
 
           <select
-            className="h-10 w-full rounded-md border border-[#c9d9c4] bg-white px-3 text-sm text-[#173c36] outline-none focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc]"
+            className="h-10 w-full rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df]"
             value={filter.isRhkPrimary}
             onChange={(event) =>
               updateFilter({
@@ -271,7 +271,7 @@ export function KinerjaBidangSopPage() {
                 render: (item) => (
                   <button
                     type="button"
-                    className="font-semibold text-[#0f766e] hover:underline"
+                    className="font-semibold text-[#0e7c86] hover:underline"
                     onClick={() => openDetail(item)}
                   >
                     {item.code}
@@ -283,7 +283,7 @@ export function KinerjaBidangSopPage() {
                 header: 'Judul SOP',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">{item.title}</div>
+                    <div className="font-semibold text-[#18343a]">{item.title}</div>
                     <div className="mt-1 max-w-2xl text-xs leading-5 text-[#6d7e68]">
                       {item.shortDescription}
                     </div>
@@ -316,7 +316,7 @@ export function KinerjaBidangSopPage() {
                 key: 'target',
                 header: 'Target',
                 render: (item) => (
-                  <span className="text-sm text-[#173c36]">
+                  <span className="text-sm text-[#18343a]">
                     {item.targetQuantity ?? 0}{' '}
                     {kinerjaTargetUnitLabel(item.targetUnit)}
                   </span>

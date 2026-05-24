@@ -65,12 +65,12 @@ function SummaryCard({
   colorClass: string;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-[#d8e5d3] bg-white p-4">
+    <div className="flex items-center gap-4 rounded-lg border border-[#cfe1da] bg-white p-4">
       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colorClass}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-2xl font-semibold text-[#102f2b]">{value}</p>
+        <p className="text-2xl font-semibold text-[#18343a]">{value}</p>
         <p className="text-xs text-[#687967]">{label}</p>
       </div>
     </div>
@@ -89,7 +89,7 @@ function AsnRow({ asn, onBuat }: { asn: AsnMendekatiPensiun; onBuat: (asnId: str
             <User className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-medium text-[#102f2b]">{asn.nama}</p>
+            <p className="text-sm font-medium text-[#18343a]">{asn.nama}</p>
             <p className="text-xs text-[#687967]">{asn.nip}</p>
           </div>
         </div>
@@ -168,7 +168,7 @@ export function PemberhentianMonitoringPage() {
             <select
               value={bulan}
               onChange={(e) => setBulan(Number(e.target.value))}
-              className="rounded border border-[#c8d8c3] bg-white px-3 py-1.5 text-sm text-[#102f2b] focus:outline-none focus:ring-2 focus:ring-[#3a6b52]"
+              className="rounded border border-[#c8d8c3] bg-white px-3 py-1.5 text-sm text-[#18343a] focus:outline-none focus:ring-2 focus:ring-[#3a6b52]"
             >
               {BULAN_OPTIONS.map((m) => (
                 <option key={m} value={m}>{m} bulan ke depan</option>
@@ -239,7 +239,7 @@ export function PemberhentianMonitoringPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-sm">
               <thead>
-                <tr className="border-b border-[#d8e5d3] text-xs text-[#687967]">
+                <tr className="border-b border-[#cfe1da] text-xs text-[#687967]">
                   <th className="px-4 py-2 text-left font-medium">ASN</th>
                   <th className="px-4 py-2 text-left font-medium">Jabatan</th>
                   <th className="px-4 py-2 text-left font-medium">Gol/Pangkat</th>

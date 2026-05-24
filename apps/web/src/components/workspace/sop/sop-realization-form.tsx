@@ -247,8 +247,8 @@ export function SopRealizationForm({
           </>
         }
       >
-        <div className="mb-4 rounded-lg border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
-          <strong className="text-[#173c36]">Catatan:</strong> Simpan Draft boleh tanpa bukti
+        <div className="mb-4 rounded-lg border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <strong className="text-[#18343a]">Catatan:</strong> Simpan Draft boleh tanpa bukti
           dukung. Untuk <strong>Simpan & Submit</strong>, bukti dukung DMS wajib dipilih.
         </div>
 

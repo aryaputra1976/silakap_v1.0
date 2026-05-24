@@ -15,7 +15,7 @@ interface Props {
 function ProgressBar({ percent, status }: { percent: number; status: string }) {
   const bg =
     status === 'AMAN' || status === 'TERLAMPAUI'
-      ? 'bg-[#087052]'
+      ? 'bg-[#12815f]'
       : status === 'PERLU_PERHATIAN'
         ? 'bg-amber-500'
         : 'bg-slate-300';
@@ -39,7 +39,7 @@ export function SianalitikRhkProgress({ summary, rows }: Props) {
           <p className="text-xs text-[#51614c]">Realisasi</p>
         </div>
         <div>
-          <p className="text-lg font-bold text-[#087052]">{summary.totalApprovedRealization}</p>
+          <p className="text-lg font-bold text-[#12815f]">{summary.totalApprovedRealization}</p>
           <p className="text-xs text-[#51614c]">Disetujui</p>
         </div>
         <div>
@@ -75,7 +75,7 @@ export function SianalitikRhkProgress({ summary, rows }: Props) {
       <div className="border-t border-slate-100 pt-2">
         <Link
           to="/kinerja-bidang/laporan"
-          className="text-xs font-medium text-[#087052] hover:underline"
+          className="text-xs font-medium text-[#12815f] hover:underline"
         >
           Lihat laporan lengkap →
         </Link>

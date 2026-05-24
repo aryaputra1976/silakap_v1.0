@@ -30,7 +30,7 @@ export function ServiceWorkbenchTable({
           className: 'w-[150px]',
           render: (item) => (
             <div>
-              <div className="font-semibold text-[#173c36]">
+              <div className="font-semibold text-[#18343a]">
                 {item.submissionNumber ?? 'Belum submit'}
               </div>
               <div className="mt-1 text-xs text-[#687967]">
@@ -44,7 +44,7 @@ export function ServiceWorkbenchTable({
           header: 'OPD',
           render: (item) => (
             <div>
-              <div className="font-medium text-[#173c36]">
+              <div className="font-medium text-[#18343a]">
                 {item.opdName ?? 'OPD'}
               </div>
               <div className="mt-1 text-xs text-[#687967]">
@@ -58,7 +58,7 @@ export function ServiceWorkbenchTable({
           header: 'Layanan',
           render: (item) => (
             <div>
-              <div className="font-medium text-[#173c36]">{item.title}</div>
+              <div className="font-medium text-[#18343a]">{item.title}</div>
               <div className="mt-1 text-xs text-[#687967]">
                 {item.moduleKey} / {item.serviceType}
               </div>

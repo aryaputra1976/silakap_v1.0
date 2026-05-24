@@ -29,12 +29,15 @@ import {
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
+import { RefGajiPokokPage } from './ref-gaji-pokok-page';
 
 type ReferenceTab =
   | 'JENIS_JABATAN'
   | 'JABATAN'
   | 'UNIT_ORGANISASI'
   | GenericReferenceType;
+
+type ReferenceCardValue = ReferenceTab | 'GAJI_POKOK';
 
 type GenericReferenceType =
   | 'GOLONGAN'
@@ -53,6 +56,11 @@ type GenericReferenceRow = {
   kode: string | null;
   nama: string;
   isActive: boolean;
+  tingkatPendidikan?: {
+    id: string;
+    kode: string | null;
+    nama: string;
+  } | null;
 };
 
 type JenisJabatanRow = {
@@ -73,6 +81,7 @@ type JabatanRow = {
   siasnNama?: string | null;
   rumpun?: string | null;
   jenjang?: string | null;
+  bup?: number | null;
   kelasJabatan?: number | null;
   source?: string | null;
   isActive: boolean;
@@ -110,6 +119,7 @@ type NormalizedReferenceRow = {
   deskripsi?: string | null;
   isActive: boolean;
   meta?: string | null;
+  bup?: number | null;
 };
 
 type JabatanListResponse = PaginatedResult<JabatanRow>;
@@ -162,7 +172,7 @@ const GENERIC_REFERENCE_TYPES: Array<{
 ];
 
 const REFERENCE_TABS: Array<{
-  value: ReferenceTab;
+  value: ReferenceCardValue;
   label: string;
   description: string;
 }> = [
@@ -182,6 +192,11 @@ const REFERENCE_TABS: Array<{
     description: 'Referensi unit organisasi aktif.',
   },
   ...GENERIC_REFERENCE_TYPES,
+  {
+    value: 'GAJI_POKOK',
+    label: 'Gaji Pokok',
+    description: 'Referensi gaji pokok PNS per golongan dan masa kerja.',
+  },
 ];
 
 const ACTIVE_OPTIONS: Array<{
@@ -200,15 +215,15 @@ function getErrorMessage(caught: unknown, fallback: string) {
   return caught instanceof ApiError ? caught.message : fallback;
 }
 
-function getTabLabel(tab: ReferenceTab) {
+function getTabLabel(tab: ReferenceCardValue) {
   return REFERENCE_TABS.find((item) => item.value === tab)?.label ?? tab;
 }
 
-function getTabDescription(tab: ReferenceTab) {
+function getTabDescription(tab: ReferenceCardValue) {
   return REFERENCE_TABS.find((item) => item.value === tab)?.description ?? '';
 }
 
-function isGenericReferenceType(tab: ReferenceTab): tab is GenericReferenceType {
+function isGenericReferenceType(tab: ReferenceCardValue): tab is GenericReferenceType {
   return GENERIC_REFERENCE_TYPES.some((item) => item.value === tab);
 }
 
@@ -431,6 +446,7 @@ function normalizeJabatan(rows: JabatanRow[]): NormalizedReferenceRow[] {
     kategori: item.jenisJabatan?.nama ?? 'Jabatan',
     deskripsi: item.rumpun ?? item.jenjang ?? item.siasnNama ?? null,
     isActive: item.isActive,
+    bup: item.bup ?? null,
     meta: [
       item.jenisJabatan?.kode,
       item.rumpun,
@@ -474,8 +490,24 @@ function normalizeGeneric(
     nama: item.nama,
     kategori: label,
     isActive: item.isActive,
-    meta: label,
+    meta: label === 'Pendidikan'
+      ? (item.tingkatPendidikan?.nama ?? inferPendidikanTingkat(item.nama))
+      : label,
   }));
+}
+
+function inferPendidikanTingkat(value: string | null | undefined) {
+  const normalized = normalizeText(value).toUpperCase();
+  if (/(S[-\s]?3|DOKTOR)/.test(normalized)) return 'S3';
+  if (/(S[-\s]?2|MAGISTER)/.test(normalized)) return 'S2';
+  if (/(S[-\s]?1|SARJANA|D[-\s]?IV|DIPLOMA IV)/.test(normalized)) return 'S1/D.IV';
+  if (/(D[-\s]?III|DIPLOMA III)/.test(normalized)) return 'D.III';
+  if (/(D[-\s]?II|DIPLOMA II)/.test(normalized)) return 'D.II';
+  if (/(D[-\s]?I|DIPLOMA I)/.test(normalized)) return 'D.I';
+  if (/(SMA|SMK|SLTA|MA)/.test(normalized)) return 'SMA/SMK';
+  if (/(SMP|SLTP|MTS)/.test(normalized)) return 'SMP';
+  if (/(^SD$|MI|SEKOLAH DASAR)/.test(normalized)) return 'SD';
+  return '-';
 }
 
 function UnitTreeTable({
@@ -548,7 +580,7 @@ function UnitTreeTable({
 }
 
 export function SidataReferensiPage() {
-  const [activeTab, setActiveTab] = useState<ReferenceTab>('JABATAN');
+  const [activeTab, setActiveTab] = useState<ReferenceCardValue>('JABATAN');
   const [q, setQ] = useState('');
   const [isActive, setIsActive] = useState<ActiveFilter>('');
   const [page, setPage] = useState(1);
@@ -572,7 +604,7 @@ export function SidataReferensiPage() {
   }, [activeTab, q, isActive]);
 
   useEffect(() => {
-    if (activeTab !== 'UNIT_ORGANISASI') {
+    if (activeTab !== 'UNIT_ORGANISASI' && activeTab !== 'GAJI_POKOK') {
       void loadReferences();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -588,6 +620,10 @@ export function SidataReferensiPage() {
   const filteredRows = useMemo(() => {
     if (activeTab === 'JABATAN') {
       return rows;
+    }
+
+    if (activeTab === 'GAJI_POKOK') {
+      return [];
     }
 
     return rows
@@ -631,6 +667,10 @@ export function SidataReferensiPage() {
   const pageRows = useMemo(() => {
     if (activeTab === 'JABATAN' || activeTab === 'UNIT_ORGANISASI') {
       return filteredRows;
+    }
+
+    if (activeTab === 'GAJI_POKOK') {
+      return [];
     }
 
     const start = (page - 1) * PAGE_LIMIT;
@@ -750,7 +790,7 @@ export function SidataReferensiPage() {
     void loadReferences(1);
   }
 
-  function changeTab(tab: ReferenceTab) {
+  function changeTab(tab: ReferenceCardValue) {
     setActiveTab(tab);
     setQ('');
     setIsActive('');
@@ -864,48 +904,52 @@ export function SidataReferensiPage() {
           </>
         }
         actions={
-          <ActionButton
-            disabled={loading}
-            icon={RefreshCcw}
-            onClick={() => void loadReferences()}
-            variant="secondary"
-          >
-            Refresh
-          </ActionButton>
+          activeTab === 'GAJI_POKOK' ? null : (
+            <ActionButton
+              disabled={loading}
+              icon={RefreshCcw}
+              onClick={() => void loadReferences()}
+              variant="secondary"
+            >
+              Refresh
+            </ActionButton>
+          )
         }
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          icon={Database}
-          label="Total Data"
-          value={effectiveTotal}
-          description={`Jumlah data pada referensi ${getTabLabel(activeTab)}.`}
-        />
-        <StatCard
-          icon={ShieldCheck}
-          label="Aktif"
-          value={activeCount}
-          tone="success"
-          description="Data referensi aktif."
-        />
-        <StatCard
-          icon={Layers3}
-          label="Tidak Aktif"
-          value={inactiveCount}
-          tone="warning"
-          description="Data referensi tidak aktif."
-        />
-        <StatCard
-          icon={Building2}
-          label="Kategori"
-          value={REFERENCE_TABS.length}
-          tone="info"
-          description="Jumlah kategori referensi tersedia."
-        />
-      </div>
+      {activeTab === 'GAJI_POKOK' ? null : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            icon={Database}
+            label="Total Data"
+            value={effectiveTotal}
+            description={`Jumlah data pada referensi ${getTabLabel(activeTab)}.`}
+          />
+          <StatCard
+            icon={ShieldCheck}
+            label="Aktif"
+            value={activeCount}
+            tone="success"
+            description="Data referensi aktif."
+          />
+          <StatCard
+            icon={Layers3}
+            label="Tidak Aktif"
+            value={inactiveCount}
+            tone="warning"
+            description="Data referensi tidak aktif."
+          />
+          <StatCard
+            icon={Building2}
+            label="Kategori"
+            value={REFERENCE_TABS.length}
+            tone="info"
+            description="Jumlah kategori referensi tersedia."
+          />
+        </div>
+      )}
 
       <SectionCard
         title="Kategori Referensi"
@@ -942,116 +986,120 @@ export function SidataReferensiPage() {
         </div>
       </SectionCard>
 
-      <Toolbar>
-        <FilterBar>
-          <div className="relative md:col-span-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-            <input
-              className={`${inputClass} w-full pl-10`}
-              placeholder="Cari kode, nama, kategori"
-              value={q}
-              onChange={(event) => setQ(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  submitSearch();
-                }
-              }}
-            />
-          </div>
+      {activeTab === 'GAJI_POKOK' ? (
+        <RefGajiPokokPage embedded />
+      ) : (
+        <>
+          <Toolbar>
+            <FilterBar>
+              <div className="relative md:col-span-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                <input
+                  className={`${inputClass} w-full pl-10`}
+                  placeholder="Cari kode, nama, kategori"
+                  value={q}
+                  onChange={(event) => setQ(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      submitSearch();
+                    }
+                  }}
+                />
+              </div>
 
-          <select
-            className={inputClass}
-            value={isActive}
-            onChange={(event) => setIsActive(event.target.value as ActiveFilter)}
-          >
-            {ACTIVE_OPTIONS.map((item) => (
-              <option key={item.label} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+              <select
+                className={inputClass}
+                value={isActive}
+                onChange={(event) => setIsActive(event.target.value as ActiveFilter)}
+              >
+                {ACTIVE_OPTIONS.map((item) => (
+                  <option key={item.label} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
 
-          <div className="flex gap-2">
-            <ActionButton
-              disabled={loading}
-              icon={Search}
-              onClick={submitSearch}
-              variant="secondary"
-            >
-              Cari
-            </ActionButton>
-            <ActionButton icon={Filter} onClick={resetFilters} variant="secondary">
-              Reset
-            </ActionButton>
-          </div>
-        </FilterBar>
-      </Toolbar>
-
-      <SectionCard
-        title="Tambah Manual"
-        description="Koreksi satu data referensi tanpa upload ulang seluruh file."
-      >
-        <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr_auto]">
-          <input
-            className={inputClass}
-            value={manualForm.kode}
-            onChange={(event) => setManualForm((current) => ({ ...current, kode: event.target.value }))}
-            placeholder="Kode"
-          />
-          <input
-            className={inputClass}
-            value={manualForm.nama}
-            onChange={(event) => setManualForm((current) => ({ ...current, nama: event.target.value }))}
-            placeholder="Nama referensi"
-          />
-          {activeTab === 'JABATAN' ? (
-            <input
-              className={inputClass}
-              value={manualForm.jenisJabatanId}
-              onChange={(event) => setManualForm((current) => ({ ...current, jenisJabatanId: event.target.value }))}
-              placeholder="ID jenis jabatan"
-            />
-          ) : (
-            <div />
-          )}
-          <ActionButton
-            icon={Plus}
-            disabled={savingManual || activeTab === 'JENIS_JABATAN'}
-            onClick={() => void createManualReference()}
-          >
-            {savingManual ? 'Menyimpan...' : 'Tambah'}
-          </ActionButton>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title={getTabLabel(activeTab)}
-        description={getTabDescription(activeTab)}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {activeTab === 'UNIT_ORGANISASI' ? (
-              <>
+              <div className="flex gap-2">
                 <ActionButton
-                  icon={FolderOpen}
-                  onClick={expandVisibleUnitTree}
+                  disabled={loading}
+                  icon={Search}
+                  onClick={submitSearch}
                   variant="secondary"
                 >
-                  Buka Semua
+                  Cari
                 </ActionButton>
-                <ActionButton
-                  icon={Folder}
-                  onClick={collapseUnitTree}
-                  variant="secondary"
-                >
-                  Tutup Semua
+                <ActionButton icon={Filter} onClick={resetFilters} variant="secondary">
+                  Reset
                 </ActionButton>
-              </>
-            ) : null}
-            <StatusBadge value={`${effectiveTotal} Data`} tone="info" />
-            <StatusBadge value={`${activeCount} Aktif`} tone="success" />
-          </div>
-        }
-      >
+              </div>
+            </FilterBar>
+          </Toolbar>
+
+          <SectionCard
+            title="Tambah Manual"
+            description="Koreksi satu data referensi tanpa upload ulang seluruh file."
+          >
+            <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr_auto]">
+              <input
+                className={inputClass}
+                value={manualForm.kode}
+                onChange={(event) => setManualForm((current) => ({ ...current, kode: event.target.value }))}
+                placeholder="Kode"
+              />
+              <input
+                className={inputClass}
+                value={manualForm.nama}
+                onChange={(event) => setManualForm((current) => ({ ...current, nama: event.target.value }))}
+                placeholder="Nama referensi"
+              />
+              {activeTab === 'JABATAN' ? (
+                <input
+                  className={inputClass}
+                  value={manualForm.jenisJabatanId}
+                  onChange={(event) => setManualForm((current) => ({ ...current, jenisJabatanId: event.target.value }))}
+                  placeholder="ID jenis jabatan"
+                />
+              ) : (
+                <div />
+              )}
+              <ActionButton
+                icon={Plus}
+                disabled={savingManual || activeTab === 'JENIS_JABATAN'}
+                onClick={() => void createManualReference()}
+              >
+                {savingManual ? 'Menyimpan...' : 'Tambah'}
+              </ActionButton>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title={getTabLabel(activeTab)}
+            description={getTabDescription(activeTab)}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                {activeTab === 'UNIT_ORGANISASI' ? (
+                  <>
+                    <ActionButton
+                      icon={FolderOpen}
+                      onClick={expandVisibleUnitTree}
+                      variant="secondary"
+                    >
+                      Buka Semua
+                    </ActionButton>
+                    <ActionButton
+                      icon={Folder}
+                      onClick={collapseUnitTree}
+                      variant="secondary"
+                    >
+                      Tutup Semua
+                    </ActionButton>
+                  </>
+                ) : null}
+                <StatusBadge value={`${effectiveTotal} Data`} tone="info" />
+                <StatusBadge value={`${activeCount} Aktif`} tone="success" />
+              </div>
+            }
+          >
         {loading ? (
           <LoadingState label={`Memuat referensi ${getTabLabel(activeTab)}`} />
         ) : activeTab === 'UNIT_ORGANISASI' && pagedUnitItems.length === 0 ? (
@@ -1079,12 +1127,19 @@ export function SidataReferensiPage() {
             rowKey={(item) => item.id}
             columns={[
               {
-                key: 'kode',
-                header: 'Kode',
-                render: (item) => (
-                  <span className="font-mono text-xs font-semibold text-zinc-800">
-                    {item.kode ?? '-'}
-                  </span>
+                key: activeTab === 'JABATAN' || activeTab === 'PENDIDIKAN' ? 'no' : 'kode',
+                header: activeTab === 'JABATAN' || activeTab === 'PENDIDIKAN' ? 'No' : 'Kode',
+                className: 'w-24',
+                render: (item, index) => (
+                  activeTab === 'JABATAN' || activeTab === 'PENDIDIKAN' ? (
+                    <span className="font-mono text-xs font-semibold text-zinc-800">
+                      {(page - 1) * PAGE_LIMIT + index + 1}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-xs font-semibold text-zinc-800">
+                      {item.kode ?? '-'}
+                    </span>
+                  )
                 ),
               },
               {
@@ -1103,13 +1158,19 @@ export function SidataReferensiPage() {
               },
               {
                 key: 'kategori',
-                header: 'Kategori',
+                header: activeTab === 'PENDIDIKAN' ? 'Tingkat Pendidikan' : 'Kategori',
                 render: (item) => (
                   <div className="space-y-1">
-                    <StatusBadge value={item.kategori} tone="neutral" />
-                    {item.meta ? (
-                      <div className="text-xs text-muted-foreground">{item.meta}</div>
-                    ) : null}
+                    {activeTab === 'PENDIDIKAN' ? (
+                      <StatusBadge value={item.meta ?? '-'} tone="info" />
+                    ) : (
+                      <>
+                        <StatusBadge value={item.kategori} tone="neutral" />
+                        {item.meta ? (
+                          <div className="text-xs text-muted-foreground">{item.meta}</div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 ),
               },
@@ -1123,15 +1184,26 @@ export function SidataReferensiPage() {
                   />
                 ),
               },
-              {
-                key: 'id',
-                header: 'ID',
-                render: (item) => (
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {item.id}
-                  </span>
-                ),
-              },
+              ...(activeTab === 'PENDIDIKAN'
+                ? []
+                : [
+                    {
+                      key: activeTab === 'JABATAN' ? 'bup' : 'id',
+                      header: activeTab === 'JABATAN' ? 'BUP' : 'ID',
+                      className: activeTab === 'JABATAN' ? 'w-28' : undefined,
+                      render: (item: NormalizedReferenceRow) => (
+                        activeTab === 'JABATAN' ? (
+                          <span className="font-semibold text-zinc-800">
+                            {item.bup ? `${item.bup} th` : '-'}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {item.id}
+                          </span>
+                        )
+                      ),
+                    },
+                  ]),
             ]}
           />
         )}
@@ -1159,6 +1231,8 @@ export function SidataReferensiPage() {
           </ActionButton>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

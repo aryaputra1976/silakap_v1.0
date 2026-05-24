@@ -110,9 +110,9 @@ function CreateArchiveModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-[#d8e5d3] bg-white shadow-xl">
-        <div className="border-b border-[#d8e5d3] px-6 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Buat Arsip Bulanan ASN</h2>
+      <div className="w-full max-w-lg rounded-xl border border-[#cfe1da] bg-white shadow-xl">
+        <div className="border-b border-[#cfe1da] px-6 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Buat Arsip Bulanan ASN</h2>
           <p className="mt-1 text-sm text-[#6d7e68]">
             Pilih sumber data dan periode arsip yang akan dibuat.
           </p>
@@ -122,15 +122,15 @@ function CreateArchiveModal({
 
           {/* Mode toggle */}
           <div>
-            <span className="mb-2 block text-sm font-semibold text-[#173c36]">Sumber Data</span>
+            <span className="mb-2 block text-sm font-semibold text-[#18343a]">Sumber Data</span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setMode('live')}
                 className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm transition-colors ${
                   mode === 'live'
-                    ? 'border-[#2f7a5e] bg-[#eaf5ef] text-[#173c36] font-semibold'
-                    : 'border-[#d8e5d3] bg-white text-[#6d7e68] hover:border-[#9dc4b0]'
+                    ? 'border-[#2f7a5e] bg-[#eaf5ef] text-[#18343a] font-semibold'
+                    : 'border-[#cfe1da] bg-white text-[#6d7e68] hover:border-[#9dc4b0]'
                 }`}
               >
                 <Database className="h-4 w-4 shrink-0" />
@@ -141,8 +141,8 @@ function CreateArchiveModal({
                 onClick={() => setMode('batch')}
                 className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm transition-colors ${
                   mode === 'batch'
-                    ? 'border-[#2f7a5e] bg-[#eaf5ef] text-[#173c36] font-semibold'
-                    : 'border-[#d8e5d3] bg-white text-[#6d7e68] hover:border-[#9dc4b0]'
+                    ? 'border-[#2f7a5e] bg-[#eaf5ef] text-[#18343a] font-semibold'
+                    : 'border-[#cfe1da] bg-white text-[#6d7e68] hover:border-[#9dc4b0]'
                 }`}
               >
                 <Archive className="h-4 w-4 shrink-0" />
@@ -159,7 +159,7 @@ function CreateArchiveModal({
           {/* Periode */}
           <div className="grid grid-cols-2 gap-3">
             <label className="grid gap-1.5 text-sm">
-              <span className="font-semibold text-[#173c36]">Bulan</span>
+              <span className="font-semibold text-[#18343a]">Bulan</span>
               <select
                 className={inputClass}
                 value={bulan}
@@ -171,7 +171,7 @@ function CreateArchiveModal({
               </select>
             </label>
             <label className="grid gap-1.5 text-sm">
-              <span className="font-semibold text-[#173c36]">Tahun</span>
+              <span className="font-semibold text-[#18343a]">Tahun</span>
               <select
                 className={inputClass}
                 value={tahun}
@@ -185,7 +185,7 @@ function CreateArchiveModal({
           {/* Batch picker — hanya tampil di mode batch */}
           {mode === 'batch' && (
             <div className="grid gap-1.5 text-sm">
-              <span className="font-semibold text-[#173c36]">Batch Import</span>
+              <span className="font-semibold text-[#18343a]">Batch Import</span>
               {loadingBatches ? (
                 <div className="flex items-center gap-2 text-[#73816e]">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -211,7 +211,7 @@ function CreateArchiveModal({
                     ))}
                   </select>
                   {selectedBatch && (
-                    <div className="rounded-lg border border-[#d8e5d3] bg-[#f5faf7] px-3 py-2 text-xs text-[#4a6356]">
+                    <div className="rounded-lg border border-[#cfe1da] bg-[#f5faf7] px-3 py-2 text-xs text-[#4a6356]">
                       <div className="flex flex-wrap gap-x-4 gap-y-1">
                         <span><span className="font-medium">Tipe:</span> {importTypeLabel(selectedBatch.importType)}</span>
                         <span><span className="font-medium">Total baris:</span> {selectedBatch.totalRows.toLocaleString('id-ID')}</span>
@@ -227,7 +227,7 @@ function CreateArchiveModal({
             </div>
           )}
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-6 py-4">
           <ActionButton variant="secondary" onClick={onClose} disabled={loading}>
             Batal
           </ActionButton>
@@ -309,7 +309,7 @@ export function SidataArsipPage() {
                 className: 'w-36',
                 render: (item) => (
                   <div>
-                    <div className="font-semibold text-[#173c36]">{item.label}</div>
+                    <div className="font-semibold text-[#18343a]">{item.label}</div>
                     <div className="mt-0.5 text-xs text-[#73816e]">
                       {formatDateTime(item.archivedAt) !== '-' ? `Diarsipkan ${formatDateTime(item.archivedAt)}` : 'Belum diarsipkan'}
                     </div>
@@ -345,9 +345,9 @@ export function SidataArsipPage() {
                 header: 'Perubahan Terdeteksi',
                 render: (item) => (
                   <div className="flex flex-wrap gap-1">
-                    {item.countAsnBaru > 0 && <span className="rounded bg-[#e6f6ee] px-1.5 py-0.5 text-xs text-[#087052]">+{item.countAsnBaru} Baru</span>}
+                    {item.countAsnBaru > 0 && <span className="rounded bg-[#e4f8ef] px-1.5 py-0.5 text-xs text-[#12815f]">+{item.countAsnBaru} Baru</span>}
                     {item.countAsnKeluar > 0 && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700">-{item.countAsnKeluar} Keluar</span>}
-                    {item.countMutasiJabatan > 0 && <span className="rounded bg-[#fff6d7] px-1.5 py-0.5 text-xs text-[#7d5a00]">{item.countMutasiJabatan} Mutasi Jabatan</span>}
+                    {item.countMutasiJabatan > 0 && <span className="rounded bg-[#fff3c4] px-1.5 py-0.5 text-xs text-[#7d5a00]">{item.countMutasiJabatan} Mutasi Jabatan</span>}
                     {item.countNaikPangkat > 0 && <span className="rounded bg-[#e7f6f5] px-1.5 py-0.5 text-xs text-[#096672]">{item.countNaikPangkat} Naik Pangkat</span>}
                     {item.countPensiun > 0 && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700">{item.countPensiun} Pensiun</span>}
                     {totalChanges(item) === 0 && <span className="text-xs text-[#73816e]">Tidak ada perubahan</span>}

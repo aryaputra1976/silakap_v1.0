@@ -140,10 +140,10 @@ function SopMetadataPanel({ document }: { document: DmsDocument }) {
   const mapping = sopCode ? getSopDmsMappingByCode(sopCode) : undefined;
 
   return (
-    <div className="mt-4 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-4">
+    <div className="mt-4 rounded-lg border border-[#cfe1da] bg-[#fbfdf8] p-4">
       <div className="mb-3 flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-[#2e6b3e]" />
-        <span className="text-sm font-semibold text-[#173c36]">
+        <span className="text-sm font-semibold text-[#18343a]">
           Metadata SOP
         </span>
       </div>

@@ -75,8 +75,8 @@ export function SopTable({ items = SOP_ITEMS }: { items?: SopItem[] }) {
             key={item.key}
             className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
               filter === item.key
-                ? 'border-[#0f766e] bg-[#0f766e] text-white'
-                : 'border-[#c9d9c4] bg-white text-[#173c36] hover:bg-[#eef7ec]'
+                ? 'border-[#0e7c86] bg-[#0e7c86] text-white'
+                : 'border-[#cfe1da] bg-white text-[#18343a] hover:bg-[#eef8f6]'
             }`}
             onClick={() => setFilter(item.key)}
             type="button"
@@ -95,7 +95,7 @@ export function SopTable({ items = SOP_ITEMS }: { items?: SopItem[] }) {
             key: 'code',
             header: 'Kode SOP',
             render: (item) => (
-              <span className="font-semibold text-[#173c36]">{item.code}</span>
+              <span className="font-semibold text-[#18343a]">{item.code}</span>
             ),
           },
           {
@@ -103,7 +103,7 @@ export function SopTable({ items = SOP_ITEMS }: { items?: SopItem[] }) {
             header: 'Nama SOP',
             render: (item) => (
               <div>
-                <div className="font-semibold text-[#173c36]">{item.title}</div>
+                <div className="font-semibold text-[#18343a]">{item.title}</div>
                 <div className="mt-1 max-w-xl text-xs leading-5 text-[#6d7e68]">
                   {item.shortDescription}
                 </div>

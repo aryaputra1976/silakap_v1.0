@@ -411,6 +411,14 @@ model Asn {
   sourceBatchId String?               @map("source_batch_id") @db.VarChar(36)
   syncedAt      DateTime?             @map("synced_at")
   checksum      String?               @db.VarChar(128)
+  syncStatus    String                @default("SYNCED") @map("sync_status") @db.VarChar(40)
+  lastSiasnBatchId String?            @map("last_siasn_batch_id") @db.VarChar(36)
+  lastSiasnSyncedAt DateTime?         @map("last_siasn_synced_at")
+  localCorrectionAt DateTime?         @map("local_correction_at")
+  localCorrectionBy String?           @map("local_correction_by") @db.VarChar(36)
+  localCorrectionReason String?       @map("local_correction_reason") @db.Text
+  needsReview   Boolean               @default(false) @map("needs_review")
+  reviewNote    String?               @map("review_note") @db.Text
   createdAt     DateTime              @default(now()) @map("created_at")
   createdBy     String?               @map("created_by") @db.VarChar(36)
   updatedAt     DateTime              @updatedAt @map("updated_at")
@@ -431,6 +439,7 @@ model Asn {
   pendidikanHistory AsnPendidikanHistory[]
   monthlyChanges    AsnMonthlyChange[]
   monthlySnapshots  AsnMonthlySnapshot[]
+  changeLogs        AsnChangeLog[]
 
   @@index([nip])
   @@index([nama])
@@ -457,7 +466,39 @@ model Asn {
   @@index([sourceBatchId])
   @@index([syncedAt])
   @@index([checksum])
+  @@index([syncStatus])
+  @@index([lastSiasnBatchId])
+  @@index([lastSiasnSyncedAt])
+  @@index([localCorrectionAt])
+  @@index([localCorrectionBy])
+  @@index([needsReview])
   @@map("asn")
+}
+
+model AsnChangeLog {
+  id                 String   @id @default(uuid()) @db.VarChar(36)
+  asnId              String   @map("asn_id") @db.VarChar(36)
+  fieldName          String   @map("field_name") @db.VarChar(120)
+  oldValue           String?  @map("old_value") @db.Text
+  newValue           String?  @map("new_value") @db.Text
+  changedBy          String?  @map("changed_by") @db.VarChar(36)
+  changedAt          DateTime @default(now()) @map("changed_at")
+  reason             String?  @db.Text
+  evidenceDocumentId String?  @map("evidence_document_id") @db.VarChar(36)
+  source             String   @default("MANUAL") @db.VarChar(60)
+  sourceBatchId      String?  @map("source_batch_id") @db.VarChar(36)
+  metadata           Json?
+
+  asn Asn @relation(fields: [asnId], references: [id], onDelete: Cascade)
+
+  @@index([asnId])
+  @@index([fieldName])
+  @@index([changedBy])
+  @@index([changedAt])
+  @@index([source])
+  @@index([sourceBatchId])
+  @@index([evidenceDocumentId])
+  @@map("asn_change_log")
 }
 
 model AsnSiasnProfile {

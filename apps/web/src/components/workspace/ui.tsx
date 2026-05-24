@@ -14,12 +14,21 @@ import {
 type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'dark';
 
 const toneClass: Record<Tone, string> = {
-  neutral: 'border-[#d6e2d1] bg-[#f4f8ef] text-[#51614c]',
-  success: 'border-[#9ed9c4] bg-[#e6f6ee] text-[#087052]',
-  warning: 'border-[#ecd28b] bg-[#fff6d7] text-[#7d5a00]',
-  danger: 'border-rose-200 bg-rose-50 text-rose-700',
-  info: 'border-[#9fd6dc] bg-[#e7f6f5] text-[#096672]',
-  dark: 'border-[#103f3b] bg-[#103f3b] text-white',
+  neutral: 'border-[#cfe1da] bg-[#f7fbf8] text-[#4c625c]',
+  success: 'border-[#91d9bf] bg-[#e4f8ef] text-[#12815f]',
+  warning: 'border-[#f2cf5a] bg-[#fff3c4] text-[#745300]',
+  danger: 'border-[#f0b2c0] bg-[#fff0f4] text-[#a83252]',
+  info: 'border-[#aeb8f4] bg-[#eef0ff] text-[#5267d8]',
+  dark: 'border-[#0e7c86] bg-[#0e7c86] text-white',
+};
+
+const toneAccentClass: Record<Tone, string> = {
+  neutral: 'from-[#0e7c86] via-[#8fd8df] to-[#cfe1da]',
+  success: 'from-[#12815f] via-[#91d9bf] to-[#e4f8ef]',
+  warning: 'from-[#f2b705] via-[#f2cf5a] to-[#fff3c4]',
+  danger: 'from-[#d94f70] via-[#f0b2c0] to-[#fff0f4]',
+  info: 'from-[#5267d8] via-[#8fd8df] to-[#eef0ff]',
+  dark: 'from-[#075e66] via-[#0e7c86] to-[#8fd8df]',
 };
 
 function cn(...values: Array<string | false | null | undefined>) {
@@ -30,6 +39,7 @@ function badgeTone(value: string | null | undefined): Tone {
   const normalized = (value ?? '').toUpperCase();
 
   if (
+    normalized.includes('SYNCED') ||
     normalized.includes('COMPLETED') ||
     normalized.includes('UPLOADED') ||
     normalized.includes('ACTIVE') ||
@@ -45,12 +55,15 @@ function badgeTone(value: string | null | undefined): Tone {
     normalized.includes('IN_PROGRESS') ||
     normalized.includes('SUBMITTED') ||
     normalized.includes('MISSING') ||
-    normalized.includes('PENDING')
+    normalized.includes('PENDING') ||
+    normalized.includes('NEED_REVIEW') ||
+    normalized.includes('LOCAL_CORRECTION')
   ) {
     return 'warning';
   }
 
   if (
+    normalized.includes('CONFLICT') ||
     normalized.includes('OVERDUE') ||
     normalized.includes('CANCELLED') ||
     normalized.includes('FAILED') ||
@@ -83,11 +96,11 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-4 border-b border-[#d8e5d3] pb-5 md:flex-row md:items-end md:justify-between">
+    <div className="flex min-w-0 flex-col gap-4 border-b border-[#cfe1da] pb-5 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
         {meta ? <div className="mb-2 flex flex-wrap gap-2">{meta}</div> : null}
-        <h1 className="truncate text-2xl font-semibold tracking-normal text-[#102f2b]">{title}</h1>
-        {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687967]">{description}</p> : null}
+        <h1 className="truncate text-2xl font-semibold tracking-normal text-[#18343a]">{title}</h1>
+        {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-[#62766f]">{description}</p> : null}
       </div>
       {actions ? <div className="flex max-w-full flex-wrap items-center gap-2 md:justify-end">{actions}</div> : null}
     </div>
@@ -108,12 +121,12 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40', className)}>
+    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-[#cfe1da] bg-white shadow-[0_12px_28px_rgba(14,124,134,0.08)]', className)}>
       {(title || description || actions) ? (
-        <div className="flex min-w-0 flex-col gap-3 border-b border-[#d8e5d3] bg-[#f5faf1] px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex min-w-0 flex-col gap-3 border-b border-[#cfe1da] bg-[linear-gradient(90deg,#eef8f6_0%,#ffffff_100%)] px-5 py-4 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-[#0e7c86] md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            {title ? <h2 className="text-sm font-semibold uppercase tracking-normal text-[#173c36]">{title}</h2> : null}
-            {description ? <p className="mt-1 text-sm text-[#6d7e68]">{description}</p> : null}
+            {title ? <h2 className="text-sm font-semibold uppercase tracking-normal text-[#075e66]">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-[#62766f]">{description}</p> : null}
           </div>
           {actions ? <div className="flex max-w-full flex-wrap items-center gap-2 md:justify-end">{actions}</div> : null}
         </div>
@@ -137,19 +150,20 @@ export function StatCard({
   tone?: Tone;
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] p-5 shadow-sm shadow-[#bfd0bb]/40">
-      <div className="flex items-start justify-between gap-4">
+    <div className="group relative min-w-0 overflow-hidden rounded-lg border border-[#cfe1da] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfa_100%)] p-5 shadow-[0_10px_24px_rgba(14,124,134,0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-[#9accc7] hover:shadow-[0_16px_32px_rgba(14,124,134,0.14)]">
+      <div className={cn('absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneAccentClass[tone])} />
+      <div className="flex items-start justify-between gap-4 pt-1">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-normal text-[#73816e]">{label}</div>
-          <div className="mt-2 break-words text-2xl font-semibold text-[#173c36]">{value}</div>
+          <div className="text-xs font-semibold uppercase tracking-normal text-[#62766f]">{label}</div>
+          <div className="mt-2 break-words text-3xl font-semibold text-[#18343a]">{value}</div>
         </div>
         {Icon ? (
-          <div className={cn('flex size-10 items-center justify-center rounded-lg border', toneClass[tone])}>
+          <div className={cn('flex size-11 items-center justify-center rounded-lg border shadow-sm transition-transform duration-200 group-hover:scale-105', toneClass[tone])}>
             <Icon className="size-5" />
           </div>
         ) : null}
       </div>
-      {description ? <p className="mt-3 text-sm leading-5 text-[#6d7e68]">{description}</p> : null}
+      {description ? <p className="mt-3 text-sm leading-5 text-[#62766f]">{description}</p> : null}
     </div>
   );
 }
@@ -198,8 +212,8 @@ export function SlaBadge({ dueDate, status }: { dueDate?: string | null; status?
 export function LoadingState({ label, message }: { label?: string; message?: string }) {
   const text = message ?? label ?? 'Memuat data';
   return (
-    <div className="flex min-h-48 items-center justify-center gap-3 rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] text-sm text-[#6d7e68] shadow-sm">
-      <Loader2 className="size-5 animate-spin text-[#0f766e]" />
+    <div className="flex min-h-48 items-center justify-center gap-3 rounded-lg border border-[#cfe1da] bg-white text-sm text-[#62766f] shadow-sm">
+      <Loader2 className="size-5 animate-spin text-[#0e7c86]" />
       {text}
     </div>
   );
@@ -215,21 +229,21 @@ export function EmptyState({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-[#b7c9b1] bg-[#f4f8ef] p-8 text-center">
+    <div className="rounded-lg border border-dashed border-[#a8c8c0] bg-[#eef8f6] p-8 text-center">
       {Icon ? (
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] text-[#587052]">
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg border border-[#cfe1da] bg-white text-[#0e7c86]">
           <Icon className="size-5" />
         </div>
       ) : null}
-      <div className="font-semibold text-[#173c36]">{title}</div>
-      {description ? <div className="mt-1 text-sm text-[#6d7e68]">{description}</div> : null}
+      <div className="font-semibold text-[#18343a]">{title}</div>
+      {description ? <div className="mt-1 text-sm text-[#62766f]">{description}</div> : null}
     </div>
   );
 }
 
 export function ErrorAlert({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+    <div className="flex items-start gap-3 rounded-lg border border-[#f0b2c0] bg-[#fff0f4] p-4 text-sm text-[#a83252]">
       <AlertCircle className="mt-0.5 size-4 shrink-0" />
       <span>{message}</span>
     </div>
@@ -250,7 +264,7 @@ export function DataTable<T>({
   columns: Array<{
     key: string;
     header: string;
-    render: (item: T) => ReactNode;
+    render: (item: T, index: number) => ReactNode;
     className?: string;
   }>;
   empty?: string;
@@ -271,10 +285,10 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-[#d8e5d3] bg-[#fbfdf8] shadow-sm shadow-[#bfd0bb]/40">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-[#cfe1da] bg-white shadow-sm shadow-[#9fbfb7]/30">
       <div className="max-w-full overflow-x-auto">
         <table className="w-full min-w-[720px] table-fixed text-left text-sm">
-          <thead className="border-b border-[#d8e5d3] bg-[#eef7ec] text-xs font-semibold uppercase tracking-normal text-[#60735b]">
+          <thead className="border-b border-[#cfe1da] bg-[#eef8f6] text-xs font-semibold uppercase tracking-normal text-[#4c625c]">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={cn('break-words px-4 py-3', column.className)}>
@@ -283,16 +297,16 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e0eadb]">
+          <tbody className="divide-y divide-[#dceae5]">
             {rows.map((item, index) => (
               <tr
                 key={resolveKey(item, index)}
-                className={cn('bg-[#fbfdf8] transition-colors hover:bg-[#f1f7ed]', onRowClick ? 'cursor-pointer' : '')}
+                className={cn('bg-white transition-colors hover:bg-[#f7fbf8]', onRowClick ? 'cursor-pointer' : '')}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
               >
                 {columns.map((column) => (
-                  <td key={column.key} className={cn('break-words px-4 py-3.5 align-top text-[#4e5f49]', column.className)}>
-                    {column.render(item)}
+                  <td key={column.key} className={cn('break-words px-4 py-3.5 align-top text-[#4c625c]', column.className)}>
+                    {column.render(item, index)}
                   </td>
                 ))}
               </tr>
@@ -320,16 +334,16 @@ export function ActionButton({
   onClick?: () => void;
 }) {
   const variantClass = {
-    primary: 'border-[#0f766e] bg-[#0f766e] text-white hover:bg-[#0b5f58]',
-    secondary: 'border-[#c9d9c4] bg-[#fbfdf8] text-[#173c36] hover:bg-[#eef7ec]',
-    danger: 'border-rose-600 bg-rose-600 text-white hover:bg-rose-700',
-    ghost: 'border-transparent bg-transparent text-[#496247] hover:bg-[#eef7ec]',
+    primary: 'border-[#0e7c86] bg-[#0e7c86] text-white hover:bg-[#075e66]',
+    secondary: 'border-[#cfe1da] bg-white text-[#18343a] hover:bg-[#eef8f6]',
+    danger: 'border-[#d94f70] bg-[#d94f70] text-white hover:bg-[#b63b59]',
+    ghost: 'border-transparent bg-transparent text-[#0e7c86] hover:bg-[#eef8f6]',
   };
 
   return (
     <button
       className={cn(
-        'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55',
+        'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#8fd8df] disabled:cursor-not-allowed disabled:opacity-55',
         variantClass[variant],
       )}
       disabled={disabled}
@@ -377,14 +391,14 @@ export function Timeline({
       {items.map((item, index) => (
         <div key={item.id} className="grid grid-cols-[24px_1fr] gap-3">
           <div className="flex flex-col items-center">
-            <div className="mt-1 flex size-6 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500">
+            <div className="mt-1 flex size-6 items-center justify-center rounded-full border border-[#cfe1da] bg-white text-[#0e7c86]">
               {index === 0 ? <Clock3 className="size-3.5" /> : <ChevronRight className="size-3.5" />}
             </div>
             {index < items.length - 1 ? <div className="h-full min-h-8 w-px bg-border" /> : null}
           </div>
           <div className="pb-5">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="font-semibold text-zinc-900">{item.title}</div>
+              <div className="font-semibold text-[#18343a]">{item.title}</div>
               {item.type ? <StatusBadge value={item.type} /> : null}
             </div>
             {item.description ? <p className="mt-1 text-sm text-muted-foreground">{item.description}</p> : null}
@@ -419,11 +433,11 @@ export function ChecklistItem({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border border-[#cfe1da] bg-white p-4 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          {uploaded ? <CheckCircle2 className="size-4 text-emerald-600" /> : <AlertCircle className="size-4 text-amber-600" />}
-          <div className="font-semibold text-zinc-900">{label}</div>
+          {uploaded ? <CheckCircle2 className="size-4 text-[#12815f]" /> : <AlertCircle className="size-4 text-[#c77900]" />}
+          <div className="font-semibold text-[#18343a]">{label}</div>
           <StatusBadge value={uploaded ? 'UPLOADED' : 'MISSING'} tone={uploaded ? 'success' : 'warning'} />
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -459,7 +473,7 @@ export function FileUploadButton({
   return (
     <label
       className={cn(
-        'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50',
+        'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#cfe1da] bg-white px-4 text-sm font-semibold text-[#18343a] transition-colors hover:bg-[#eef8f6]',
         disabled && 'pointer-events-none cursor-not-allowed opacity-55',
       )}
     >
@@ -487,7 +501,7 @@ export function DownloadButton({ onClick, disabled }: { onClick: () => void; dis
 export function Field({ label, description, children }: { label: string; description?: string; children: ReactNode }) {
   return (
     <label className="grid min-w-0 gap-1.5 text-sm">
-      <span className="font-semibold text-zinc-800">{label}</span>
+      <span className="font-semibold text-[#18343a]">{label}</span>
       {description && <span className="text-xs text-muted-foreground -mt-1">{description}</span>}
       {children}
     </label>
@@ -498,7 +512,7 @@ export function FileMeta({ label, value }: { label: string; value: ReactNode }) 
   return (
     <div>
       <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium text-zinc-900">{value}</div>
+      <div className="mt-1 text-sm font-medium text-[#18343a]">{value}</div>
     </div>
   );
 }
@@ -538,12 +552,12 @@ export function formatFileSize(value: number | null | undefined) {
 }
 
 export const inputClass =
-  'h-10 w-full min-w-0 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-3 text-sm text-[#173c36] outline-none transition-colors placeholder:text-[#8a9a84] focus:border-[#0f766e] focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:bg-[#edf3e9] disabled:text-[#74806f]';
+  'h-10 w-full min-w-0 rounded-md border border-[#cfe1da] bg-white px-3 text-sm text-[#18343a] outline-none transition-colors placeholder:text-[#8a9a84] focus:border-[#0e7c86] focus:ring-2 focus:ring-[#8fd8df] disabled:cursor-not-allowed disabled:bg-[#edf5ef] disabled:text-[#74806f]';
 
 export const buttonClass =
-  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#0f766e] bg-[#0f766e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0b5f58] focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55';
+  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#0e7c86] bg-[#0e7c86] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#075e66] focus:outline-none focus:ring-2 focus:ring-[#8fd8df] disabled:cursor-not-allowed disabled:opacity-55';
 
 export const secondaryButtonClass =
-  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#c9d9c4] bg-[#fbfdf8] px-4 text-sm font-semibold text-[#173c36] transition-colors hover:bg-[#eef7ec] focus:outline-none focus:ring-2 focus:ring-[#a9d7cc] disabled:cursor-not-allowed disabled:opacity-55';
+  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#cfe1da] bg-white px-4 text-sm font-semibold text-[#18343a] transition-colors hover:bg-[#eef8f6] focus:outline-none focus:ring-2 focus:ring-[#8fd8df] disabled:cursor-not-allowed disabled:opacity-55';
 
 export const uploadIcon = FileUp;

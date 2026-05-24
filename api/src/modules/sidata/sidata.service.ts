@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { AuthUser } from '../auth/auth.types';
 import {
   AsnAssignmentHistoryRecord,
+  AsnChangeLogRecord,
   AsnDocumentRecord,
   AsnGolonganHistoryRecord,
   AsnRecord,
@@ -30,6 +31,7 @@ import {
   SIDATA_ASN_DOCUMENT_EXTENSION_BY_MIME,
   SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
   SidataAsnDocumentUploadDto,
+  SidataAsnChangeLogResponse,
   SidataAccessScope,
   SidataAsnQualityDashboardResponse,
   SidataAsnQueryDto,
@@ -91,6 +93,16 @@ type AsnResponse = {
   statusAsn: string | null;
   tanggalLahir: string | null;
   tmtPensiun: string | null;
+  syncStatus: string;
+  lastSiasnBatchId: string | null;
+  lastSiasnSyncedAt: string | null;
+  localCorrectionAt: string | null;
+  localCorrectionBy: string | null;
+  localCorrectionReason: string | null;
+  needsReview: boolean;
+  reviewNote: string | null;
+  sourceBatchId: string | null;
+  syncedAt: string | null;
 };
 
 type PaginatedAsnResponse = {
@@ -306,9 +318,17 @@ export class SidataService {
         issueRows,
         qualityScore: this.toPercentage(completeCoreRows, totalAsn),
       },
+      sync: {
+        synced: dashboard.aggregate.syncedRows,
+        localCorrection: dashboard.aggregate.localCorrectionRows,
+        needReview: dashboard.aggregate.needReviewRows,
+        pendingSiasnUpdate: dashboard.aggregate.pendingSiasnUpdateRows,
+        conflict: dashboard.aggregate.conflictRows,
+      },
       breakdown: {
         byStatusAsn: this.toQualityBreakdownItems(dashboard.byStatusAsn, totalAsn),
         byJenisAsn: this.toQualityBreakdownItems(dashboard.byJenisAsn, totalAsn),
+        bySyncStatus: this.toQualityBreakdownItems(dashboard.bySyncStatus, totalAsn),
       },
     };
   }
@@ -351,8 +371,42 @@ export class SidataService {
     if (dto.tmtGolongan !== undefined) data.tmtGolongan = this.parseOptionalDate(dto.tmtGolongan, 'TMT golongan');
     if (dto.tmtPensiun !== undefined) data.tmtPensiun = this.parseOptionalDate(dto.tmtPensiun, 'TMT pensiun');
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.needsReview !== undefined) data.needsReview = dto.needsReview;
+    this.assignOptionalString(data, 'reviewNote', dto.reviewNote);
+
+    const changes = this.getManualAsnChanges(asn, data);
+    if (changes.length > 0) {
+      const reason = dto.changeReason?.trim();
+      if (!reason) {
+        throw new BadRequestException('Alasan perubahan wajib diisi untuk koreksi data ASN');
+      }
+
+      data.syncStatus = 'LOCAL_CORRECTION';
+      data.localCorrectionAt = new Date();
+      data.localCorrectionBy = user.id;
+      data.localCorrectionReason = reason;
+      data.needsReview = dto.needsReview ?? true;
+    }
 
     const updated = await this.sidataRepository.updateAsn(asn.id, data);
+
+    await this.sidataRepository.createAsnChangeLogs(
+      changes.map((change) => ({
+        id: randomUUID(),
+        asnId: asn.id,
+        fieldName: change.fieldName,
+        oldValue: change.oldValue,
+        newValue: change.newValue,
+        changedBy: user.id,
+        reason: dto.changeReason?.trim() || null,
+        evidenceDocumentId: dto.evidenceDocumentId?.trim() || null,
+        source: 'MANUAL',
+        sourceBatchId: asn.sourceBatchId,
+        metadata: {
+          syncStatus: 'LOCAL_CORRECTION',
+        },
+      })),
+    );
     this.logger.log(`updateAsn id=${asn.id} actor=${user.id}`);
 
     return this.toAsnResponse(updated);
@@ -654,6 +708,17 @@ export class SidataService {
     };
   }
 
+  async findAsnChangeLogs(
+    id: string,
+    user: AuthUser,
+  ): Promise<SidataAsnChangeLogResponse[]> {
+    const asn = await this.sidataRepository.findAsnById(id.trim());
+    this.assertAsnAccessible(asn, user);
+
+    const logs = await this.sidataRepository.findAsnChangeLogs(asn.id);
+    return logs.map((item) => this.toAsnChangeLogResponse(item));
+  }
+
   async exportAsnExcel(
     query: SidataAsnQueryDto,
     user: AuthUser,
@@ -840,6 +905,11 @@ export class SidataService {
   private toQualityBreakdownLabel(value: string): string {
     if (value === 'TIDAK_DIISI') return 'Tidak Diisi';
     if (value === 'PPPK_PARUH_WAKTU') return 'PPPK Paruh Waktu';
+    if (value === 'SYNCED') return 'Sinkron';
+    if (value === 'LOCAL_CORRECTION') return 'Koreksi Lokal';
+    if (value === 'NEED_REVIEW') return 'Perlu Review';
+    if (value === 'PENDING_SIASN_UPDATE') return 'Menunggu Perbaikan SIASN';
+    if (value === 'CONFLICT') return 'Konflik';
     return value
       .split('_')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
@@ -885,6 +955,48 @@ export class SidataService {
     return value.trim().toLowerCase().replace(/\s+/g, ' ') || null;
   }
 
+  private getManualAsnChanges(
+    before: AsnRecord,
+    data: Prisma.AsnUncheckedUpdateInput,
+  ): Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> {
+    const trackedFields: Array<keyof AsnRecord> = [
+      'nipLama',
+      'nik',
+      'nama',
+      'tipePegawai',
+      'statusAsn',
+      'isActive',
+      'unitKerjaId',
+      'jabatanRefId',
+      'jabatanNama',
+      'golonganRefId',
+      'golonganNama',
+      'tmtJabatan',
+      'tmtGolongan',
+      'tmtPensiun',
+    ];
+
+    return trackedFields.flatMap((fieldName) => {
+      if (!(fieldName in data)) return [];
+
+      const oldValue = this.stringifyAsnChangeValue(before[fieldName]);
+      const newValue = this.stringifyAsnChangeValue(
+        data[fieldName as keyof Prisma.AsnUncheckedUpdateInput],
+      );
+
+      return oldValue === newValue
+        ? []
+        : [{ fieldName: String(fieldName), oldValue, newValue }];
+    });
+  }
+
+  private stringifyAsnChangeValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    return String(value);
+  }
+
   private assertAsnAccessible(
     asn: AsnRecord | null,
     user: AuthUser,
@@ -916,6 +1028,7 @@ export class SidataService {
       unitKerjaId,
       statusAsn: this.normalizeOptionalText(query.statusAsn),
       jenisAsn: this.normalizeOptionalText(query.jenisAsn),
+      syncStatus: this.normalizeOptionalText(query.syncStatus),
       page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
       limit: this.normalizePositiveNumber(query.limit, 20, 1, 100),
     };
@@ -1128,6 +1241,33 @@ export class SidataService {
       statusAsn: asn.statusAsn ?? asn.detailStatusNama,
       tanggalLahir: asn.siasnProfile?.tanggalLahir?.toISOString() ?? null,
       tmtPensiun: asn.tmtPensiun?.toISOString() ?? null,
+      syncStatus: asn.syncStatus,
+      lastSiasnBatchId: asn.lastSiasnBatchId,
+      lastSiasnSyncedAt: asn.lastSiasnSyncedAt?.toISOString() ?? null,
+      localCorrectionAt: asn.localCorrectionAt?.toISOString() ?? null,
+      localCorrectionBy: asn.localCorrectionBy,
+      localCorrectionReason: asn.localCorrectionReason,
+      needsReview: asn.needsReview,
+      reviewNote: asn.reviewNote,
+      sourceBatchId: asn.sourceBatchId,
+      syncedAt: asn.syncedAt?.toISOString() ?? null,
+    };
+  }
+
+  private toAsnChangeLogResponse(item: AsnChangeLogRecord): SidataAsnChangeLogResponse {
+    return {
+      id: item.id,
+      asnId: item.asnId,
+      fieldName: item.fieldName,
+      oldValue: item.oldValue,
+      newValue: item.newValue,
+      changedBy: item.changedBy,
+      changedAt: item.changedAt.toISOString(),
+      reason: item.reason,
+      evidenceDocumentId: item.evidenceDocumentId,
+      source: item.source,
+      sourceBatchId: item.sourceBatchId,
+      metadata: item.metadata,
     };
   }
 

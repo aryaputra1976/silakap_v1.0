@@ -14,9 +14,9 @@ export function SopReportNarrative({
       description="Narasi awal yang dapat digunakan sebagai bahan laporan Kabid kepada Kepala Badan."
       actions={<StatusBadge value="Draft Otomatis" tone="info" />}
     >
-      <article className="min-w-0 space-y-5 overflow-hidden rounded-lg border border-[#d8e5d3] bg-white p-5 text-sm leading-7 text-[#40533c]">
-        <header className="border-b border-[#d8e5d3] pb-4">
-          <div className="mb-2 flex min-w-0 items-center gap-2 text-[#173c36]">
+      <article className="min-w-0 space-y-5 overflow-hidden rounded-lg border border-[#cfe1da] bg-white p-5 text-sm leading-7 text-[#40533c]">
+        <header className="border-b border-[#cfe1da] pb-4">
+          <div className="mb-2 flex min-w-0 items-center gap-2 text-[#18343a]">
             <FileText className="size-5" />
             <h2 className="min-w-0 break-words text-lg font-semibold">{narrative.title}</h2>
           </div>
@@ -24,22 +24,22 @@ export function SopReportNarrative({
         </header>
 
         <section>
-          <h3 className="mb-1 font-semibold text-[#173c36]">A. Capaian Pelaksanaan</h3>
+          <h3 className="mb-1 font-semibold text-[#18343a]">A. Capaian Pelaksanaan</h3>
           <p className="break-words">{narrative.achievement}</p>
         </section>
 
         <section>
-          <h3 className="mb-1 font-semibold text-[#173c36]">B. Kendala dan Permasalahan</h3>
+          <h3 className="mb-1 font-semibold text-[#18343a]">B. Kendala dan Permasalahan</h3>
           <p className="break-words">{narrative.constraints}</p>
         </section>
 
         <section>
-          <h3 className="mb-1 font-semibold text-[#173c36]">C. Tindak Lanjut</h3>
+          <h3 className="mb-1 font-semibold text-[#18343a]">C. Tindak Lanjut</h3>
           <p className="break-words">{narrative.followUp}</p>
         </section>
 
         <section>
-          <h3 className="mb-2 font-semibold text-[#173c36]">D. Rekomendasi</h3>
+          <h3 className="mb-2 font-semibold text-[#18343a]">D. Rekomendasi</h3>
           <ol className="list-decimal space-y-1 ps-5">
             {narrative.recommendations.map((item) => (
               <li key={item}>{item}</li>
@@ -48,7 +48,7 @@ export function SopReportNarrative({
         </section>
 
         <section>
-          <h3 className="mb-1 font-semibold text-[#173c36]">E. Penutup</h3>
+          <h3 className="mb-1 font-semibold text-[#18343a]">E. Penutup</h3>
           <p className="break-words">{narrative.closing}</p>
         </section>
       </article>

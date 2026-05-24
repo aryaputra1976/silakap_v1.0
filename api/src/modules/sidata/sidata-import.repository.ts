@@ -97,6 +97,40 @@ const jabatanSelect = {
 
 const simpleIdSelect = { id: true } as const;
 
+const asnImportCompareSelect = {
+  id: true,
+  nip: true,
+  nipLama: true,
+  nik: true,
+  nama: true,
+  tipePegawai: true,
+  statusAsn: true,
+  isActive: true,
+  kedudukanHukumRefId: true,
+  kedudukanHukumNama: true,
+  tmtPensiun: true,
+  unitKerjaId: true,
+  siasnUnorId: true,
+  unorNama: true,
+  jabatanRefId: true,
+  siasnJabatanId: true,
+  jabatanNama: true,
+  jenisJabatanNama: true,
+  tmtJabatan: true,
+  golonganRefId: true,
+  siasnGolonganId: true,
+  golonganNama: true,
+  tmtGolongan: true,
+  pendidikanRefId: true,
+  pendidikanNama: true,
+  tingkatPendidikanRefId: true,
+  tingkatPendidikanNama: true,
+  tmtPerjanjianKerja: true,
+  akhirPerjanjianKerja: true,
+  checksum: true,
+  syncStatus: true,
+} satisfies Prisma.AsnSelect;
+
 const reconciliationAsnSelect = {
   id: true,
   nip: true,
@@ -279,6 +313,10 @@ export type SidataImportAuditLogRecord = Prisma.SidataImportAuditLogGetPayload<{
 
 type ReconciliationAsnRecord = Prisma.AsnGetPayload<{
   select: typeof reconciliationAsnSelect;
+}>;
+
+type AsnImportCompareRecord = Prisma.AsnGetPayload<{
+  select: typeof asnImportCompareSelect;
 }>;
 
 type NormalizedAsnReconciliationQuery = {
@@ -3172,6 +3210,11 @@ export class SidataImportRepository {
         },
       });
 
+      if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.SKIPPED) {
+        skippedRows += 1;
+        continue;
+      }
+
       committedRows += 1;
       if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.CREATED) createdRows += 1;
       if (commitResult.action === SIDATA_ASN_COMMIT_ACTION.UPDATED) updatedRows += 1;
@@ -3198,26 +3241,72 @@ export class SidataImportRepository {
       batchId: string;
       importType: string;
     },
-  ): Promise<{ asnId: string; action: 'CREATED' | 'UPDATED' }> {
+  ): Promise<{ asnId: string; action: 'CREATED' | 'UPDATED' | 'SKIPPED' }> {
     const { row } = params;
 
     const existing = row.matchedAsnId
       ? await tx.asn.findFirst({
           where: { id: row.matchedAsnId, deletedAt: null },
-          select: simpleIdSelect,
+          select: asnImportCompareSelect,
         })
       : await tx.asn.findFirst({
           where: { nip: row.nip ?? '', deletedAt: null },
-          select: simpleIdSelect,
+          select: asnImportCompareSelect,
         });
 
     const safeData = this.buildAsnSafeDataFromStaging(params);
 
     if (existing) {
+      if (this.hasProtectedLocalCorrectionConflict(existing, safeData)) {
+        await tx.asn.update({
+          where: { id: existing.id },
+          data: {
+            syncStatus: 'CONFLICT',
+            needsReview: true,
+            reviewNote:
+              'Data SIASN terbaru berbeda dengan data SIDATA yang memiliki koreksi lokal. Review manual sebelum memperbarui master ASN.',
+            lastSiasnBatchId: params.batchId,
+            lastSiasnSyncedAt: new Date(),
+            updatedAt: new Date(),
+          },
+          select: simpleIdSelect,
+        });
+
+        await this.createAsnChangeLogsInTx(tx, {
+          asnId: existing.id,
+          before: existing,
+          after: safeData,
+          source: 'SIASN_IMPORT',
+          sourceBatchId: params.batchId,
+          reason: 'Import SIASN mendeteksi konflik dengan koreksi lokal SIDATA.',
+          metadata: {
+            rowId: row.id,
+            rowNumber: row.rowNumber,
+            importType: params.importType,
+            syncStatus: 'CONFLICT',
+          },
+        });
+
+        return { asnId: existing.id, action: SIDATA_ASN_COMMIT_ACTION.SKIPPED };
+      }
+
       const updated = await tx.asn.update({
         where: { id: existing.id },
         data: safeData,
         select: simpleIdSelect,
+      });
+      await this.createAsnChangeLogsInTx(tx, {
+        asnId: updated.id,
+        before: existing,
+        after: safeData,
+        source: 'SIASN_IMPORT',
+        sourceBatchId: params.batchId,
+        reason: 'Pemutakhiran dari import SIASN yang sudah melewati validasi dan mapping.',
+        metadata: {
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          importType: params.importType,
+        },
       });
       await this.upsertAsnEnterpriseRecordsInTx(tx, {
         ...params,
@@ -3229,6 +3318,24 @@ export class SidataImportRepository {
     const created = await tx.asn.create({
       data: { id: randomUUID(), ...safeData },
       select: simpleIdSelect,
+    });
+    await tx.asnChangeLog.create({
+      data: {
+        id: randomUUID(),
+        asnId: created.id,
+        fieldName: '*',
+        oldValue: null,
+        newValue: row.nip ?? row.nama ?? created.id,
+        source: 'SIASN_IMPORT',
+        sourceBatchId: params.batchId,
+        reason: 'ASN baru dibuat dari import SIASN.',
+        metadata: {
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          importType: params.importType,
+          action: SIDATA_ASN_COMMIT_ACTION.CREATED,
+        },
+      },
     });
     await this.upsertAsnEnterpriseRecordsInTx(tx, {
       ...params,
@@ -3357,6 +3464,11 @@ export class SidataImportRepository {
       tahunLulus,
       namaSekolah: row.namaSekolah,
       sourceBatchId: params.batchId ?? null,
+      syncStatus: 'SYNCED',
+      lastSiasnBatchId: params.batchId ?? null,
+      lastSiasnSyncedAt: new Date(),
+      needsReview: false,
+      reviewNote: null,
       deletedAt: null,
     };
 
@@ -3365,6 +3477,109 @@ export class SidataImportRepository {
       syncedAt: new Date(),
       checksum: this.checksumJson(currentData),
     };
+  }
+
+  private hasProtectedLocalCorrectionConflict(
+    existing: AsnImportCompareRecord,
+    incoming: Record<string, unknown>,
+  ): boolean {
+    if (
+      existing.syncStatus !== 'LOCAL_CORRECTION'
+      && existing.syncStatus !== 'PENDING_SIASN_UPDATE'
+    ) {
+      return false;
+    }
+
+    return Boolean(existing.checksum && incoming.checksum && existing.checksum !== incoming.checksum);
+  }
+
+  private async createAsnChangeLogsInTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      asnId: string;
+      before: AsnImportCompareRecord;
+      after: Record<string, unknown>;
+      source: string;
+      sourceBatchId?: string | null;
+      reason?: string | null;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    const changes = this.getTrackedAsnFieldChanges(params.before, params.after);
+
+    if (changes.length === 0) {
+      return;
+    }
+
+    await tx.asnChangeLog.createMany({
+      data: changes.map((change) => ({
+        id: randomUUID(),
+        asnId: params.asnId,
+        fieldName: change.fieldName,
+        oldValue: change.oldValue,
+        newValue: change.newValue,
+        source: params.source,
+        sourceBatchId: params.sourceBatchId ?? null,
+        reason: params.reason ?? null,
+        metadata: params.metadata
+          ? (params.metadata as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+      })),
+    });
+  }
+
+  private getTrackedAsnFieldChanges(
+    before: AsnImportCompareRecord,
+    after: Record<string, unknown>,
+  ): Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> {
+    const fields: Array<keyof AsnImportCompareRecord> = [
+      'nip',
+      'nipLama',
+      'nik',
+      'nama',
+      'tipePegawai',
+      'statusAsn',
+      'isActive',
+      'kedudukanHukumRefId',
+      'kedudukanHukumNama',
+      'tmtPensiun',
+      'unitKerjaId',
+      'siasnUnorId',
+      'unorNama',
+      'jabatanRefId',
+      'siasnJabatanId',
+      'jabatanNama',
+      'jenisJabatanNama',
+      'tmtJabatan',
+      'golonganRefId',
+      'siasnGolonganId',
+      'golonganNama',
+      'tmtGolongan',
+      'pendidikanRefId',
+      'pendidikanNama',
+      'tingkatPendidikanRefId',
+      'tingkatPendidikanNama',
+      'tmtPerjanjianKerja',
+      'akhirPerjanjianKerja',
+    ];
+
+    return fields.flatMap((fieldName) => {
+      const oldValue = this.stringifyAsnChangeValue(before[fieldName]);
+      const newValue = this.stringifyAsnChangeValue(
+        after[fieldName as keyof typeof after],
+      );
+
+      return oldValue === newValue
+        ? []
+        : [{ fieldName: String(fieldName), oldValue, newValue }];
+    });
+  }
+
+  private stringifyAsnChangeValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    return String(value);
   }
 
   private async upsertAsnEnterpriseRecordsInTx(

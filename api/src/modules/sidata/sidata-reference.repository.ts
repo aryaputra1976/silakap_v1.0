@@ -39,6 +39,11 @@ export type GenericRefRow = {
   kode: string | null;
   nama: string;
   isActive: boolean;
+  tingkatPendidikan?: {
+    id: string;
+    kode: string | null;
+    nama: string;
+  } | null;
 };
 
 @Injectable()
@@ -127,7 +132,16 @@ export class SidataReferenceRepository {
         const where: Prisma.RefPendidikanWhereInput = { deletedAt: null };
         if (filters.isActive !== undefined) where.isActive = filters.isActive;
         if (filters.q) where.OR = [{ kode: { contains: filters.q } }, { nama: { contains: filters.q } }];
-        return this.prisma.refPendidikan.findMany({ where, select, orderBy });
+        return this.prisma.refPendidikan.findMany({
+          where,
+          select: {
+            ...select,
+            tingkatPendidikan: {
+              select: { id: true, kode: true, nama: true },
+            },
+          },
+          orderBy,
+        });
       }
       case 'AGAMA': {
         const where: Prisma.RefAgamaWhereInput = { deletedAt: null };

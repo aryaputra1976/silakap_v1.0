@@ -254,14 +254,14 @@ export function SopDetailPage() {
 
       <div className="no-print">
         <SectionCard>
-          <div className="mb-5 flex flex-wrap gap-2 border-b border-[#d8e5d3] pb-4">
+          <div className="mb-5 flex flex-wrap gap-2 border-b border-[#cfe1da] pb-4">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
                   activeTab === tab.key
-                    ? 'border-[#0f766e] bg-[#0f766e] text-white'
-                    : 'border-[#c9d9c4] bg-white text-[#173c36] hover:bg-[#eef7ec]'
+                    ? 'border-[#0e7c86] bg-[#0e7c86] text-white'
+                    : 'border-[#cfe1da] bg-white text-[#18343a] hover:bg-[#eef8f6]'
                 }`}
                 onClick={() => setActiveTab(tab.key)}
                 type="button"
@@ -300,14 +300,14 @@ function SopSummaryTab({ sop }: { sop: SopDetail }) {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <div>
-        <h3 className="mb-2 text-sm font-semibold uppercase text-[#173c36]">
+        <h3 className="mb-2 text-sm font-semibold uppercase text-[#18343a]">
           Dasar Hukum
         </h3>
         <ul className="space-y-2 text-sm leading-6 text-[#51614c]">
           {sop.legalBasis.map((item) => (
             <li
               key={item}
-              className="rounded-md border border-[#d8e5d3] bg-white px-3 py-2"
+              className="rounded-md border border-[#cfe1da] bg-white px-3 py-2"
             >
               {item}
             </li>
@@ -317,19 +317,19 @@ function SopSummaryTab({ sop }: { sop: SopDetail }) {
 
       <div className="space-y-4">
         <div>
-          <h3 className="mb-2 text-sm font-semibold uppercase text-[#173c36]">
+          <h3 className="mb-2 text-sm font-semibold uppercase text-[#18343a]">
             Tujuan
           </h3>
-          <p className="rounded-md border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <p className="rounded-md border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
             {sop.objective}
           </p>
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold uppercase text-[#173c36]">
+          <h3 className="mb-2 text-sm font-semibold uppercase text-[#18343a]">
             Ruang Lingkup
           </h3>
-          <p className="rounded-md border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <p className="rounded-md border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
             {sop.scope}
           </p>
         </div>

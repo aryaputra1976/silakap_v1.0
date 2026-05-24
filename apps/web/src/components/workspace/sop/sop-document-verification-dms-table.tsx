@@ -50,7 +50,7 @@ export function SopDocumentVerificationDmsTable({
             header: 'Dokumen',
             render: (item) => (
               <div>
-                <div className="font-semibold text-[#173c36]">{item.title}</div>
+                <div className="font-semibold text-[#18343a]">{item.title}</div>
                 <div className="mt-1 text-xs leading-5 text-[#6d7e68]">
                   {item.originalFileName ?? item.fileName ?? 'Belum ada file'}
                 </div>
@@ -62,7 +62,7 @@ export function SopDocumentVerificationDmsTable({
             header: 'ASN',
             render: (item) => (
               <div>
-                <div className="font-semibold text-[#173c36]">{item.asn?.nama ?? '-'}</div>
+                <div className="font-semibold text-[#18343a]">{item.asn?.nama ?? '-'}</div>
                 <div className="mt-1 text-xs text-[#6d7e68]">{item.asn?.nip ?? item.asnId ?? '-'}</div>
               </div>
             ),

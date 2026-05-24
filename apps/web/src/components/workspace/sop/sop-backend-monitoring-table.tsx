@@ -32,7 +32,7 @@ export function SopBackendMonitoringTable({ rows }: { rows: KinerjaBidangRhkRepo
           className: 'w-[24%]',
           render: (item) => (
             <div className="min-w-0">
-              <div className="break-words font-semibold leading-6 text-[#173c36]">{item.sopTitle}</div>
+              <div className="break-words font-semibold leading-6 text-[#18343a]">{item.sopTitle}</div>
               <div className="mt-1 text-xs text-[#6d7e68]">{item.sopCode}</div>
             </div>
           ),
@@ -65,10 +65,10 @@ export function SopBackendMonitoringTable({ rows }: { rows: KinerjaBidangRhkRepo
           className: 'w-[16%]',
           render: (item) => (
             <div className="w-full min-w-0 max-w-40">
-              <div className="mb-1 text-xs font-semibold text-[#173c36]">{item.progressPercent}%</div>
+              <div className="mb-1 text-xs font-semibold text-[#18343a]">{item.progressPercent}%</div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-[#dce8d6]">
                 <div
-                  className="h-full rounded-full bg-[#0f766e]"
+                  className="h-full rounded-full bg-[#0e7c86]"
                   style={{ width: `${item.progressPercent}%` }}
                 />
               </div>

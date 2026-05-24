@@ -58,7 +58,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
       <span className="w-40 shrink-0 text-xs text-[#687967]">{label}</span>
-      <span className="text-sm text-[#102f2b]">{value ?? '—'}</span>
+      <span className="text-sm text-[#18343a]">{value ?? '—'}</span>
     </div>
   );
 }
@@ -107,19 +107,19 @@ function TransisiModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-[#d8e5d3] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Pindah Status</h2>
-          <button onClick={onClose} className="text-[#687967] hover:text-[#102f2b]"><X className="h-5 w-5" /></button>
+        <div className="flex items-center justify-between border-b border-[#cfe1da] px-5 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Pindah Status</h2>
+          <button onClick={onClose} className="text-[#687967] hover:text-[#18343a]"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-4 px-5 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#102f2b]">Status Baru</label>
+            <label className="text-sm font-medium text-[#18343a]">Status Baru</label>
             <div className="space-y-1.5">
               {transitions.map((t) => (
                 <button
                   key={t.status}
                   onClick={() => setSelected(t.status)}
-                  className={`flex w-full items-center justify-between rounded border px-3 py-2 text-sm transition-colors ${selected === t.status ? 'border-[#3a6b52] bg-[#e8f0e5] text-[#3a6b52]' : 'border-[#d8e5d3] text-[#687967] hover:bg-[#f4f8ef]'}`}
+                  className={`flex w-full items-center justify-between rounded border px-3 py-2 text-sm transition-colors ${selected === t.status ? 'border-[#3a6b52] bg-[#e8f0e5] text-[#3a6b52]' : 'border-[#cfe1da] text-[#687967] hover:bg-[#f4f8ef]'}`}
                 >
                   {t.label}
                   {selected === t.status && <CheckCircle2 className="h-4 w-4" />}
@@ -128,11 +128,11 @@ function TransisiModal({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-[#102f2b]">Catatan <span className="font-normal text-[#687967]">(opsional)</span></label>
+            <label className="text-sm font-medium text-[#18343a]">Catatan <span className="font-normal text-[#687967]">(opsional)</span></label>
             <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} rows={2} className={inputClass} placeholder="Catatan perubahan status..." />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-5 py-3">
           <button onClick={onClose} className="rounded border border-[#c8d8c3] px-4 py-2 text-sm text-[#687967] hover:bg-[#f4f8ef]">Batal</button>
           <button
             onClick={handleSubmit}
@@ -221,9 +221,9 @@ function EditInfoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-[#d8e5d3] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Edit Informasi Proses</h2>
-          <button onClick={onClose} className="text-[#687967] hover:text-[#102f2b]"><X className="h-5 w-5" /></button>
+        <div className="flex items-center justify-between border-b border-[#cfe1da] px-5 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Edit Informasi Proses</h2>
+          <button onClick={onClose} className="text-[#687967] hover:text-[#18343a]"><X className="h-5 w-5" /></button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto space-y-3 px-5 py-4">
           <div className="grid grid-cols-2 gap-3">
@@ -261,7 +261,7 @@ function EditInfoModal({
             <textarea {...f('catatan')} rows={2} className={inputClass} placeholder="Catatan tambahan" />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-5 py-3">
           <button onClick={onClose} className="rounded border border-[#c8d8c3] px-4 py-2 text-sm text-[#687967] hover:bg-[#f4f8ef]">Batal</button>
           <button onClick={handleSubmit} disabled={saving} className="rounded bg-[#3a6b52] px-4 py-2 text-sm font-medium text-white hover:bg-[#2d5340] disabled:opacity-50">
             {saving ? 'Menyimpan...' : 'Simpan'}
@@ -329,13 +329,13 @@ function AddDokumenModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-[#d8e5d3] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#102f2b]">Tambah Dokumen</h2>
-          <button onClick={onClose} className="text-[#687967] hover:text-[#102f2b]"><X className="h-5 w-5" /></button>
+        <div className="flex items-center justify-between border-b border-[#cfe1da] px-5 py-4">
+          <h2 className="text-base font-semibold text-[#18343a]">Tambah Dokumen</h2>
+          <button onClick={onClose} className="text-[#687967] hover:text-[#18343a]"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-3 px-5 py-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-[#102f2b]">Jenis Dokumen</label>
+            <label className="mb-1 block text-sm font-medium text-[#18343a]">Jenis Dokumen</label>
             <select value={jenisDokumen} onChange={(e) => setJenisDokumen(e.target.value)} className={inputClass}>
               {JENIS_DOKUMEN_OPTIONS.map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
@@ -346,19 +346,19 @@ function AddDokumenModal({
             </div>
           )}
           <div>
-            <label className="mb-1 block text-sm font-medium text-[#102f2b]">Nama File</label>
+            <label className="mb-1 block text-sm font-medium text-[#18343a]">Nama File</label>
             <input type="text" value={namaFile} onChange={(e) => setNamaFile(e.target.value)} className={inputClass} placeholder="contoh: SK_Pangkat_Terakhir.pdf" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-[#102f2b]">Path / Referensi</label>
+            <label className="mb-1 block text-sm font-medium text-[#18343a]">Path / Referensi</label>
             <input type="text" value={storagePath} onChange={(e) => setStoragePath(e.target.value)} className={inputClass} placeholder="Lokasi penyimpanan atau nomor referensi" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-[#102f2b]">Keterangan <span className="font-normal text-[#687967]">(opsional)</span></label>
+            <label className="mb-1 block text-sm font-medium text-[#18343a]">Keterangan <span className="font-normal text-[#687967]">(opsional)</span></label>
             <input type="text" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} className={inputClass} placeholder="Keterangan tambahan..." />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#d8e5d3] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-[#cfe1da] px-5 py-3">
           <button onClick={onClose} className="rounded border border-[#c8d8c3] px-4 py-2 text-sm text-[#687967] hover:bg-[#f4f8ef]">Batal</button>
           <button onClick={handleSubmit} disabled={saving} className="rounded bg-[#3a6b52] px-4 py-2 text-sm font-medium text-white hover:bg-[#2d5340] disabled:opacity-50">
             {saving ? 'Menyimpan...' : 'Tambah'}
@@ -470,7 +470,7 @@ export function PemberhentianProsesDetailPage() {
         meta={<StatusBadge status={proses.status} />}
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/pemberhentian/proses')} className="flex items-center gap-1 text-sm text-[#687967] hover:text-[#102f2b]">
+            <button onClick={() => navigate('/pemberhentian/proses')} className="flex items-center gap-1 text-sm text-[#687967] hover:text-[#18343a]">
               <ArrowLeft className="h-4 w-4" />Kembali
             </button>
             {isEditable && (
@@ -503,7 +503,7 @@ export function PemberhentianProsesDetailPage() {
               </div>
               <div className="flex-1 space-y-2">
                 <div>
-                  <p className="text-lg font-semibold text-[#102f2b]">{proses.asn.nama}</p>
+                  <p className="text-lg font-semibold text-[#18343a]">{proses.asn.nama}</p>
                   <p className="text-sm text-[#687967]">{proses.asn.nip}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
@@ -562,7 +562,7 @@ export function PemberhentianProsesDetailPage() {
                     <div className="flex items-center gap-2.5">
                       <FileText className="h-4 w-4 text-[#687967]" />
                       <div>
-                        <p className="text-sm font-medium text-[#102f2b]">{dok.namaFile}</p>
+                        <p className="text-sm font-medium text-[#18343a]">{dok.namaFile}</p>
                         <p className="text-xs text-[#687967]">{dok.jenisDokumen}{dok.keterangan ? ` · ${dok.keterangan}` : ''}</p>
                       </div>
                     </div>

@@ -81,7 +81,7 @@ export function OpdSipensiunCreatePage() {
       />
 
       {success ? (
-        <div className="rounded-lg border border-[#9ed9c4] bg-[#e6f6ee] p-4 text-sm font-medium text-[#087052]">
+        <div className="rounded-lg border border-[#91d9bf] bg-[#e4f8ef] p-4 text-sm font-medium text-[#12815f]">
           {success}
         </div>
       ) : null}

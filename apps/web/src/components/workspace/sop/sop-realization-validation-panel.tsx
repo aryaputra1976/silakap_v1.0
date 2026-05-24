@@ -34,17 +34,17 @@ export function SopRealizationValidationPanel({
       }
     >
       <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
-            <ShieldAlert className="size-4 text-[#0f766e]" />
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
+            <ShieldAlert className="size-4 text-[#0e7c86]" />
             Status Saat Ini
           </div>
           <p>{realizationStatusHelp(realization.status)}</p>
         </div>
 
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
-            <CheckCircle2 className="size-4 text-[#0f766e]" />
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
+            <CheckCircle2 className="size-4 text-[#0e7c86]" />
             Hak Aksi
           </div>
           <div className="flex flex-wrap gap-2">
@@ -59,8 +59,8 @@ export function SopRealizationValidationPanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#d8e5d3] bg-white p-4 text-sm leading-6 text-[#51614c]">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-[#173c36]">
+        <div className="rounded-lg border border-[#cfe1da] bg-white p-4 text-sm leading-6 text-[#51614c]">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-[#18343a]">
             <AlertTriangle className="size-4 text-[#a16207]" />
             Catatan Validasi
           </div>
