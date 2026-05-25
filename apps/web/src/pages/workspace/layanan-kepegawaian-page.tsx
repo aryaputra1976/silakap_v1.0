@@ -17,9 +17,10 @@ import {
 import { LayananSummaryCards } from '@/components/workspace/layanan/layanan-summary-cards';
 import { LayananRegisterTable } from '@/components/workspace/layanan/layanan-register-table';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { LAYANAN_SOP_LIST } from '@/lib/layanan/layanan-data';
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 export function LayananKepegawaianPage() {
+  const { sops } = useLayananSopConfigs();
   const [q, setQ] = useState('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -136,7 +137,7 @@ export function LayananKepegawaianPage() {
         </div>
 
         <div className="space-y-4">
-          <LayananSopPanel sops={LAYANAN_SOP_LIST} title="SOP Layanan Kepegawaian" />
+          <LayananSopPanel sops={sops} title="SOP Layanan Kepegawaian" />
         </div>
       </div>
     </div>

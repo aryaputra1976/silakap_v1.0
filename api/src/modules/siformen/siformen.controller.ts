@@ -24,7 +24,7 @@ import {
   CreateJabatanFungsionalRefDto,
   UpdateJabatanFungsionalRefDto,
 } from './dto/jabatan-fungsional-ref.dto';
-import { CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
+import { BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
 import {
   AbkQueryDto,
   BezettingQueryDto,
@@ -129,6 +129,21 @@ export class SiformenController {
   async getJabatan(@Param('id') id: string) {
     const result = await this.service.getJabatan(id);
     return ok(result);
+  }
+
+  @Post('jabatan/generate-from-unit-kerja')
+  async generateJabatanFromUnitKerja(@CurrentUser() user: AuthUser) {
+    const result = await this.service.generateJabatanFromUnitKerja(user);
+    return ok(
+      result,
+      `Generate selesai: ${result.created} jabatan dibuat, ${result.updated} diperbarui`,
+    );
+  }
+
+  @Post('jabatan/import')
+  async bulkImportJabatan(@Body() dto: BulkImportJabatanDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.bulkImportJabatan(dto, user);
+    return ok(result, `Import selesai: ${result.created} ditambahkan, ${result.updated} diperbarui`);
   }
 
   @Post('jabatan')

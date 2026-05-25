@@ -15,9 +15,8 @@ import {
 } from '@/components/workspace/ui';
 import { LayananSlaTable } from '@/components/workspace/layanan/layanan-sla-table';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { getLayananSopConfig, getTaskSlaStatus } from '@/lib/layanan/layanan-data';
-
-const sopConfig = getLayananSopConfig('LAY-003');
+import { getTaskSlaStatus } from '@/lib/layanan/layanan-data';
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 type SlaFilter = '' | 'OVERDUE' | 'PENDING' | 'COMPLETED';
 
@@ -29,6 +28,7 @@ const SLA_FILTER_OPTIONS: Array<{ value: SlaFilter; label: string }> = [
 ];
 
 export function LayananSlaPage() {
+  const sopConfig = useLayananSopConfigs().sops.find((s) => s.key === 'LAY-003');
   const [q, setQ] = useState('');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);

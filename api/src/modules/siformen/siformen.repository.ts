@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { BulkImportJabatanItemDto } from './dto/jabatan.dto';
 import type {
   AbkQueryDto,
   BezettingQueryDto,
@@ -55,28 +56,30 @@ export class SiformenRepository {
   async bulkUpsertJabatanFungsionalRef(
     items: Prisma.SiformenJabatanFungsionalRefCreateInput[],
   ): Promise<{ created: number; skipped: number }> {
-    let created = 0;
-    let skipped = 0;
+    return this.prisma.$transaction(async (tx) => {
+      let created = 0;
+      let skipped = 0;
 
-    for (const item of items) {
-      const existing = await this.prisma.siformenJabatanFungsionalRef.findFirst({
-        where: { namaJabatan: item.namaJabatan as string, jenjang: item.jenjang as string },
-        select: { id: true },
-      });
-
-      if (existing) {
-        await this.prisma.siformenJabatanFungsionalRef.update({
-          where: { id: existing.id },
-          data: item,
+      for (const item of items) {
+        const existing = await tx.siformenJabatanFungsionalRef.findFirst({
+          where: { namaJabatan: item.namaJabatan as string, jenjang: item.jenjang as string },
+          select: { id: true },
         });
-        skipped++;
-      } else {
-        await this.prisma.siformenJabatanFungsionalRef.create({ data: item });
-        created++;
-      }
-    }
 
-    return { created, skipped };
+        if (existing) {
+          await tx.siformenJabatanFungsionalRef.update({
+            where: { id: existing.id },
+            data: item,
+          });
+          skipped++;
+        } else {
+          await tx.siformenJabatanFungsionalRef.create({ data: item });
+          created++;
+        }
+      }
+
+      return { created, skipped };
+    });
   }
 
   async updateJabatanFungsionalRef(
@@ -131,8 +134,8 @@ export class SiformenRepository {
     const [items, total] = await Promise.all([
       this.prisma.siformenJabatan.findMany({
         where,
-        include: { jabatanFungsionalRef: true },
-        orderBy: [{ unitKerja: 'asc' }, { namaJabatan: 'asc' }],
+        include: { jabatanFungsionalRef: true, unitKerjaRef: true },
+        orderBy: [{ sortOrder: 'asc' }, { unitKerja: 'asc' }, { namaJabatan: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -145,7 +148,7 @@ export class SiformenRepository {
   async findJabatanById(id: string) {
     return this.prisma.siformenJabatan.findFirst({
       where: { id, deletedAt: null },
-      include: { jabatanFungsionalRef: true },
+      include: { jabatanFungsionalRef: true, unitKerjaRef: true },
     });
   }
 
@@ -168,12 +171,189 @@ export class SiformenRepository {
     });
   }
 
+  async generateJabatanFromUnitKerja(userId: string): Promise<{ created: number; updated: number; skipped: number }> {
+    const SKIP_PATTERNS = [
+      /^SD\s/i, /^SMP\s/i, /^SMA\s/i, /^SMK\s/i,
+      /^TK\s/i, /^PAUD\s/i,
+      /puskesmas\s+pembantu/i,
+      /^poskesdes/i,
+      /^korwil\s/i,
+      /^SD\s+SMP\s/i,
+      /satuan\s+pendidikan\s+non\s+formal\s+sanggar/i,
+    ];
+
+    const allUnits = await this.prisma.unitKerja.findMany({
+      where: { deletedAt: null, isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const byId = new Map(allUnits.map((u) => [u.id, u]));
+
+    function getSkpdNama(unitId: string | null): string {
+      if (!unitId) return '';
+      const unit = byId.get(unitId);
+      if (!unit) return '';
+      if (unit.level === 1) return unit.nama;
+      return getSkpdNama(unit.parentId);
+    }
+
+    function toNamaJabatan(nama: string, level: number): string {
+      if (level === 1) {
+        if (nama === 'Sekretariat Daerah') return 'Sekretaris Daerah';
+        if (/^Inspektorat/i.test(nama)) return 'Inspektur Daerah';
+        if (/^Sekretariat DPRD/i.test(nama)) return 'Sekretaris DPRD';
+        if (/^Rumah Sakit/i.test(nama)) return 'Direktur ' + nama;
+        if (/^Kecamatan\s/i.test(nama)) return 'Camat';
+        if (/^Kelurahan\s/i.test(nama)) return 'Lurah';
+        return 'Kepala ' + nama;
+      }
+      if (level === 2) {
+        if (/^Sekretariat$/i.test(nama)) return 'Sekretaris';
+        if (/^(Staf Ahli|Asisten|Inspektur Pembantu)/i.test(nama)) return nama;
+        return 'Kepala ' + nama;
+      }
+      return 'Kepala ' + nama;
+    }
+
+    function toEselon(level: number, nama: string): string {
+      if (level === 1) {
+        if (nama === 'Sekretariat Daerah') return 'II.a';
+        if (/^Kecamatan\s/i.test(nama)) return 'III.a';
+        if (/^Kelurahan\s/i.test(nama)) return 'IV.a';
+        return 'II.b';
+      }
+      if (level === 2) return 'III.a';
+      if (level === 3) return 'IV.a';
+      if (level === 4) return 'IV.b';
+      return '';
+    }
+
+    const toProcess = allUnits.filter((u) => {
+      if (u.level === 0) return false;
+      return !SKIP_PATTERNS.some((p) => p.test(u.nama));
+    });
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        let created = 0;
+        let updated = 0;
+        let skipped = 0;
+
+        for (const unit of toProcess) {
+          const namaJabatan = toNamaJabatan(unit.nama, unit.level);
+          const eselonLevel = toEselon(unit.level, unit.nama);
+          const unitKerja = unit.level === 1 ? unit.nama : getSkpdNama(unit.parentId);
+          const kodeJabatan = `STR-${String(unit.sortOrder).padStart(4, '0')}`;
+
+          const existing = await tx.siformenJabatan.findFirst({
+            where: { unitKerjaId: unit.id, deletedAt: null },
+            select: { id: true },
+          });
+
+          if (existing) {
+            await tx.siformenJabatan.update({
+              where: { id: existing.id },
+              data: { namaJabatan, eselonLevel, unitKerja, sortOrder: unit.sortOrder, updatedBy: userId },
+            });
+            updated++;
+          } else {
+            const kodeConflict = await tx.siformenJabatan.findFirst({
+              where: { kodeJabatan, deletedAt: null },
+              select: { id: true },
+            });
+            const finalKode = kodeConflict
+              ? `STR-${String(unit.sortOrder).padStart(4, '0')}-${unit.id.slice(0, 4)}`
+              : kodeJabatan;
+
+            await tx.siformenJabatan.create({
+              data: {
+                kodeJabatan: finalKode,
+                namaJabatan,
+                jenisJabatan: 'STRUKTURAL',
+                eselonLevel: eselonLevel || null,
+                unitKerja,
+                unitKerjaId: unit.id,
+                sortOrder: unit.sortOrder,
+                createdBy: userId,
+                updatedBy: userId,
+              },
+            });
+            created++;
+          }
+        }
+
+        return { created, updated, skipped };
+      },
+      { timeout: 120_000 },
+    );
+  }
+
+  async bulkImportJabatan(
+    items: BulkImportJabatanItemDto[],
+    userId: string,
+  ): Promise<{ created: number; updated: number }> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        let created = 0;
+        let updated = 0;
+
+        for (const item of items) {
+          const existing = await tx.siformenJabatan.findFirst({
+            where: { kodeJabatan: item.kodeJabatan, deletedAt: null },
+            select: { id: true },
+          });
+
+          if (existing) {
+            await tx.siformenJabatan.update({
+              where: { id: existing.id },
+              data: {
+                namaJabatan: item.namaJabatan,
+                jenisJabatan: item.jenisJabatan,
+                eselonLevel: item.eselonLevel ?? null,
+                unitKerja: item.unitKerja,
+                sortOrder: item.sortOrder ?? null,
+                updatedBy: userId,
+              },
+            });
+            updated++;
+          } else {
+            await tx.siformenJabatan.create({
+              data: {
+                kodeJabatan: item.kodeJabatan,
+                namaJabatan: item.namaJabatan,
+                jenisJabatan: item.jenisJabatan,
+                eselonLevel: item.eselonLevel ?? null,
+                unitKerja: item.unitKerja,
+                sortOrder: item.sortOrder ?? null,
+                createdBy: userId,
+                updatedBy: userId,
+              },
+            });
+            created++;
+          }
+        }
+
+        return { created, updated };
+      },
+      { timeout: 120_000 },
+    );
+  }
+
+  async countActiveReferencesByJabatan(jabatanId: string): Promise<number> {
+    const [bezetting, formasi, abk] = await Promise.all([
+      this.prisma.siformenBezetting.count({ where: { jabatanId } }),
+      this.prisma.siformenFormasi.count({ where: { jabatanId, deletedAt: null } }),
+      this.prisma.siformenAbk.count({ where: { jabatanId } }),
+    ]);
+    return bezetting + formasi + abk;
+  }
+
   // ── Bezetting ────────────────────────────────────────────────────────────
 
   async findManyBezetting(query: BezettingQueryDto) {
     const page = parsePage(query.page);
     const limit = parseLimit(query.limit);
-    const where: Prisma.SiformenBezettingWhereInput = {};
+    const where: Prisma.SiformenBezettingWhereInput = { deletedAt: null };
 
     if (query.tahun) where.tahun = parseInt(query.tahun, 10);
     if (query.unitKerja) where.unitKerja = { contains: query.unitKerja };
@@ -194,8 +374,8 @@ export class SiformenRepository {
   }
 
   async findBezettingById(id: string) {
-    return this.prisma.siformenBezetting.findUnique({
-      where: { id },
+    return this.prisma.siformenBezetting.findFirst({
+      where: { id, deletedAt: null },
       include: { jabatan: true },
     });
   }
@@ -216,7 +396,10 @@ export class SiformenRepository {
   }
 
   async deleteBezetting(id: string) {
-    return this.prisma.siformenBezetting.delete({ where: { id } });
+    return this.prisma.siformenBezetting.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   // ── Formasi ──────────────────────────────────────────────────────────────
@@ -263,6 +446,23 @@ export class SiformenRepository {
     return this.prisma.siformenFormasi.update({
       where: { id },
       data,
+      include: { jabatan: true },
+    });
+  }
+
+  /** Atomic: update hanya jika status saat ini sesuai. Return null jika status sudah berubah. */
+  async updateFormasiConditional(
+    id: string,
+    expectedStatus: string,
+    data: Prisma.SiformenFormasiUpdateInput,
+  ) {
+    const result = await this.prisma.siformenFormasi.updateMany({
+      where: { id, status: expectedStatus, deletedAt: null },
+      data,
+    });
+    if (result.count === 0) return null;
+    return this.prisma.siformenFormasi.findFirst({
+      where: { id, deletedAt: null },
       include: { jabatan: true },
     });
   }
@@ -332,6 +532,7 @@ export class SiformenRepository {
     const where: Prisma.SiformenBezettingWhereInput = {
       tahun: params.tahun,
       statusIsi: 'FILLED',
+      deletedAt: null,
     };
 
     if (params.jabatanId) {
@@ -356,10 +557,10 @@ export class SiformenRepository {
       totalAbk,
     ] = await Promise.all([
       this.prisma.siformenJabatan.count({ where: { deletedAt: null, isActive: true } }),
-      this.prisma.siformenBezetting.count({ where: { tahun } }),
+      this.prisma.siformenBezetting.count({ where: { tahun, deletedAt: null } }),
       this.prisma.siformenBezetting.groupBy({
         by: ['statusIsi'],
-        where: { tahun },
+        where: { tahun, deletedAt: null },
         _count: { _all: true },
       }),
       this.prisma.siformenFormasi.count({ where: { tahun, deletedAt: null } }),
@@ -378,9 +579,9 @@ export class SiformenRepository {
       this.prisma.siformenAbk.count({ where: { tahun } }),
     ]);
 
-    const filled = bezettingByStatus.find((b) => b.statusIsi === 'FILLED')?._count._all ?? 0;
-    const vacant = bezettingByStatus.find((b) => b.statusIsi === 'VACANT')?._count._all ?? 0;
-    const acting = bezettingByStatus.find((b) => b.statusIsi === 'ACTING')?._count._all ?? 0;
+    const filled = bezettingByStatus.find((b) => b.statusIsi === 'FILLED')?._count?._all ?? 0;
+    const vacant = bezettingByStatus.find((b) => b.statusIsi === 'VACANT')?._count?._all ?? 0;
+    const acting = bezettingByStatus.find((b) => b.statusIsi === 'ACTING')?._count?._all ?? 0;
 
     return {
       tahun,

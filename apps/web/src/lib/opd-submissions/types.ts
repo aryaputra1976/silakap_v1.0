@@ -106,6 +106,7 @@ export type OpdSubmission = {
   createdById?: string;
   updatedById?: string;
   assignedToId?: string;
+  assignedToName?: string;
   createdAt: string;
   updatedAt: string;
   documents: OpdSubmissionDocument[];

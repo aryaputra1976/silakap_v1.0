@@ -248,7 +248,7 @@ export function LayananDetailPage() {
           />
           <FileMeta
             label="Ditugaskan ke"
-            value={submission.assignedToId ?? '-'}
+            value={submission.assignedToName ?? (submission.assignedToId ? 'Petugas PPIK' : '-')}
           />
         </div>
       </SectionCard>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, Building2, CheckCircle, Link2, Link2Off, Loader2, Pencil, Plus, RefreshCcw, Trash2, X, XCircle } from 'lucide-react';
+import { BookOpen, Building2, CheckCircle, DatabaseZap, Link2, Loader2, Pencil, Plus, RefreshCcw, Trash2, X } from 'lucide-react';
 import {
   ActionButton,
   DataTable,
@@ -19,6 +19,8 @@ import {
 } from '@/lib/api/siformen';
 import { useAuth } from '@/lib/auth/session';
 import { getPrimaryRole } from '@/lib/rbac/roles';
+
+
 
 const WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'ANALIS_MADYA'];
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM'];
@@ -66,6 +68,11 @@ export function SiformenJabatanPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
+  // Generate state
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [generateError, setGenerateError] = useState('');
+  const [generateResult, setGenerateResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
+
   // Ref picker state
   const [selectedRef, setSelectedRef] = useState<SiformenJabatanFungsionalRef | null>(null);
   const [refSearch, setRefSearch] = useState('');
@@ -102,6 +109,22 @@ export function SiformenJabatanPage() {
     const cleanup = load();
     return cleanup;
   }, [load]);
+
+  async function handleGenerate() {
+    if (!confirm('Generate jabatan struktural dari data Unit Kerja? Jabatan yang sudah ada akan diperbarui.')) return;
+    setGenerateLoading(true);
+    setGenerateError('');
+    setGenerateResult(null);
+    try {
+      const result = await siformenApi.generateJabatanFromUnitKerja();
+      setGenerateResult(result);
+      load();
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Gagal generate jabatan dari Unit Kerja');
+    } finally {
+      setGenerateLoading(false);
+    }
+  }
 
   function openCreate() {
     setEditItem(null);
@@ -244,6 +267,16 @@ export function SiformenJabatanPage() {
             >
               Refresh
             </ActionButton>
+            {canAdmin ? (
+              <ActionButton
+                icon={generateLoading ? Loader2 : DatabaseZap}
+                variant="secondary"
+                disabled={generateLoading}
+                onClick={() => void handleGenerate()}
+              >
+                {generateLoading ? 'Generating…' : 'Generate dari Unit Kerja'}
+              </ActionButton>
+            ) : null}
             {canWrite ? (
               <ActionButton icon={Plus} variant="primary" onClick={openCreate}>
                 Tambah Jabatan
@@ -255,6 +288,22 @@ export function SiformenJabatanPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
       {actionError ? <ErrorAlert message={actionError} /> : null}
+      {generateError ? <ErrorAlert message={generateError} /> : null}
+
+      {/* Generate result */}
+      {generateResult ? (
+        <div className="flex items-center justify-between rounded-lg border border-green-300 bg-green-50 px-4 py-3 dark:border-green-700 dark:bg-green-950">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+              Generate selesai — {generateResult.created} jabatan ditambahkan, {generateResult.updated} diperbarui, {generateResult.skipped} dilewati.
+            </p>
+          </div>
+          <button onClick={() => setGenerateResult(null)} className="text-green-600 hover:text-green-800 dark:text-green-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       {/* Form */}
       {showForm ? (
@@ -507,7 +556,17 @@ export function SiformenJabatanPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{item.unitKerja}</div>
+                    {/* Show unit kerja name from FK ref for disambiguation, fallback to denormalized string */}
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      {item.unitKerjaRef ? (
+                        <>
+                          <Building2 className="h-3 w-3 shrink-0" />
+                          <span>{item.unitKerjaRef.nama}</span>
+                        </>
+                      ) : (
+                        <span>{item.unitKerja}</span>
+                      )}
+                    </div>
                   </div>
                 ),
               },

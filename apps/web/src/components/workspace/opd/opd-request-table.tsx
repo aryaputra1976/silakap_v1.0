@@ -12,6 +12,7 @@ import {
   opdSubmissionStatusTone,
   type OpdSubmission,
 } from '@/lib/opd-submissions/types';
+import { layananServiceTypeLabel } from '@/lib/layanan/layanan-data';
 
 export function OpdRequestTable({
   items,
@@ -38,7 +39,7 @@ export function OpdRequestTable({
         {
           key: 'jenis',
           header: 'Jenis Layanan',
-          render: (item) => item.serviceType,
+          render: (item) => layananServiceTypeLabel(item.serviceType),
         },
         {
           key: 'tanggal',

@@ -14,9 +14,7 @@ import {
 } from '@/components/workspace/ui';
 import { LayananVerificationChecklist } from '@/components/workspace/layanan/layanan-verification-checklist';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { getLayananSopConfig } from '@/lib/layanan/layanan-data';
-
-const sopConfig = getLayananSopConfig('LAY-002');
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'ASSIGNED', label: 'Ditugaskan' },
@@ -28,6 +26,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export function LayananVerificationPage() {
+  const sopConfig = useLayananSopConfigs().sops.find((s) => s.key === 'LAY-002');
   const [q, setQ] = useState('');
   const [currentState, setCurrentState] = useState('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);

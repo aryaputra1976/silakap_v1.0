@@ -322,6 +322,7 @@ model UnitKerja {
   asnAssignmentHistory AsnAssignmentHistory[]
   siapWorklogs         SiapWorklog[]
   dmsDocuments         DmsDocument[]
+  siformenJabatan      SiformenJabatan[]      @relation("SiformenJabatanUnitKerja")
 
   @@index([kode])
   @@index([parentId])
@@ -1067,6 +1068,7 @@ model OpdSubmission {
   createdById      String?   @map("created_by_id") @db.VarChar(36)
   updatedById      String?   @map("updated_by_id") @db.VarChar(36)
   assignedToId     String?   @map("assigned_to_id") @db.VarChar(36)
+  assignedToName   String?   @map("assigned_to_name") @db.VarChar(200)
   slaStartedAt     DateTime? @map("sla_started_at")
   slaPausedAt      DateTime? @map("sla_paused_at")
   slaResumedAt     DateTime? @map("sla_resumed_at")
@@ -2811,6 +2813,10 @@ model SiformenJabatan {
   satuanKerja             String?                      @map("satuan_kerja") @db.VarChar(200)
   kualifikasiPendidikan   String?                      @map("kualifikasi_pendidikan") @db.Text
   isActive                Boolean                      @default(true) @map("is_active")
+  sortOrder               Int?                         @map("sort_order")
+
+  unitKerjaId             String?                      @map("unit_kerja_id") @db.VarChar(36)
+  unitKerjaRef            UnitKerja?                   @relation("SiformenJabatanUnitKerja", fields: [unitKerjaId], references: [id], onDelete: SetNull)
 
   jabatanFungsionalRefId  String?                      @map("jabatan_fungsional_ref_id") @db.VarChar(36)
   jabatanFungsionalRef    SiformenJabatanFungsionalRef? @relation(fields: [jabatanFungsionalRefId], references: [id], onDelete: SetNull)
@@ -2827,6 +2833,8 @@ model SiformenJabatan {
 
   @@index([jenisJabatan])
   @@index([unitKerja])
+  @@index([unitKerjaId])
+  @@index([sortOrder])
   @@index([jabatanFungsionalRefId])
   @@map("siformen_jabatan")
 }
@@ -2853,6 +2861,7 @@ model SiformenBezetting {
   createdBy    String?          @map("created_by") @db.VarChar(36)
   updatedAt    DateTime         @updatedAt @map("updated_at")
   updatedBy    String?          @map("updated_by") @db.VarChar(36)
+  deletedAt    DateTime?        @map("deleted_at")
 
   @@index([tahun])
   @@index([unitKerja])
@@ -2995,4 +3004,24 @@ model PemberhentianDokumen {
   @@index([prosesId])
   @@index([jenisDokumen])
   @@map("pemberhentian_dokumen")
+}
+
+
+// ─── Layanan Kepegawaian SOP Config ───────────────────────────────────────────
+
+model LayananSopConfig {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  sopKey      String   @unique @map("sop_key") @db.VarChar(20)
+  code        String   @unique @db.VarChar(60)
+  title       String   @db.VarChar(255)
+  shortLabel  String   @map("short_label") @db.VarChar(100)
+  description String   @db.Text
+  rhkCodes    Json     @map("rhk_codes")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("layanan_sop_config")
 }

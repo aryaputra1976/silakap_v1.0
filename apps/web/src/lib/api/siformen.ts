@@ -39,6 +39,9 @@ export interface SiformenJabatan {
   satuanKerja: string | null;
   kualifikasiPendidikan: string | null;
   isActive: boolean;
+  sortOrder: number | null;
+  unitKerjaId: string | null;
+  unitKerjaRef: { id: string; nama: string; kode: string; level: number } | null;
   jabatanFungsionalRefId: string | null;
   jabatanFungsionalRef: SiformenJabatanFungsionalRef | null;
   createdAt: string;
@@ -197,6 +200,15 @@ export interface CreateJabatanFungsionalRefPayload {
 }
 
 export type UpdateJabatanFungsionalRefPayload = Partial<CreateJabatanFungsionalRefPayload>;
+
+export interface BulkImportJabatanItem {
+  kodeJabatan: string;
+  namaJabatan: string;
+  jenisJabatan: string;
+  eselonLevel?: string;
+  unitKerja: string;
+  sortOrder?: number;
+}
 
 export interface CreateJabatanPayload {
   kodeJabatan: string;
@@ -368,6 +380,14 @@ export const siformenApi = {
   },
   getJabatan(id: string) {
     return apiClient.get<SiformenJabatan>(`/siformen/jabatan/${id}`);
+  },
+  generateJabatanFromUnitKerja() {
+    return apiClient.post<{ created: number; updated: number; skipped: number }>(
+      '/siformen/jabatan/generate-from-unit-kerja',
+    );
+  },
+  bulkImportJabatan(items: BulkImportJabatanItem[]) {
+    return apiClient.post<{ created: number; updated: number }>('/siformen/jabatan/import', { items });
   },
   createJabatan(payload: CreateJabatanPayload) {
     return apiClient.post<SiformenJabatan>('/siformen/jabatan', payload);

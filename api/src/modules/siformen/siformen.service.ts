@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import type { CreateAbkDto, UpdateAbkDto } from './dto/abk.dto';
@@ -15,7 +16,7 @@ import type {
   CreateJabatanFungsionalRefDto,
   UpdateJabatanFungsionalRefDto,
 } from './dto/jabatan-fungsional-ref.dto';
-import type { CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
+import type { BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
 import type {
   AbkQueryDto,
   BezettingQueryDto,
@@ -198,9 +199,27 @@ export class SiformenService {
     });
   }
 
+  async generateJabatanFromUnitKerja(user: AuthUser) {
+    requireRole(user, ADMIN_ROLES);
+    return this.repo.generateJabatanFromUnitKerja(user.id);
+  }
+
+  async bulkImportJabatan(dto: BulkImportJabatanDto, user: AuthUser) {
+    requireRole(user, ADMIN_ROLES);
+    if (dto.items.length === 0) throw new BadRequestException('Tidak ada data untuk diimport');
+    if (dto.items.length > 1000) throw new BadRequestException('Maksimal 1000 jabatan per import');
+    return this.repo.bulkImportJabatan(dto.items, user.id);
+  }
+
   async deleteJabatan(id: string, user: AuthUser) {
     requireRole(user, ADMIN_ROLES);
     await this.getJabatan(id);
+    const refCount = await this.repo.countActiveReferencesByJabatan(id);
+    if (refCount > 0) {
+      throw new UnprocessableEntityException(
+        `Jabatan tidak dapat dihapus karena masih direferensi oleh ${refCount} data (bezetting/formasi/ABK)`,
+      );
+    }
     return this.repo.softDeleteJabatan(id);
   }
 
@@ -275,16 +294,11 @@ export class SiformenService {
   async createFormasi(dto: CreateFormasiDto, user: AuthUser) {
     requireRole(user, WRITE_ROLES);
 
-    const jenisFormasi = dto.jenisFormasi.toUpperCase();
-    if (!['CPNS', 'PPPK'].includes(jenisFormasi)) {
-      throw new BadRequestException('Jenis formasi harus CPNS atau PPPK');
-    }
-
     return this.repo.createFormasi({
       jabatan: dto.jabatanId ? { connect: { id: dto.jabatanId } } : undefined,
       namaJabatan: dto.namaJabatan,
       unitKerja: dto.unitKerja,
-      jenisFormasi,
+      jenisFormasi: dto.jenisFormasi,
       tahun: dto.tahun,
       periode: dto.periode ?? null,
       jumlahKebutuhan: dto.jumlahKebutuhan,
@@ -309,7 +323,7 @@ export class SiformenService {
     return this.repo.updateFormasi(id, {
       namaJabatan: dto.namaJabatan,
       unitKerja: dto.unitKerja,
-      jenisFormasi: dto.jenisFormasi?.toUpperCase(),
+      jenisFormasi: dto.jenisFormasi,
       tahun: dto.tahun,
       periode: dto.periode,
       jumlahKebutuhan: dto.jumlahKebutuhan,
@@ -324,49 +338,46 @@ export class SiformenService {
 
   async submitFormasi(id: string, user: AuthUser) {
     requireRole(user, WRITE_ROLES);
-    const item = await this.getFormasi(id);
-
-    if (item.status !== 'DRAFT') {
-      throw new BadRequestException('Hanya formasi berstatus DRAFT yang dapat disubmit');
-    }
-
-    return this.repo.updateFormasi(id, {
+    await this.getFormasi(id); // 404 jika tidak ada
+    const updated = await this.repo.updateFormasiConditional(id, 'DRAFT', {
       status: 'SUBMITTED',
       submittedAt: new Date(),
       updatedBy: user.id,
     });
+    if (!updated) {
+      throw new ConflictException('Status formasi telah berubah, hanya DRAFT yang dapat disubmit');
+    }
+    return updated;
   }
 
   async approveFormasi(id: string, dto: ReviewFormasiDto, user: AuthUser) {
     requireRole(user, APPROVE_ROLES);
-    const item = await this.getFormasi(id);
-
-    if (item.status !== 'SUBMITTED') {
-      throw new BadRequestException('Hanya formasi berstatus SUBMITTED yang dapat disetujui');
-    }
-
-    return this.repo.updateFormasi(id, {
+    await this.getFormasi(id); // 404 jika tidak ada
+    const updated = await this.repo.updateFormasiConditional(id, 'SUBMITTED', {
       status: 'APPROVED',
       catatanVerifikasi: dto.catatanVerifikasi ?? null,
       approvedById: user.id,
       approvedAt: new Date(),
       updatedBy: user.id,
     });
+    if (!updated) {
+      throw new ConflictException('Status formasi telah berubah, hanya SUBMITTED yang dapat disetujui');
+    }
+    return updated;
   }
 
   async rejectFormasi(id: string, dto: ReviewFormasiDto, user: AuthUser) {
     requireRole(user, APPROVE_ROLES);
-    const item = await this.getFormasi(id);
-
-    if (item.status !== 'SUBMITTED') {
-      throw new BadRequestException('Hanya formasi berstatus SUBMITTED yang dapat ditolak');
-    }
-
-    return this.repo.updateFormasi(id, {
+    await this.getFormasi(id); // 404 jika tidak ada
+    const updated = await this.repo.updateFormasiConditional(id, 'SUBMITTED', {
       status: 'REJECTED',
       catatanVerifikasi: dto.catatanVerifikasi ?? null,
       updatedBy: user.id,
     });
+    if (!updated) {
+      throw new ConflictException('Status formasi telah berubah, hanya SUBMITTED yang dapat ditolak');
+    }
+    return updated;
   }
 
   async deleteFormasi(id: string, user: AuthUser) {

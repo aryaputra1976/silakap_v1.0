@@ -31,6 +31,7 @@ import { SiformenModule } from './siformen/siformen.module';
 import { AsnMonthlyArchiveModule } from './asn-monthly-archive/asn-monthly-archive.module';
 import { RefGajiPokokModule } from './ref-gaji-pokok/ref-gaji-pokok.module';
 import { PemberhentianModule } from './pemberhentian/pemberhentian.module';
+import { LayananKepegawaianModule } from './layanan-kepegawaian/layanan-kepegawaian.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PemberhentianModule } from './pemberhentian/pemberhentian.module';
     AsnMonthlyArchiveModule,
     RefGajiPokokModule,
     PemberhentianModule,
+    LayananKepegawaianModule,
   ],
   controllers: [
     HealthController,

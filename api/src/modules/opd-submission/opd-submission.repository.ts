@@ -78,6 +78,22 @@ export class OpdSubmissionRepository {
     });
   }
 
+  async updateAtomic(
+    id: string,
+    expectedStatuses: string[],
+    data: Prisma.OpdSubmissionUncheckedUpdateInput,
+  ): Promise<OpdSubmissionRecord | null> {
+    const { count } = await this.prisma.opdSubmission.updateMany({
+      where: { id, status: { in: expectedStatuses } },
+      data,
+    });
+    if (count === 0) return null;
+    return this.prisma.opdSubmission.findUnique({
+      where: { id },
+      include: submissionInclude,
+    });
+  }
+
   findSlaItems(filters: Omit<OpdSubmissionListFilters, 'page' | 'limit'>) {
     return this.prisma.opdSubmission.findMany({
       where: this.buildWhere({ ...filters, page: 1, limit: 1 }),

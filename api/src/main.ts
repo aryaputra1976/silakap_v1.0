@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
 import { validateEnv } from './config/env';
 import { AppModule } from './modules/app.module';
@@ -54,12 +55,29 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
+  if (appConfig.nodeEnv !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Silakap API')
+      .setDescription('API Sistem Layanan Kepegawaian (Silakap) — BKPSDM')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
+
   await app.listen(appConfig.port);
 
   // eslint-disable-next-line no-console
   console.log(
     `${appConfig.appName} running on http://localhost:${appConfig.port}`,
   );
+
+  if (appConfig.nodeEnv !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log(`Swagger docs: http://localhost:${appConfig.port}/api/docs`);
+  }
 }
 
 bootstrap();

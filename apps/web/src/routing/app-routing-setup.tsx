@@ -80,6 +80,7 @@ import { RekonsiliasiBpkadLaporanPrintPage } from '@/pages/workspace/rekonsilias
 import { AdminRbacPage } from '@/pages/workspace/admin-rbac-page';
 import { AdminSettingsPage } from '@/pages/workspace/admin-settings-page';
 import { AdminUsersPage } from '@/pages/workspace/admin-users-page';
+import { AdminLayananSopConfigPage } from '@/pages/workspace/admin-layanan-sop-config-page';
 import SianalitikPage from '@/pages/workspace/sianalitik-page';
 import { WorkingCalendarPage } from '@/pages/workspace/working-calendar-page';
 import { OpdIkmSurveyPage } from '@/pages/workspace/opd-ikm-survey-page';
@@ -244,6 +245,7 @@ export function AppRoutingSetup() {
           <Route path="/admin/rbac" element={<AdminRbacPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          <Route path="/admin/layanan/sop-configs" element={<AdminLayananSopConfigPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

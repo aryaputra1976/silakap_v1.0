@@ -1,4 +1,6 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { BezettingStatusIsi } from './bezetting.dto';
+import { FormasiJenis, FormasiStatus } from './formasi.dto';
 
 export class JabatanQueryDto {
   @IsOptional()
@@ -40,9 +42,8 @@ export class BezettingQueryDto {
   unitKerja?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  statusIsi?: string;
+  @IsIn(Object.values(BezettingStatusIsi))
+  statusIsi?: BezettingStatusIsi;
 
   @IsOptional()
   @IsString()
@@ -64,14 +65,12 @@ export class FormasiQueryDto {
   unitKerja?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  jenisFormasi?: string;
+  @IsIn(Object.values(FormasiJenis))
+  jenisFormasi?: FormasiJenis;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  status?: string;
+  @IsIn(Object.values(FormasiStatus))
+  status?: FormasiStatus;
 
   @IsOptional()
   @IsString()

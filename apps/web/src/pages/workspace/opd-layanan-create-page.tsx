@@ -13,6 +13,10 @@ import { ApiError } from '@/lib/api/client';
 import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdUploadGuidanceCard } from '@/components/workspace/opd/opd-upload-guidance-card';
+import {
+  LAYANAN_SERVICE_TYPE_OPTIONS,
+  layananServiceTypeLabel,
+} from '@/lib/layanan/layanan-data';
 
 export function OpdLayananCreatePage() {
   const navigate = useNavigate();
@@ -23,8 +27,24 @@ export function OpdLayananCreatePage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [fieldError, setFieldError] = useState('');
+
+  function validate(): boolean {
+    if (!serviceType) {
+      setFieldError('Jenis layanan wajib dipilih.');
+      return false;
+    }
+    if (subjectNip && !/^\d{18}$/.test(subjectNip)) {
+      setFieldError('NIP harus 18 digit angka.');
+      return false;
+    }
+    setFieldError('');
+    return true;
+  }
 
   async function handleSave(submitAfterCreate: boolean) {
+    if (!validate()) return;
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -33,10 +53,10 @@ export function OpdLayananCreatePage() {
       const created = await opdSubmissionsApi.createOpdSubmission({
         moduleKey: 'LAYANAN_KEPEGAWAIAN',
         serviceType,
-        title: serviceType || 'Permohonan Layanan OPD',
-        subjectName,
-        subjectNip,
-        description,
+        title: `${layananServiceTypeLabel(serviceType)}${subjectName ? ` — ${subjectName}` : ''}`,
+        subjectName: subjectName || undefined,
+        subjectNip: subjectNip || undefined,
+        description: description || undefined,
       });
 
       const finalSubmission = submitAfterCreate
@@ -79,6 +99,7 @@ export function OpdLayananCreatePage() {
       ) : null}
 
       {error ? <ErrorAlert message={error} /> : null}
+      {fieldError ? <ErrorAlert message={fieldError} /> : null}
 
       <SectionCard
         title="Draft Permohonan"
@@ -87,26 +108,32 @@ export function OpdLayananCreatePage() {
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 lg:grid-cols-3">
-            <Field label="Jenis Layanan">
+            <Field label="Jenis Layanan *">
               <select
+                required
                 className={inputClass}
                 value={serviceType}
-                onChange={(event) => setServiceType(event.target.value)}
+                onChange={(event) => {
+                  setServiceType(event.target.value);
+                  setFieldError('');
+                }}
               >
                 <option value="" disabled>
                   Pilih jenis layanan
                 </option>
-                <option value="KENAIKAN_PANGKAT">Kenaikan Pangkat</option>
-                <option value="MUTASI_PEGAWAI">Mutasi Pegawai</option>
-                <option value="CUTI_ASN">Cuti ASN</option>
-                <option value="DATA_KEPEGAWAIAN">Data Kepegawaian</option>
+                {LAYANAN_SERVICE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Nama ASN Terkait">
               <input
                 className={inputClass}
-                placeholder="Nama ASN"
+                placeholder="Nama ASN (opsional)"
                 type="text"
+                maxLength={200}
                 value={subjectName}
                 onChange={(event) => setSubjectName(event.target.value)}
               />
@@ -114,10 +141,16 @@ export function OpdLayananCreatePage() {
             <Field label="NIP ASN Terkait">
               <input
                 className={inputClass}
-                placeholder="NIP ASN"
+                placeholder="18 digit NIP (opsional)"
                 type="text"
+                inputMode="numeric"
+                maxLength={18}
                 value={subjectNip}
-                onChange={(event) => setSubjectNip(event.target.value)}
+                onChange={(event) => {
+                  const v = event.target.value.replace(/\D/g, '').slice(0, 18);
+                  setSubjectNip(v);
+                  setFieldError('');
+                }}
               />
             </Field>
           </div>
@@ -141,7 +174,7 @@ export function OpdLayananCreatePage() {
           <Field label="Keterangan">
             <textarea
               className={`${inputClass} h-auto min-h-28 py-2`}
-              placeholder="Tuliskan ringkasan kebutuhan layanan"
+              placeholder="Tuliskan ringkasan kebutuhan layanan (opsional)"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />

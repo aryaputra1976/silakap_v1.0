@@ -12,9 +12,11 @@ import {
   StatusBadge,
 } from '@/components/workspace/ui';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { LAYANAN_SOP_LIST, getTaskSlaStatus } from '@/lib/layanan/layanan-data';
+import { getTaskSlaStatus } from '@/lib/layanan/layanan-data';
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 export function LayananReportPage() {
+  const { sops } = useLayananSopConfigs();
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -80,7 +82,7 @@ export function LayananReportPage() {
                 description="Referensi SOP LAY-001 s.d. LAY-005 dan link DMS terkait."
               >
                 <div className="divide-y divide-zinc-100">
-                  {LAYANAN_SOP_LIST.map((sop) => (
+                  {sops.map((sop) => (
                     <div key={sop.code} className="flex items-center gap-3 py-3">
                       <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
                       <div className="min-w-0 flex-1">
@@ -126,7 +128,7 @@ export function LayananReportPage() {
             </div>
 
             <div className="space-y-4">
-              <LayananSopPanel sops={LAYANAN_SOP_LIST} title="Semua SOP Layanan" />
+              <LayananSopPanel sops={sops} title="Semua SOP Layanan" />
             </div>
           </div>
         </>

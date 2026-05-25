@@ -11,6 +11,7 @@ import {
   opdSubmissionSlaStatusLabel,
   type OpdSubmission,
 } from '@/lib/opd-submissions/types';
+import { layananServiceTypeLabel } from '@/lib/layanan/layanan-data';
 import { ServiceStatusBadge } from './service-status-badge';
 
 export function ServiceWorkbenchTable({
@@ -60,7 +61,7 @@ export function ServiceWorkbenchTable({
             <div>
               <div className="font-medium text-[#18343a]">{item.title}</div>
               <div className="mt-1 text-xs text-[#687967]">
-                {item.moduleKey} / {item.serviceType}
+                {item.moduleKey} / {layananServiceTypeLabel(item.serviceType)}
               </div>
             </div>
           ),

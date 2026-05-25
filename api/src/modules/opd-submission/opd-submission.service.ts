@@ -11,7 +11,7 @@ import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { DmsService, type UploadedDmsFile } from '../dms/dms.service';
 import { KinerjaRhkCandidateService } from '../kinerja-rhk-candidate/kinerja-rhk-candidate.service';
-import { CreateOpdSubmissionDto, OPD_MODULE_KEYS } from './dto/create-opd-submission.dto';
+import { CreateOpdSubmissionDto, LAYANAN_SERVICE_TYPES, OPD_MODULE_KEYS } from './dto/create-opd-submission.dto';
 import { OpdSubmissionQueryDto } from './dto/opd-submission-query.dto';
 import {
   CompleteOpdSubmissionDto,
@@ -33,6 +33,8 @@ import {
   calculateSlaDueAtBusiness,
   diffHours,
   getSlaTargetHours,
+  isCorrectionStatus,
+  isFinalStatus,
 } from './opd-sla.policy';
 import {
   OpdSubmissionRecord,
@@ -165,9 +167,13 @@ export class OpdSubmissionService {
   ) {
     this.ensureOpd(user);
 
+    const moduleKey = this.normalizeModuleKey(dto.moduleKey);
+    const serviceType = this.normalizeRequired(dto.serviceType, 'Jenis layanan wajib diisi');
+    this.validateServiceType(moduleKey, serviceType);
+
     const created = await this.repo.create({
-      moduleKey: this.normalizeModuleKey(dto.moduleKey),
-      serviceType: this.normalizeRequired(dto.serviceType, 'Jenis layanan wajib diisi'),
+      moduleKey,
+      serviceType,
       title: this.normalizeRequired(dto.title, 'Judul permohonan wajib diisi'),
       description: this.normalizeNullable(dto.description),
       subjectName: this.normalizeNullable(dto.subjectName),
@@ -198,10 +204,16 @@ export class OpdSubmissionService {
       throw new BadRequestException('Pengajuan hanya dapat diubah saat DRAFT atau NEEDS_CORRECTION');
     }
 
+    const newServiceType =
+      dto.serviceType !== undefined
+        ? this.normalizeRequired(dto.serviceType, 'Jenis layanan wajib diisi')
+        : undefined;
+    if (newServiceType !== undefined) {
+      this.validateServiceType(before.moduleKey, newServiceType);
+    }
+
     const updated = await this.repo.update(before.id, {
-      ...(dto.serviceType !== undefined
-        ? { serviceType: this.normalizeRequired(dto.serviceType, 'Jenis layanan wajib diisi') }
-        : {}),
+      ...(newServiceType !== undefined ? { serviceType: newServiceType } : {}),
       ...(dto.title !== undefined
         ? { title: this.normalizeRequired(dto.title, 'Judul permohonan wajib diisi') }
         : {}),
@@ -525,7 +537,7 @@ export class OpdSubmissionService {
     const byModuleMap = new Map<string, { total: number; overdue: number; dueSoon: number }>();
 
     for (const item of filtered) {
-      const slaStatus = calculateSlaStatus(item, now);
+      const slaStatus = this.liveAdjustedSlaStatus(item, now);
       const current = byModuleMap.get(item.moduleKey) ?? {
         total: 0,
         overdue: 0,
@@ -539,10 +551,10 @@ export class OpdSubmissionService {
 
     return {
       totalActive: filtered.filter((item) => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(item.status)).length,
-      onTrack: filtered.filter((item) => calculateSlaStatus(item, now) === 'ON_TRACK').length,
-      dueSoon: filtered.filter((item) => calculateSlaStatus(item, now) === 'DUE_SOON').length,
-      overdue: filtered.filter((item) => calculateSlaStatus(item, now) === 'OVERDUE').length,
-      pausedForCorrection: filtered.filter((item) => calculateSlaStatus(item, now) === 'PAUSED_FOR_CORRECTION').length,
+      onTrack: filtered.filter((item) => this.liveAdjustedSlaStatus(item, now) === 'ON_TRACK').length,
+      dueSoon: filtered.filter((item) => this.liveAdjustedSlaStatus(item, now) === 'DUE_SOON').length,
+      overdue: filtered.filter((item) => this.liveAdjustedSlaStatus(item, now) === 'OVERDUE').length,
+      pausedForCorrection: filtered.filter((item) => this.liveAdjustedSlaStatus(item, now) === 'PAUSED_FOR_CORRECTION').length,
       completed: completed.length,
       averageElapsedHours:
         filtered.length > 0 ? Math.round(elapsedTotal / filtered.length) : 0,
@@ -551,7 +563,7 @@ export class OpdSubmissionService {
         ...value,
       })),
       topOverdue: filtered
-        .filter((item) => calculateSlaStatus(item, now) === 'OVERDUE')
+        .filter((item) => this.liveAdjustedSlaStatus(item, now) === 'OVERDUE')
         .slice(0, 5)
         .map((item) => this.toSlaQueueItem(item, now)),
     };
@@ -579,6 +591,7 @@ export class OpdSubmissionService {
       status: 'RECEIVED',
       receivedAt: new Date(),
       assignedToId: user.id,
+      assignedToName: user.name,
       updatedById: user.id,
     }, dto.note, user, context);
   }
@@ -588,6 +601,7 @@ export class OpdSubmissionService {
     return this.changeInternalStatus(id, 'START_VERIFICATION', ['RECEIVED'], {
       status: 'IN_VERIFICATION',
       assignedToId: user.id,
+      assignedToName: user.name,
       updatedById: user.id,
     }, dto.note, user, context);
   }
@@ -826,10 +840,17 @@ export class OpdSubmissionService {
     }
 
     const toStatus = String(data.status ?? before.status);
-    const updated = await this.repo.update(before.id, {
+    const updated = await this.repo.updateAtomic(before.id, allowedFrom, {
       ...data,
       ...this.buildSlaPatch(before, toStatus, user),
     });
+
+    if (!updated) {
+      throw new BadRequestException(
+        'Pengajuan sedang diproses pengguna lain. Harap muat ulang halaman.',
+      );
+    }
+
     await this.writeAudit(updated, action, before, updated, user, note, context);
     await this.writeTimeline(
       updated,
@@ -959,6 +980,15 @@ export class OpdSubmissionService {
     }
 
     return normalized;
+  }
+
+  private validateServiceType(moduleKey: string, serviceType: string) {
+    if (moduleKey !== 'LAYANAN_KEPEGAWAIAN') return;
+    if (!LAYANAN_SERVICE_TYPES.includes(serviceType as typeof LAYANAN_SERVICE_TYPES[number])) {
+      throw new BadRequestException(
+        `Jenis layanan tidak valid. Pilihan yang tersedia: ${LAYANAN_SERVICE_TYPES.join(', ')}`,
+      );
+    }
   }
 
   private normalizeOptional(value: string | undefined | null) {
@@ -1144,6 +1174,22 @@ export class OpdSubmissionService {
     return notes[action] ?? note ?? null;
   }
 
+  private liveAdjustedSlaStatus(
+    record: OpdSubmissionRecord,
+    now = new Date(),
+  ): string {
+    if (record.status === 'CANCELLED') return 'CANCELLED';
+    if (isFinalStatus(record.status)) return 'COMPLETED';
+    if (!record.slaStartedAt || !record.slaDueAt) return 'NOT_STARTED';
+    if (isCorrectionStatus(record.status) || record.slaPausedAt) return 'PAUSED_FOR_CORRECTION';
+    // Always recompute OVERDUE live so stale stored values are corrected.
+    if (record.slaDueAt <= now) return 'OVERDUE';
+    // Prefer stored DUE_SOON (may be business-hours accurate from Sprint 29 paths).
+    if (record.slaStatus === 'DUE_SOON') return 'DUE_SOON';
+    // Fall back to calendar-hours computation for everything else.
+    return calculateSlaStatus(record, now);
+  }
+
   private filterByComputedSlaStatus(
     items: OpdSubmissionRecord[],
     requestedStatus: string | undefined,
@@ -1153,11 +1199,11 @@ export class OpdSubmissionService {
       return items;
     }
 
-    return items.filter((item) => calculateSlaStatus(item, now) === requestedStatus);
+    return items.filter((item) => this.liveAdjustedSlaStatus(item, now) === requestedStatus);
   }
 
   private toSlaQueueItem(record: OpdSubmissionRecord, now: Date) {
-    const slaStatus = calculateSlaStatus(record, now);
+    const slaStatus = this.liveAdjustedSlaStatus(record, now);
 
     return {
       id: record.id,
@@ -1271,12 +1317,13 @@ export class OpdSubmissionService {
         pausedHours: record.slaPausedHours,
       }),
       slaPausedHours: record.slaPausedHours,
-      slaStatus: calculateSlaStatus(record),
+      slaStatus: this.liveAdjustedSlaStatus(record),
       lastStatusChangedAt: record.lastStatusChangedAt?.toISOString() ?? null,
       lastStatusChangedById: internal ? record.lastStatusChangedById : undefined,
       createdById: internal ? record.createdById : undefined,
       updatedById: internal ? record.updatedById : undefined,
       assignedToId: internal ? record.assignedToId : undefined,
+      assignedToName: internal ? record.assignedToName : undefined,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       documents: visibleDocuments.map((document) => ({

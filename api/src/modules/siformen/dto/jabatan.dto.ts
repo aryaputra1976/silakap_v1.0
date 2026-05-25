@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateJabatanDto {
@@ -43,6 +43,42 @@ export class CreateJabatanDto {
   @IsString()
   @MaxLength(36)
   jabatanFungsionalRefId?: string;
+}
+
+export class BulkImportJabatanItemDto {
+  @IsString()
+  @MaxLength(40)
+  kodeJabatan!: string;
+
+  @IsString()
+  @MaxLength(200)
+  namaJabatan!: string;
+
+  @IsString()
+  @MaxLength(40)
+  jenisJabatan!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  eselonLevel?: string;
+
+  @IsString()
+  @MaxLength(200)
+  unitKerja!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  sortOrder?: number;
+}
+
+export class BulkImportJabatanDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkImportJabatanItemDto)
+  items!: BulkImportJabatanItemDto[];
 }
 
 export class UpdateJabatanDto {

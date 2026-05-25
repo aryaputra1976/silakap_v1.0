@@ -1,5 +1,11 @@
-import { IsDateString, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export enum BezettingStatusIsi {
+  VACANT = 'VACANT',
+  FILLED = 'FILLED',
+  ACTING = 'ACTING',
+}
 
 export class CreateBezettingDto {
   @IsOptional()
@@ -44,9 +50,8 @@ export class CreateBezettingDto {
   tmtJabatan?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  statusIsi?: string;
+  @IsIn(Object.values(BezettingStatusIsi))
+  statusIsi?: BezettingStatusIsi;
 
   @IsOptional()
   @IsString()
@@ -95,9 +100,8 @@ export class UpdateBezettingDto {
   tmtJabatan?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  statusIsi?: string;
+  @IsIn(Object.values(BezettingStatusIsi))
+  statusIsi?: BezettingStatusIsi;
 
   @IsOptional()
   @IsString()

@@ -1,5 +1,17 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export enum FormasiJenis {
+  CPNS = 'CPNS',
+  PPPK = 'PPPK',
+}
+
+export enum FormasiStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
 
 export class CreateFormasiDto {
   @IsOptional()
@@ -14,9 +26,8 @@ export class CreateFormasiDto {
   @MaxLength(200)
   unitKerja!: string;
 
-  @IsString()
-  @MaxLength(20)
-  jenisFormasi!: string;
+  @IsIn(Object.values(FormasiJenis))
+  jenisFormasi!: FormasiJenis;
 
   @IsInt()
   @Min(2000)
@@ -72,9 +83,8 @@ export class UpdateFormasiDto {
   unitKerja?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  jenisFormasi?: string;
+  @IsIn(Object.values(FormasiJenis))
+  jenisFormasi?: FormasiJenis;
 
   @IsOptional()
   @IsInt()

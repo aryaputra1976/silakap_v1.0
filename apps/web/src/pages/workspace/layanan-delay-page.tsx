@@ -14,11 +14,10 @@ import {
 } from '@/components/workspace/ui';
 import { LayananDelayPanel } from '@/components/workspace/layanan/layanan-delay-panel';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { getLayananSopConfig } from '@/lib/layanan/layanan-data';
-
-const sopConfig = getLayananSopConfig('LAY-004');
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 export function LayananDelayPage() {
+  const sopConfig = useLayananSopConfigs().sops.find((s) => s.key === 'LAY-004');
   const [q, setQ] = useState('');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
   const [loading, setLoading] = useState(false);

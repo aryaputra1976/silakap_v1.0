@@ -5,11 +5,10 @@ import {
 } from '@/components/workspace/ui';
 import { LayananSatisfactionPanel } from '@/components/workspace/layanan/layanan-satisfaction-panel';
 import { LayananSopPanel } from '@/components/workspace/layanan/layanan-sop-panel';
-import { getLayananSopConfig } from '@/lib/layanan/layanan-data';
-
-const sopConfig = getLayananSopConfig('LAY-005');
+import { useLayananSopConfigs } from '@/lib/layanan/use-layanan-sop-configs';
 
 export function LayananSatisfactionPage() {
+  const sopConfig = useLayananSopConfigs().sops.find((s) => s.key === 'LAY-005');
   return (
     <div className="space-y-5">
       <PageHeader

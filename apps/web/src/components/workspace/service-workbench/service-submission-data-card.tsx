@@ -1,5 +1,6 @@
 import { SectionCard, FileMeta, formatDateTime } from '@/components/workspace/ui';
 import type { OpdSubmission } from '@/lib/opd-submissions/types';
+import { layananServiceTypeLabel } from '@/lib/layanan/layanan-data';
 
 export function ServiceSubmissionDataCard({
   submission,
@@ -13,7 +14,7 @@ export function ServiceSubmissionDataCard({
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <FileMeta label="Module" value={submission.moduleKey} />
-        <FileMeta label="Jenis layanan" value={submission.serviceType} />
+        <FileMeta label="Jenis layanan" value={layananServiceTypeLabel(submission.serviceType)} />
         <FileMeta label="Judul" value={submission.title} />
         <FileMeta label="ASN terkait" value={submission.subjectName ?? '-'} />
         <FileMeta label="NIP" value={submission.subjectNip ?? '-'} />

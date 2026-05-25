@@ -67,7 +67,7 @@ export const MENU_SIDEBAR: MenuConfig = [
         path: '/siap/cases/new',
         icon: FilePlus,
         moduleKey: 'SIAP',
-        allowedRoles: ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPD_OPERATOR', 'ASN'],
+        allowedRoles: ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPD'],
       },
       {
         title: 'Tugas SIAP',
@@ -577,6 +577,14 @@ export const MENU_SIDEBAR: MenuConfig = [
     title: 'Pengaturan',
     icon: Settings,
     path: '/admin/settings',
+    moduleKey: 'ADMIN',
+    requiredPermission: 'admin',
+    allowedRoles: ADMIN_ROLES,
+  },
+  {
+    title: 'Konfigurasi SOP Layanan',
+    icon: BookOpenCheck,
+    path: '/admin/layanan/sop-configs',
     moduleKey: 'ADMIN',
     requiredPermission: 'admin',
     allowedRoles: ADMIN_ROLES,

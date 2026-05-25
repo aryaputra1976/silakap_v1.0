@@ -1,5 +1,24 @@
 export type LayananSopKey = 'LAY-001' | 'LAY-002' | 'LAY-003' | 'LAY-004' | 'LAY-005';
 
+export const LAYANAN_SERVICE_TYPE_OPTIONS = [
+  { value: 'kenaikan_pangkat',  label: 'Kenaikan Pangkat' },
+  { value: 'pengangkatan',      label: 'Pengangkatan' },
+  { value: 'mutasi',            label: 'Mutasi Pegawai' },
+  { value: 'cuti',              label: 'Cuti ASN' },
+  { value: 'penghargaan',       label: 'Penghargaan / Tanda Jasa' },
+  { value: 'disiplin',          label: 'Disiplin Pegawai' },
+  { value: 'pemberhentian',     label: 'Pemberhentian / Pensiun' },
+] as const;
+
+export type LayananServiceTypeValue =
+  typeof LAYANAN_SERVICE_TYPE_OPTIONS[number]['value'];
+
+export function layananServiceTypeLabel(value: string): string {
+  return (
+    LAYANAN_SERVICE_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value
+  );
+}
+
 export interface LayananSopConfig {
   key: LayananSopKey;
   code: string;
