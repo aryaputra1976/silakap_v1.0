@@ -82,6 +82,18 @@ export interface IkmSurveyQuery {
   serviceType?: string;
 }
 
+export interface IkmTrendEntry {
+  periodId: string;
+  label: string;
+  year: number;
+  semester: number;
+  status: string;
+  totalResponden: number;
+  avgIkmConvert: number;
+  avgIkmScore: number;
+  predikat: string;
+}
+
 // PermenPANRB No. 14/2017 — 9 unsur layanan
 export const IKM_UNSUR_LABELS: Record<string, string> = {
   u1: 'Persyaratan',

@@ -82,6 +82,7 @@ import { WorkingCalendarPage } from '@/pages/workspace/working-calendar-page';
 import { OpdIkmSurveyPage } from '@/pages/workspace/opd-ikm-survey-page';
 import { IkmPeriodePage } from '@/pages/workspace/ikm-periode-page';
 import { IkmDataPage } from '@/pages/workspace/ikm-data-page';
+import { IkmDashboardPage } from '@/pages/workspace/ikm-dashboard-page';
 import { SiformenDashboardPage } from '@/pages/workspace/siformen-dashboard-page';
 import { SiformenJabatanPage } from '@/pages/workspace/siformen-jabatan-page';
 import { SiformenJabatanFungsionalRefPage } from '@/pages/workspace/siformen-jabatan-fungsional-ref-page';
@@ -208,6 +209,7 @@ export function AppRoutingSetup() {
           <Route path="/layanan/sla" element={<LayananSlaPage />} />
           <Route path="/layanan/keterlambatan" element={<LayananDelayPage />} />
           <Route path="/layanan/kepuasan" element={<LayananSatisfactionPage />} />
+          <Route path="/layanan/ikm/dashboard" element={<IkmDashboardPage />} />
           <Route path="/layanan/ikm/periode" element={<IkmPeriodePage />} />
           <Route path="/layanan/ikm/data" element={<IkmDataPage />} />
           <Route path="/layanan/laporan" element={<LayananReportPage />} />

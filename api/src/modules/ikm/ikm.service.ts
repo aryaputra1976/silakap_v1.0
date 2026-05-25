@@ -165,6 +165,32 @@ export class IkmService {
     return surveys.map(toSurveyResponse);
   }
 
+  async getTrend(user: AuthUser) {
+    this.ensureInternal(user);
+    const data = await this.repo.getTrendData();
+    return data.map(({ period, avgIkmConvert, avgIkmScore, totalResponden }) => {
+      const convert = avgIkmConvert ?? 0;
+      let predikat = '-';
+      if (totalResponden > 0) {
+        if (convert >= 88.31) predikat = 'A';
+        else if (convert >= 76.61) predikat = 'B';
+        else if (convert >= 65.0) predikat = 'C';
+        else predikat = 'D';
+      }
+      return {
+        periodId: period.id,
+        label: period.label,
+        year: period.year,
+        semester: period.semester,
+        status: period.status,
+        totalResponden,
+        avgIkmConvert: Math.round(convert * 100) / 100,
+        avgIkmScore: Math.round((avgIkmScore ?? 0) * 100) / 100,
+        predikat,
+      };
+    });
+  }
+
   async getSummary(periodId: string, user: AuthUser) {
     this.ensureInternal(user);
     await this.getPeriodOrThrow(periodId);

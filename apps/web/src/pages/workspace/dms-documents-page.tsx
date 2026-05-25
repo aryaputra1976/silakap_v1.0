@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -6,6 +7,8 @@ import {
   type DmsDocument,
   type DmsDocumentListQuery,
   type DmsDocumentListResponse,
+  type DmsFolderTree,
+  dmsCategoryLabel,
 } from '@/lib/api/dms';
 import { ErrorAlert } from '@/components/workspace/ui';
 import { type DmsFilterValue } from '@/components/workspace/dms/dms-filter-bar';
@@ -13,6 +16,10 @@ import { type DmsStatSummary } from '@/components/workspace/dms/dms-stat-cards';
 import { DmsDocumentsHeader } from '@/components/workspace/dms/list/dms-documents-header';
 import { DmsDocumentsSummary } from '@/components/workspace/dms/list/dms-documents-summary';
 import { DmsDocumentsSection } from '@/components/workspace/dms/list/dms-documents-section';
+import {
+  DmsFolderSidebar,
+  type DmsFolderSelection,
+} from '@/components/workspace/dms/dms-folder-sidebar';
 
 const defaultFilter: DmsFilterValue = {
   q: '',
@@ -39,13 +46,22 @@ export function DmsDocumentsPage() {
   const [downloadingId, setDownloadingId] = useState('');
   const [error, setError] = useState('');
 
-  async function loadDocuments(nextFilter: DmsFilterValue = appliedFilter) {
+  const [folderTree, setFolderTree] = useState<DmsFolderTree | null>(null);
+  const [folderSelection, setFolderSelection] = useState<DmsFolderSelection>({});
+
+  async function loadDocuments(
+    nextFilter: DmsFilterValue = appliedFilter,
+    folder: DmsFolderSelection = folderSelection,
+  ) {
     setLoading(true);
     setError('');
 
     try {
       const query: DmsDocumentListQuery = {
         ...nextFilter,
+        unitKerjaId: folder.unitKerjaId,
+        year: folder.year != null ? String(folder.year) : nextFilter.year,
+        category: (folder.category as DmsDocumentListQuery['category']) || nextFilter.category,
         page: 1,
         limit: 25,
       };
@@ -60,6 +76,15 @@ export function DmsDocumentsPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadFolderTree() {
+    try {
+      const tree = await dmsApi.getFolderTree();
+      setFolderTree(tree);
+    } catch {
+      // folder tree is non-critical — silently ignore
     }
   }
 
@@ -90,9 +115,18 @@ export function DmsDocumentsPage() {
   useEffect(() => {
     setFilter(initialFilter);
     setAppliedFilter(initialFilter);
-    void loadDocuments(initialFilter);
+    void loadDocuments(initialFilter, {});
+    void loadFolderTree();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilter]);
+
+  function handleFolderSelect(sel: DmsFolderSelection) {
+    setFolderSelection(sel);
+    const resetted = { ...defaultFilter };
+    setFilter(resetted);
+    setAppliedFilter(resetted);
+    void loadDocuments(resetted, sel);
+  }
 
   const documents = data?.items ?? [];
 
@@ -103,13 +137,13 @@ export function DmsDocumentsPage() {
 
   function applyFilter() {
     setAppliedFilter(filter);
-    void loadDocuments(filter);
+    void loadDocuments(filter, folderSelection);
   }
 
   function resetFilter() {
     setFilter(defaultFilter);
     setAppliedFilter(defaultFilter);
-    void loadDocuments(defaultFilter);
+    void loadDocuments(defaultFilter, folderSelection);
   }
 
   return (
@@ -118,25 +152,115 @@ export function DmsDocumentsPage() {
         totalDocuments={data?.total ?? 0}
         loading={loading}
         onUpload={() => navigate('/dms/upload')}
-        onRefresh={() => void loadDocuments()}
+        onRefresh={() => {
+          void loadDocuments();
+          void loadFolderTree();
+        }}
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
       <DmsDocumentsSummary summary={summary} />
 
-      <DmsDocumentsSection
-        documents={documents}
-        filter={filter}
-        loading={loading}
-        downloadingId={downloadingId}
-        onFilterChange={setFilter}
-        onApplyFilter={applyFilter}
-        onResetFilter={resetFilter}
-        onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
-        onDownloadDocument={(document) => void downloadDocument(document)}
-      />
+      <div className="flex gap-5 items-start">
+        {folderTree && (
+          <DmsFolderSidebar
+            tree={folderTree}
+            selection={folderSelection}
+            onSelect={handleFolderSelect}
+          />
+        )}
+
+        <div className="min-w-0 flex-1 space-y-3">
+          {folderSelection.unitKerjaId && (
+            <FolderBreadcrumb selection={folderSelection} onNavigate={handleFolderSelect} />
+          )}
+
+          <DmsDocumentsSection
+            documents={documents}
+            filter={filter}
+            loading={loading}
+            downloadingId={downloadingId}
+            onFilterChange={setFilter}
+            onApplyFilter={applyFilter}
+            onResetFilter={resetFilter}
+            onOpenDocument={(id) => navigate(`/dms/documents/${id}`)}
+            onDownloadDocument={(document) => void downloadDocument(document)}
+          />
+        </div>
+      </div>
     </div>
+  );
+}
+
+interface BreadcrumbProps {
+  selection: DmsFolderSelection;
+  onNavigate: (sel: DmsFolderSelection) => void;
+}
+
+function FolderBreadcrumb({ selection, onNavigate }: BreadcrumbProps) {
+  return (
+    <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+      <button
+        type="button"
+        className="hover:text-foreground transition-colors"
+        onClick={() => onNavigate({})}
+      >
+        Semua Dokumen
+      </button>
+
+      {selection.unitKerjaId && (
+        <>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <button
+            type="button"
+            className={[
+              'transition-colors',
+              !selection.year ? 'font-medium text-foreground' : 'hover:text-foreground',
+            ].join(' ')}
+            onClick={() =>
+              onNavigate({
+                unitKerjaId: selection.unitKerjaId,
+                unitKerjaNama: selection.unitKerjaNama,
+              })
+            }
+          >
+            {selection.unitKerjaNama ?? selection.unitKerjaId}
+          </button>
+        </>
+      )}
+
+      {selection.year != null && (
+        <>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <button
+            type="button"
+            className={[
+              'transition-colors',
+              !selection.category ? 'font-medium text-foreground' : 'hover:text-foreground',
+            ].join(' ')}
+            onClick={() =>
+              onNavigate({
+                unitKerjaId: selection.unitKerjaId,
+                unitKerjaNama: selection.unitKerjaNama,
+                year: selection.year,
+              })
+            }
+          >
+            {selection.year}
+          </button>
+        </>
+      )}
+
+      {selection.category && (
+        <>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="font-medium text-foreground">
+            {dmsCategoryLabel(selection.category)}
+          </span>
+        </>
+      )}
+    </nav>
   );
 }
 

@@ -156,6 +156,33 @@ export class IkmRepository {
     });
   }
 
+  async getTrendData() {
+    const periods = await this.prisma.ikmSurveyPeriod.findMany({
+      select: periodSelect,
+      orderBy: [{ year: 'asc' }, { semester: 'asc' }],
+    });
+
+    if (periods.length === 0) return [];
+
+    const summaries = await this.prisma.ikmSurvey.groupBy({
+      by: ['periodId'],
+      _avg: { ikmConvert: true, ikmScore: true },
+      _count: { id: true },
+    });
+
+    const byPeriod = new Map(summaries.map((s) => [s.periodId, s]));
+
+    return periods.map((p) => {
+      const s = byPeriod.get(p.id);
+      return {
+        period: p,
+        avgIkmConvert: s?._avg.ikmConvert ?? null,
+        avgIkmScore: s?._avg.ikmScore ?? null,
+        totalResponden: s?._count.id ?? 0,
+      };
+    });
+  }
+
   async getSummaryByPeriod(periodId: string) {
     const agg = await this.prisma.ikmSurvey.aggregate({
       where: { periodId },

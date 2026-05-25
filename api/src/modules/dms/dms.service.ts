@@ -7,8 +7,7 @@ import {
 } from '@nestjs/common';
 import { DmsDocumentCategory, DmsDocumentStatus, Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { basename, extname, isAbsolute, relative, resolve } from 'path';
+import { basename } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import {
@@ -33,6 +32,9 @@ import {
   DmsRepository,
   NormalizedDmsDocumentFilters,
 } from './dms.repository';
+import { validateDmsFile } from './storage/dms-file-validator';
+import { buildDmsStoragePath } from './storage/dms-storage-path.util';
+import { DmsStorageService } from './storage/dms-storage.service';
 
 export type UploadedDmsFile = {
   originalname: string;
@@ -89,16 +91,7 @@ const DMS_ADMIN_ROLES = [
   'ADMIN_BKPSDM',
 ];
 
-const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_DMS_ACCESS_LEVEL = 'INTERNAL';
-
-const ALLOWED_MIME_EXTENSIONS = {
-  'application/pdf': 'pdf',
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
-} as const;
 
 @Injectable()
 export class DmsService {
@@ -107,6 +100,8 @@ export class DmsService {
     private readonly dmsRepository: DmsRepository,
     @Inject(AuditService)
     private readonly auditService: AuditService,
+    @Inject(DmsStorageService)
+    private readonly storageService: DmsStorageService,
   ) {}
 
   async create(
@@ -164,8 +159,7 @@ export class DmsService {
       throw new NotFoundException('File dokumen DMS belum tersedia');
     }
 
-    const absoluteStoragePath = this.resolveSafeStoragePath(document.storagePath);
-    const buffer = await this.readStoredFile(absoluteStoragePath);
+    const buffer = await this.storageService.read(document.storagePath);
 
     await this.auditService.record({
       entityType: 'DMS_DOCUMENT',
@@ -235,22 +229,20 @@ export class DmsService {
       throw new BadRequestException('File wajib diunggah');
     }
 
-    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      throw new BadRequestException('Ukuran file maksimal 10 MB');
-    }
-
-    const extension = this.getAllowedExtension(file.mimetype);
+    const extension = validateDmsFile(file);
     const checksum = createHash('sha256').update(file.buffer).digest('hex');
     const timestamp = Date.now();
     const random = randomBytes(4).toString('hex');
     const storedFileName = `DMS-${document.category}-${timestamp}-${random}.${extension}`;
-    const relativeStoragePath = this.toStoragePath(document.id, storedFileName);
-    const absoluteStoragePath = this.resolveSafeStoragePath(relativeStoragePath);
-
-    await mkdir(resolve(this.getUploadRoot(), 'dms', document.id), {
-      recursive: true,
+    const relativeStoragePath = buildDmsStoragePath({
+      documentId: document.id,
+      unitKerjaId: document.unitKerjaId,
+      periodYear: document.periodYear,
+      category: document.category,
+      storedFileName,
     });
-    await writeFile(absoluteStoragePath, file.buffer);
+
+    await this.storageService.save(relativeStoragePath, file.buffer);
 
     const updated = await this.dmsRepository.update(document.id, {
       description:
@@ -432,11 +424,7 @@ export class DmsService {
       throw new BadRequestException('File wajib diunggah');
     }
 
-    if (input.file.size > MAX_UPLOAD_SIZE_BYTES) {
-      throw new BadRequestException('Ukuran file maksimal 10 MB');
-    }
-
-    const extension = this.getAllowedExtension(input.file.mimetype);
+    const extension = validateDmsFile(input.file);
     const created = await this.dmsRepository.create({
       title: this.normalizeRequiredText(input.title, 'Judul dokumen wajib diisi'),
       description: this.normalizeNullableText(input.description ?? undefined),
@@ -454,13 +442,15 @@ export class DmsService {
     const timestamp = Date.now();
     const random = randomBytes(4).toString('hex');
     const storedFileName = `OPD-${input.moduleKey}-${timestamp}-${random}.${extension}`;
-    const relativeStoragePath = this.toStoragePath(created.id, storedFileName);
-    const absoluteStoragePath = this.resolveSafeStoragePath(relativeStoragePath);
-
-    await mkdir(resolve(this.getUploadRoot(), 'dms', created.id), {
-      recursive: true,
+    const relativeStoragePath = buildDmsStoragePath({
+      documentId: created.id,
+      unitKerjaId: input.unitKerjaId ?? null,
+      periodYear: null,
+      category: input.category ?? 'BUKTI_DUKUNG',
+      storedFileName,
     });
-    await writeFile(absoluteStoragePath, input.file.buffer);
+
+    await this.storageService.save(relativeStoragePath, input.file.buffer);
 
     const updated = await this.dmsRepository.update(created.id, {
       status: DmsDocumentStatus.UPLOADED,
@@ -852,54 +842,5 @@ export class DmsService {
     return Math.min(Math.max(Math.trunc(parsed), min), max);
   }
 
-  private getAllowedExtension(mimeType: string) {
-    const extension =
-      ALLOWED_MIME_EXTENSIONS[mimeType as keyof typeof ALLOWED_MIME_EXTENSIONS];
-
-    if (!extension) {
-      throw new BadRequestException(
-        'Tipe file tidak didukung. Gunakan PDF, JPG, PNG, DOCX, atau XLSX',
-      );
-    }
-
-    return extension;
-  }
-
-  private getUploadRoot() {
-    return resolve(process.cwd(), 'uploads');
-  }
-
-  private toStoragePath(documentId: string, fileName: string) {
-    return ['uploads', 'dms', documentId, fileName].join('/');
-  }
-
-  private resolveSafeStoragePath(storagePath: string) {
-    if (isAbsolute(storagePath)) {
-      throw new BadRequestException('Path dokumen tidak valid');
-    }
-
-    const uploadRoot = this.getUploadRoot();
-    const absolutePath = resolve(process.cwd(), storagePath);
-    const relativePath = relative(uploadRoot, absolutePath);
-
-    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
-      throw new BadRequestException('Path dokumen tidak valid');
-    }
-
-    const extension = extname(absolutePath).toLowerCase();
-
-    if (!['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.xlsx'].includes(extension)) {
-      throw new BadRequestException('Ekstensi dokumen tidak valid');
-    }
-
-    return absolutePath;
-  }
-
-  private async readStoredFile(absoluteStoragePath: string) {
-    try {
-      return await readFile(absoluteStoragePath);
-    } catch {
-      throw new NotFoundException('File dokumen DMS tidak ditemukan di storage');
-    }
-  }  
 }
+

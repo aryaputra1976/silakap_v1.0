@@ -5,6 +5,7 @@ import type {
   IkmSurvey,
   IkmSurveyPeriod,
   IkmSurveyQuery,
+  IkmTrendEntry,
   SubmitIkmSurveyPayload,
 } from '@/lib/ikm/types';
 
@@ -41,5 +42,9 @@ export const ikmApi = {
 
   getSummary(periodId: string) {
     return apiClient.get<IkmSummary>(`/ikm/periods/${periodId}/summary`);
+  },
+
+  getTrend() {
+    return apiClient.get<IkmTrendEntry[]>('/ikm/summary/trend');
   },
 };

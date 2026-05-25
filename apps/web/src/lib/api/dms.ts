@@ -476,8 +476,40 @@ export const dmsApi = {
     const fileName = `laporan-dms${year}${month}${quarter}.csv`;
 
     return apiClient.download(`/dms/reports/export${suffix}`, fileName);
-  },  
+  },
+
+  getFolderTree() {
+    return apiClient.get<DmsFolderTree>('/dms/folders');
+  },
 };
+
+// ---------------------------------------------------------------------------
+// Folder tree types
+// ---------------------------------------------------------------------------
+
+export interface DmsCategoryNode {
+  category: DmsDocumentCategory;
+  count: number;
+}
+
+export interface DmsYearNode {
+  year: number | null;
+  total: number;
+  categories: DmsCategoryNode[];
+}
+
+export interface DmsFolderNode {
+  unitKerjaId: string | null;
+  unitKerjaKode: string | null;
+  unitKerjaNama: string | null;
+  total: number;
+  years: DmsYearNode[];
+}
+
+export interface DmsFolderTree {
+  nodes: DmsFolderNode[];
+  grandTotal: number;
+}
 
 export function dmsCategoryLabel(category: DmsDocumentCategory | string) {
   const labels: Record<DmsDocumentCategory, string> = {

@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as XLSX from 'xlsx';
 import { AuthUser } from '../auth/auth.types';
@@ -131,6 +132,8 @@ const MAX_IMPORT_ROWS = 20_000;
 
 @Injectable()
 export class ReconciliationBpkadService {
+  private static readonly MATCHING_TIMEOUT_MS = 5 * 60 * 1000;
+
   constructor(
     @Inject(ReconciliationBpkadRepository)
     private readonly repo: ReconciliationBpkadRepository,
@@ -334,6 +337,13 @@ export class ReconciliationBpkadService {
     const period = await this.repo.findPeriodById(periodId);
     if (!period) throw new NotFoundException('Periode rekonsiliasi tidak ditemukan');
 
+    const activeRun = await this.repo.findActiveMatchingRunByPeriod(periodId);
+    if (activeRun) {
+      throw new ConflictException(
+        'Proses matching sedang berjalan untuk periode ini. Tunggu hingga selesai.',
+      );
+    }
+
     const batchId = await this.resolveMatchingBatchId(periodId, dto.batchId);
 
     const run = await this.repo.createMatchingRun({
@@ -344,56 +354,78 @@ export class ReconciliationBpkadService {
       runById: user.id,
     });
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error('Proses matching melebihi batas waktu 5 menit')),
+        ReconciliationBpkadService.MATCHING_TIMEOUT_MS,
+      );
+    });
+
     try {
-      const [bpkadRows, asnList] = await Promise.all([
-        this.repo.findAllPayrollRowsByBatchId(batchId),
-        this.repo.findAllAsnForMatching(),
+      return await Promise.race([
+        this.doMatching(run.id, periodId, batchId, user),
+        timeoutPromise,
       ]);
-
-      const findings = this.computeFindings(periodId, run.id, asnList, bpkadRows);
-      await this.repo.deleteAllFindingsByMatchingRunId(run.id);
-
-      const chunkSize = 500;
-      for (let i = 0; i < findings.length; i += chunkSize) {
-        await this.repo.createFindings(findings.slice(i, i + chunkSize));
-      }
-
-      const counts = this.countFindings(findings);
-      const bpkadNipSet = new Set(bpkadRows.map((r) => r.nip).filter(Boolean));
-      const asnNipSet = new Set(asnList.map((a) => a.nip).filter(Boolean));
-      const matchedNips = [...asnNipSet].filter((nip) => bpkadNipSet.has(nip));
-
-      const updated = await this.repo.updateMatchingRun(run.id, {
-        status: 'DONE',
-        totalBkpsdm: asnList.length,
-        totalBpkad: bpkadRows.length,
-        totalMatched: matchedNips.length,
-        totalFindings: findings.length,
-        ...counts,
-      });
-
-      await this.repo.createAuditLog({
-        periodId,
-        batchId,
-        action: 'RUN_MATCHING',
-        actorId: user.id,
-        actorRole: this.primaryRole(user),
-        metadata: this.toJsonObject({
-          runId: run.id,
-          totalBkpsdm: asnList.length,
-          totalBpkad: bpkadRows.length,
-          totalFindings: findings.length,
-        }),
-      });
-
-      return this.toMatchingRunResponse(updated);
     } catch (error) {
       await this.repo.updateMatchingRun(run.id, {
         status: 'FAILED',
         errorMessage: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
+  }
+
+  private async doMatching(
+    runId: string,
+    periodId: string,
+    batchId: string,
+    user: AuthUser,
+  ) {
+    const [bpkadRows, asnList] = await Promise.all([
+      this.repo.findAllPayrollRowsByBatchId(batchId),
+      this.repo.findAllAsnForMatching(),
+    ]);
+
+    const findings = this.computeFindings(periodId, runId, asnList, bpkadRows);
+    await this.repo.deleteAllFindingsByMatchingRunId(runId);
+
+    const chunkSize = 500;
+    for (let i = 0; i < findings.length; i += chunkSize) {
+      await this.repo.createFindings(findings.slice(i, i + chunkSize));
+    }
+
+    const counts = this.countFindings(findings);
+    const bpkadNipSet = new Set(bpkadRows.map((r) => r.nip).filter(Boolean));
+    const asnNipSet = new Set(asnList.map((a) => a.nip).filter(Boolean));
+    const matchedNips = [...asnNipSet].filter((nip) => bpkadNipSet.has(nip));
+
+    const updated = await this.repo.updateMatchingRun(runId, {
+      status: 'DONE',
+      totalBkpsdm: asnList.length,
+      totalBpkad: bpkadRows.length,
+      totalMatched: matchedNips.length,
+      totalFindings: findings.length,
+      ...counts,
+    });
+
+    await this.repo.createAuditLog({
+      periodId,
+      batchId,
+      action: 'RUN_MATCHING',
+      actorId: user.id,
+      actorRole: this.primaryRole(user),
+      metadata: this.toJsonObject({
+        runId,
+        totalBkpsdm: asnList.length,
+        totalBpkad: bpkadRows.length,
+        totalFindings: findings.length,
+      }),
+    });
+
+    return this.toMatchingRunResponse(updated);
   }
 
   async getMatchingRun(periodId: string, user: AuthUser) {
@@ -645,22 +677,15 @@ export class ReconciliationBpkadService {
       return batchId;
     }
 
-    const batches = await this.repo.findBpkadImportBatches({
-      page: 1,
-      limit: 1,
-      status: 'VALIDATED',
-    });
+    const periodBatch = await this.repo.findLatestValidatedBatchByPeriod(periodId);
+    if (periodBatch) return periodBatch.id;
 
-    const match = batches.items.find((b) => b.periodId === periodId)
-      ?? batches.items.find((b) => b.periodId === null);
+    const globalBatch = await this.repo.findLatestValidatedBatchWithoutPeriod();
+    if (globalBatch) return globalBatch.id;
 
-    if (!match) {
-      throw new BadRequestException(
-        'Tidak ada batch Simgaji VALIDATED untuk periode ini. Upload dan validasi file Simgaji terlebih dahulu.',
-      );
-    }
-
-    return match.id;
+    throw new BadRequestException(
+      'Tidak ada batch Simgaji VALIDATED untuk periode ini. Upload dan validasi file Simgaji terlebih dahulu.',
+    );
   }
 
   private computeFindings(
@@ -882,6 +907,36 @@ export class ReconciliationBpkadService {
       }
     }
 
+    // R10: Komponen pembayaran tidak sesuai (bersih ≠ kotor − potongan)
+    for (const row of bpkadRows) {
+      if (!row.nip) continue;
+      const nip = row.nip.trim();
+      const kotor = row.kotor?.toNumber() ?? null;
+      const potongan = row.potongan?.toNumber() ?? null;
+      const bersih = row.bersih?.toNumber() ?? null;
+
+      if (kotor !== null && potongan !== null && bersih !== null) {
+        const expected = kotor - potongan;
+        if (Math.abs(bersih - expected) > 1) {
+          findings.push({
+            id: this.generateId(),
+            matchingRunId,
+            periodId,
+            findingCode: 'R10',
+            priority: FINDING_PRIORITY['R10'],
+            status: 'OPEN',
+            nip,
+            namaBpkad: row.nama,
+            bpkadValue: `Bersih=${bersih.toFixed(0)}, expected=${expected.toFixed(0)}, selisih=${(bersih - expected).toFixed(0)}`,
+            description: FINDING_DESCRIPTION['R10'],
+            bpkadRowId: row.id,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+    }
+
     return findings;
   }
 
@@ -962,10 +1017,7 @@ export class ReconciliationBpkadService {
   }
 
   private generateId(): string {
-    return createHash('sha256')
-      .update(`${Date.now()}-${Math.random()}`)
-      .digest('hex')
-      .slice(0, 36);
+    return randomUUID();
   }
 
   private async getPeriodOrThrow(id: string) {
@@ -1034,6 +1086,16 @@ export class ReconciliationBpkadService {
 
     if (!allowedExtensions.includes(extension)) {
       throw new BadRequestException('File harus berformat .xlsx atau .xls');
+    }
+
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Tipe file tidak valid. Hanya format Excel (.xlsx, .xls) yang diizinkan.',
+      );
     }
 
     if (!file.buffer || file.buffer.length === 0) {
@@ -1106,9 +1168,9 @@ export class ReconciliationBpkadService {
     return {
       totalRows: rows.length,
       validRows: rows.filter((row) => row.validationStatus === 'VALID').length,
-      invalidRows:
-        rows.filter((row) => row.validationStatus === 'INVALID').length +
-        (missingColumns.length > 0 ? rows.length : 0),
+      invalidRows: missingColumns.length > 0
+        ? rows.length
+        : rows.filter((row) => row.validationStatus === 'INVALID').length,
       duplicateRows: rows.filter((row) =>
         row.validationErrors.includes('NIP duplikat dalam file Simgaji'),
       ).length,

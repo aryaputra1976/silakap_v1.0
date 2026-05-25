@@ -81,6 +81,12 @@ export class IkmController {
     return ok(await this.service.findSurveys(query, user));
   }
 
+  @Get('summary/trend')
+  @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN', 'KABID', 'ANALIS_MADYA', 'ANALIS_MUDA', 'ANALIS_PERTAMA', 'PENELAAH', 'PPPK')
+  async getTrend(@CurrentUser() user: AuthUser) {
+    return ok(await this.service.getTrend(user));
+  }
+
   @Get('periods/:id/summary')
   @Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KEPALA_BADAN', 'KABID', 'ANALIS_MADYA', 'ANALIS_MUDA', 'ANALIS_PERTAMA', 'PENELAAH', 'PPPK')
   async getSummary(@Param('id') id: string, @CurrentUser() user: AuthUser) {

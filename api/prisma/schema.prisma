@@ -472,6 +472,8 @@ model Asn {
   @@index([localCorrectionAt])
   @@index([localCorrectionBy])
   @@index([needsReview])
+  @@index([deletedAt, unitKerjaId])
+  @@index([deletedAt, tipePegawai])
   @@map("asn")
 }
 
@@ -702,6 +704,7 @@ model AsnGolonganHistory {
 
   @@unique([asnId, sourceBatchId])
   @@index([asnId])
+  @@index([asnId, deletedAt])
   @@index([sourceBatchId])
   @@index([golonganRefId])
   @@index([siasnGolonganId])
@@ -739,6 +742,7 @@ model AsnPendidikanHistory {
 
   @@unique([asnId, sourceBatchId])
   @@index([asnId])
+  @@index([asnId, deletedAt])
   @@index([sourceBatchId])
   @@index([pendidikanRefId])
   @@index([tingkatPendidikanRefId])

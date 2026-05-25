@@ -149,6 +149,49 @@ export type TimelineEntry = {
   createdAt: string;
 };
 
+export type SiapSlaTracking = {
+  id: string;
+  caseId: string;
+  taskId: string | null;
+  workflowState: string;
+  startedAt: string;
+  dueAt: string;
+  completedAt: string | null;
+  status: 'ON_TRACK' | 'WARNING' | 'OVERDUE' | 'COMPLETED';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SiapCaseListItem = {
+  id: string;
+  caseNumber: string;
+  serviceType: string;
+  title: string;
+  description: string | null;
+  asnId: string | null;
+  asn: {
+    id: string;
+    nip: string;
+    nama: string;
+    unitKerja: { id: string; kode: string; nama: string } | null;
+  } | null;
+  currentState: string;
+  status: string;
+  priority: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SiapCaseDetail = SiapCaseListItem & {
+  tasks: SiapTask[];
+  workflowLogs: WorkflowLog[];
+  slaTracking: SiapSlaTracking[];
+  timelines: TimelineEntry[];
+};
+
 export type RequirementItem = {
   documentType: string;
   label: string;

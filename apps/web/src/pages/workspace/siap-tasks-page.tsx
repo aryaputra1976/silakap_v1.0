@@ -45,6 +45,7 @@ export function SiapTasksPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
+  const [taskType, setTaskType] = useState(searchParams.get('type') ?? '');
   const [data, setData] = useState<PaginatedResult<SiapTask> | null>(null);
   const [overdueTotal, setOverdueTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -65,7 +66,8 @@ export function SiapTasksPage() {
     try {
       const [tasks, overdue] = await Promise.all([
         apiClient.get<PaginatedResult<SiapTask>>('/siap/tasks', {
-          status,
+          status: status || undefined,
+          taskType: taskType || undefined,
           page: 1,
           limit: 20,
         }),
@@ -88,7 +90,7 @@ export function SiapTasksPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, taskType]);
 
   function changeStatus(nextStatus: string) {
     setStatus(nextStatus);
@@ -98,6 +100,19 @@ export function SiapTasksPage() {
       nextParams.set('status', nextStatus);
     } else {
       nextParams.delete('status');
+    }
+
+    setSearchParams(nextParams);
+  }
+
+  function changeTaskType(nextType: string) {
+    setTaskType(nextType);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextType) {
+      nextParams.set('type', nextType);
+    } else {
+      nextParams.delete('type');
     }
 
     setSearchParams(nextParams);
@@ -148,8 +163,8 @@ export function SiapTasksPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="SIAP Tasks"
-        description="Task workflow aktif yang dapat diproses berdasarkan user, assignee, dan role."
+        title={taskType === 'DISPOSISI' ? 'Disposisi & Arahan' : taskType === 'TINDAK_LANJUT' ? 'Tindak Lanjut' : 'SIAP Tasks'}
+        description={taskType === 'DISPOSISI' ? 'Task disposisi dan arahan dari pimpinan.' : taskType === 'TINDAK_LANJUT' ? 'Task tindak lanjut yang perlu diselesaikan.' : 'Task workflow aktif yang dapat diproses berdasarkan user, assignee, dan role.'}
         meta={<StatusBadge value={`${data?.total ?? 0} TASK`} tone="info" />}
         actions={
           <>
@@ -202,6 +217,17 @@ export function SiapTasksPage() {
 
       <Toolbar>
         <FilterBar>
+          <select
+            className={inputClass}
+            value={taskType}
+            onChange={(event) => changeTaskType(event.target.value)}
+          >
+            <option value="">Semua tipe task</option>
+            <option value="DISPOSISI">Disposisi</option>
+            <option value="TINDAK_LANJUT">Tindak Lanjut</option>
+            <option value="VERIFIKASI">Verifikasi</option>
+            <option value="APPROVAL">Approval</option>
+          </select>
           <select
             className={inputClass}
             value={status}

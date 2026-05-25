@@ -764,94 +764,34 @@ export class SidataRepository {
           a.id,
           a.nama,
           a.nip,
-          COALESCE(
-            NULLIF(gh.siasn_golongan_akhir_id, ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.gol_akhir_id')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.golongan_akhir_id')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."Gol Akhir ID"')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."Golongan Akhir ID"')), ''),
-            NULLIF(a.siasn_golongan_id, ''),
-            NULLIF(rg.kode, ''),
-            '0'
-          ) AS golongan_akhir_code_sort,
-          COALESCE(
-            NULLIF(gh.golongan_akhir_nama, ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.gol_akhir_nama')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.golongan_akhir_nama')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."Gol Akhir Nama"')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."Golongan Akhir Nama"')), ''),
-            NULLIF(gh.golongan_nama, ''),
-            NULLIF(a.golongan_nama, ''),
-            rg.nama,
-            ''
-          ) AS golongan_akhir_sort,
-          COALESCE(
-            NULLIF(a.siasn_eselon_id, ''),
-            NULLIF(a.eselon_nama, ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.eselon_id')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$.eselon')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."eselon id"')), ''),
-            NULLIF(JSON_UNQUOTE(JSON_EXTRACT(sp.raw_data, '$."Eselon ID"')), ''),
-            ''
-          ) AS eselon_sort,
+          COALESCE(NULLIF(rg.kode, ''), '0') AS golongan_akhir_code_sort,
+          COALESCE(NULLIF(a.golongan_nama, ''), '') AS golongan_akhir_sort,
+          COALESCE(NULLIF(a.siasn_eselon_id, ''), NULLIF(a.eselon_nama, ''), '') AS eselon_sort,
           COALESCE(a.kelas_jabatan, rj.kelas_jabatan, 0) AS kelas_jabatan_sort,
           a.jenis_jabatan_nama,
           COALESCE(a.jabatan_nama, rj.nama, '') AS jabatan_sort,
-          COALESCE(a.masa_kerja_tahun, gh.mk_tahun, 0) AS mk_tahun_sort,
-          COALESCE(a.masa_kerja_bulan, gh.mk_bulan, 0) AS mk_bulan_sort,
-          COALESCE(sp.tmt_pns, sp.tmt_cpns, a.tmt_golongan, a.tmt_jabatan, a.created_at) AS tmt_masa_kerja_sort,
-          COALESCE(
-            CASE
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?3|DOKTOR' THEN 9
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?2|MAGISTER' THEN 8
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?1|D[ -]?IV|DIPLOMA IV|SARJANA' THEN 7
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?III|DIPLOMA III' THEN 6
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?II|DIPLOMA II' THEN 5
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?I|DIPLOMA I' THEN 4
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMA|SMK|SLTA|MA' THEN 3
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMP|SLTP|MTS' THEN 2
-              WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SD|MI' THEN 1
-              ELSE NULL
-            END,
-            edu.pendidikan_rank,
-            0
-          ) AS pendidikan_rank,
+          COALESCE(a.masa_kerja_tahun, 0) AS mk_tahun_sort,
+          COALESCE(a.masa_kerja_bulan, 0) AS mk_bulan_sort,
+          COALESCE(a.tmt_jabatan, a.tmt_golongan, a.created_at) AS tmt_masa_kerja_sort,
+          CASE
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?3|DOKTOR' THEN 9
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?2|MAGISTER' THEN 8
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?1|D[ -]?IV|DIPLOMA IV|SARJANA' THEN 7
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?III|DIPLOMA III' THEN 6
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?II|DIPLOMA II' THEN 5
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?I|DIPLOMA I' THEN 4
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMA|SMK|SLTA|MA' THEN 3
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMP|SLTP|MTS' THEN 2
+            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SD|MI' THEN 1
+            ELSE 0
+          END AS pendidikan_rank,
           COALESCE(sp.tanggal_lahir, '9999-12-31') AS tanggal_lahir_sort,
-          COALESCE(NULLIF(rg.kode, ''), NULLIF(a.siasn_golongan_id, ''), '0') AS golongan_kode_sort,
+          COALESCE(NULLIF(rg.kode, ''), '0') AS golongan_kode_sort,
           COALESCE(NULLIF(a.tipe_pegawai, ''), 'LAINNYA') AS tipe_pegawai_sort
         FROM asn a
         LEFT JOIN ref_golongan rg ON rg.id = a.golongan_ref_id
         LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        LEFT JOIN asn_golongan_history gh ON gh.id = (
-          SELECT gh2.id
-          FROM asn_golongan_history gh2
-          WHERE gh2.asn_id = a.id AND gh2.deleted_at IS NULL
-          ORDER BY gh2.effective_date DESC, gh2.synced_at DESC, gh2.created_at DESC
-          LIMIT 1
-        )
-        LEFT JOIN (
-          SELECT
-            ph.asn_id,
-            MAX(
-              CASE
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'S[ -]?3|DOKTOR' THEN 9
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'S[ -]?2|MAGISTER' THEN 8
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'S[ -]?1|D[ -]?IV|DIPLOMA IV|SARJANA' THEN 7
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'D[ -]?III|DIPLOMA III' THEN 6
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'D[ -]?II|DIPLOMA II' THEN 5
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'D[ -]?I|DIPLOMA I' THEN 4
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'SMA|SMK|SLTA|MA' THEN 3
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'SMP|SLTP|MTS' THEN 2
-                WHEN UPPER(COALESCE(rpt.nama, ph.tingkat_pendidikan_nama, ph.pendidikan_nama, '')) REGEXP 'SD|MI' THEN 1
-                ELSE CAST(COALESCE(NULLIF(rpt.kode, ''), NULLIF(ph.siasn_tingkat_pendidikan_id, ''), '0') AS UNSIGNED)
-              END
-            ) AS pendidikan_rank
-          FROM asn_pendidikan_history ph
-          LEFT JOIN ref_pendidikan_tingkat rpt ON rpt.id = ph.tingkat_pendidikan_ref_id
-          WHERE ph.deleted_at IS NULL
-          GROUP BY ph.asn_id
-        ) edu ON edu.asn_id = a.id
         WHERE ${whereSql}
       ) sorted
       ORDER BY

@@ -458,6 +458,10 @@ export class ReconciliationBpkadRepository {
         kdStapeg: true,
         kdPangkat: true,
         tmtStop: true,
+        gapok: true,
+        kotor: true,
+        potongan: true,
+        bersih: true,
         validationStatus: true,
         validationErrors: true,
       },
@@ -543,6 +547,39 @@ export class ReconciliationBpkadRepository {
     return this.prisma.reconciliationBeritaAcara.findUnique({
       where: { id },
       select: beritaAcaraSelect,
+    });
+  }
+
+  findActiveMatchingRunByPeriod(periodId: string) {
+    return this.prisma.reconciliationMatchingRun.findFirst({
+      where: { periodId, status: 'RUNNING' },
+      select: matchingRunSelect,
+    });
+  }
+
+  findLatestValidatedBatchByPeriod(periodId: string) {
+    return this.prisma.reconciliationImportBatch.findFirst({
+      where: {
+        periodId,
+        source: 'BPKAD',
+        importType: 'BPKAD_PAYROLL',
+        status: 'VALIDATED',
+      },
+      select: importBatchSelect,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findLatestValidatedBatchWithoutPeriod() {
+    return this.prisma.reconciliationImportBatch.findFirst({
+      where: {
+        periodId: null,
+        source: 'BPKAD',
+        importType: 'BPKAD_PAYROLL',
+        status: 'VALIDATED',
+      },
+      select: importBatchSelect,
+      orderBy: { createdAt: 'desc' },
     });
   }
 }

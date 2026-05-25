@@ -12,6 +12,7 @@ import {
   TaskPriority,
   TaskStatus,
 } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { EventBusService } from '../events/event-bus.service';
@@ -71,31 +72,47 @@ export class SiapService {
     client?: SiapDbClient,
   ): Promise<SiapCaseListRecord> {
     const serviceType = dto.serviceType.trim().toUpperCase();
-    const created = await this.siapRepository.createCase({
-      caseNumber: await this.createCaseNumber(serviceType, client),
-      serviceType,
-      title: dto.title.trim(),
-      description: this.normalizeOptionalText(dto.description),
-      asnId: this.normalizeOptionalText(dto.asnId),
-      currentState: DRAFT_STATE,
-      status: CaseStatus.DRAFT,
-      priority: dto.priority ?? CasePriority.NORMAL,
-      createdBy: user.id,
-      updatedBy: user.id,
-    }, client);
+
+    let created: SiapCaseListRecord | undefined;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        created = await this.siapRepository.createCase({
+          caseNumber: await this.createCaseNumber(serviceType, client),
+          serviceType,
+          title: dto.title.trim(),
+          description: this.normalizeOptionalText(dto.description),
+          asnId: this.normalizeOptionalText(dto.asnId),
+          currentState: DRAFT_STATE,
+          status: CaseStatus.DRAFT,
+          priority: dto.priority ?? CasePriority.NORMAL,
+          createdBy: user.id,
+          updatedBy: user.id,
+        }, client);
+        break;
+      } catch (err) {
+        if (
+          err instanceof PrismaClientKnownRequestError &&
+          err.code === 'P2002' &&
+          attempt < 3
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
 
     await this.siapRepository.createTimelineEntry(
       {
-        caseId: created.id,
+        caseId: created!.id,
         eventType: 'CASE_CREATED',
         title: 'Case dibuat',
-        description: `Case ${created.caseNumber} dibuat dalam status DRAFT`,
+        description: `Case ${created!.caseNumber} dibuat dalam status DRAFT`,
         performedBy: user.id,
       },
       client,
     );
 
-    return created;
+    return created!;
   }
 
   async submitCase(id: string, user: AuthUser, context?: AuditContext) {
