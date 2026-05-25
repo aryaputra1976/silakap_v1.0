@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { CreateSopRealizationDto } from './dto/create-sop-realization.dto';
+import { CreateSopTargetDto, UpdateSopTargetDto } from './dto/create-sop-target.dto';
 import {
   KinerjaBidangReportQueryDto,
   KinerjaBidangSopQueryDto,
@@ -75,6 +76,31 @@ export class KinerjaBidangController {
   async listTargets(@Query() query: KinerjaBidangTargetQueryDto) {
     const result = await this.service.listTargets(query);
     return ok(result);
+  }
+
+  @Post('targets')
+  @Roles(...KINERJA_BIDANG_SEED_ROLES)
+  async createTarget(@Body() dto: CreateSopTargetDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.createTarget(dto, user);
+    return ok(result, 'Target RHK berhasil dibuat');
+  }
+
+  @Patch('targets/:id')
+  @Roles(...KINERJA_BIDANG_SEED_ROLES)
+  async updateTarget(
+    @Param('id') id: string,
+    @Body() dto: UpdateSopTargetDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.service.updateTarget(id, dto, user);
+    return ok(result, 'Target RHK berhasil diperbarui');
+  }
+
+  @Delete('targets/:id')
+  @Roles(...KINERJA_BIDANG_SEED_ROLES)
+  async deleteTarget(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const result = await this.service.deleteTarget(id, user);
+    return ok(result, 'Target RHK berhasil dihapus');
   }
 
   @Get('realizations')

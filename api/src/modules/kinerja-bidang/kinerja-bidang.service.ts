@@ -3,6 +3,7 @@ import { SopRealizationStatus } from '@prisma/client';
 import { AuthUser } from '../auth/auth.types';
 import { KINERJA_BIDANG_SEED_SOP } from './constants/kinerja-bidang-seed.constant';
 import { CreateSopRealizationDto } from './dto/create-sop-realization.dto';
+import { CreateSopTargetDto, UpdateSopTargetDto } from './dto/create-sop-target.dto';
 import {
   KinerjaBidangReportQueryDto,
   KinerjaBidangSopQueryDto,
@@ -352,6 +353,68 @@ export class KinerjaBidangService {
     await this.repository.removeEvidence(evidenceId);
 
     return this.getRealization(id);
+  }
+
+  async createTarget(dto: CreateSopTargetDto, user: AuthUser) {
+    const sop = await this.repository.findSopById(dto.sopId);
+
+    if (!sop) {
+      throw new NotFoundException('SOP tidak ditemukan');
+    }
+
+    const duplicate = await this.repository.targetUniqueExists(dto.sopId, dto.rhkCode, dto.year);
+
+    if (duplicate) {
+      throw new BadRequestException(
+        `Target untuk SOP ${sop.code}, RHK ${dto.rhkCode}, tahun ${dto.year} sudah ada.`,
+      );
+    }
+
+    return this.repository.createTarget({
+      sopId: dto.sopId,
+      rhkCode: dto.rhkCode,
+      year: dto.year,
+      targetQuantity: dto.targetQuantity,
+      targetUnit: dto.targetUnit,
+      qualityTarget: dto.qualityTarget,
+      timeTarget: dto.timeTarget,
+      createdBy: user.id,
+      updatedBy: user.id,
+    });
+  }
+
+  async updateTarget(id: string, dto: UpdateSopTargetDto, user: AuthUser) {
+    const current = await this.repository.findTargetById(id);
+
+    if (!current) {
+      throw new NotFoundException('Target RHK tidak ditemukan');
+    }
+
+    return this.repository.updateTarget(id, {
+      targetQuantity: dto.targetQuantity,
+      targetUnit: dto.targetUnit,
+      qualityTarget: dto.qualityTarget,
+      timeTarget: dto.timeTarget,
+      updatedBy: user.id,
+    });
+  }
+
+  async deleteTarget(id: string, user: AuthUser) {
+    const current = await this.repository.findTargetById(id);
+
+    if (!current) {
+      throw new NotFoundException('Target RHK tidak ditemukan');
+    }
+
+    const realizationCount = await this.repository.countTargetRealizations(id);
+
+    if (realizationCount > 0) {
+      throw new BadRequestException(
+        'Target tidak dapat dihapus karena sudah memiliki realisasi.',
+      );
+    }
+
+    return this.repository.softDeleteTarget(id, user.id);
   }
 
   private async validateEvidence(evidence: Array<{ dmsDocumentId: string }>) {

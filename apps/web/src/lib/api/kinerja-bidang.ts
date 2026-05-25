@@ -229,6 +229,23 @@ export interface KinerjaBidangReportQuery {
   status?: KinerjaSopRealizationStatus | '';
 }
 
+export interface CreateSopTargetPayload {
+  sopId: string;
+  rhkCode: string;
+  year: number;
+  targetQuantity: number;
+  targetUnit: KinerjaSopTargetUnit;
+  qualityTarget: string;
+  timeTarget: string;
+}
+
+export interface UpdateSopTargetPayload {
+  targetQuantity?: number;
+  targetUnit?: KinerjaSopTargetUnit;
+  qualityTarget?: string;
+  timeTarget?: string;
+}
+
 export interface SopEvidenceInputPayload {
   dmsDocumentId: string;
   label?: string;
@@ -356,6 +373,18 @@ export const kinerjaBidangApi = {
       '/kinerja-bidang/targets',
       cleanTargetQuery(query),
     );
+  },
+
+  createTarget(payload: CreateSopTargetPayload) {
+    return apiClient.post<KinerjaBidangSopTarget>('/kinerja-bidang/targets', payload);
+  },
+
+  updateTarget(id: string, payload: UpdateSopTargetPayload) {
+    return apiClient.patch<KinerjaBidangSopTarget>(`/kinerja-bidang/targets/${id}`, payload);
+  },
+
+  deleteTarget(id: string) {
+    return apiClient.delete<KinerjaBidangSopTarget>(`/kinerja-bidang/targets/${id}`);
   },
 
   listRealizations(query: KinerjaBidangReportQuery = {}) {

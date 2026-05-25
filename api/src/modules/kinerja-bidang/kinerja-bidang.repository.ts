@@ -400,6 +400,60 @@ export class KinerjaBidangRepository {
     });
   }
 
+  async createTarget(data: {
+    sopId: string;
+    rhkCode: string;
+    year: number;
+    targetQuantity: number;
+    targetUnit: SopTargetUnit;
+    qualityTarget: string;
+    timeTarget: string;
+    createdBy?: string;
+    updatedBy?: string;
+  }) {
+    return this.prisma.kinerjaBidangSopTarget.create({ data });
+  }
+
+  async updateTarget(
+    id: string,
+    data: {
+      targetQuantity?: number;
+      targetUnit?: SopTargetUnit;
+      qualityTarget?: string;
+      timeTarget?: string;
+      updatedBy?: string;
+    },
+  ) {
+    return this.prisma.kinerjaBidangSopTarget.update({ where: { id }, data });
+  }
+
+  async softDeleteTarget(id: string, userId?: string) {
+    return this.prisma.kinerjaBidangSopTarget.update({
+      where: { id },
+      data: { deletedAt: new Date(), updatedBy: userId },
+    });
+  }
+
+  async targetUniqueExists(sopId: string, rhkCode: string, year: number, excludeId?: string) {
+    const count = await this.prisma.kinerjaBidangSopTarget.count({
+      where: {
+        sopId,
+        rhkCode,
+        year,
+        deletedAt: null,
+        id: excludeId ? { not: excludeId } : undefined,
+      },
+    });
+
+    return count > 0;
+  }
+
+  async countTargetRealizations(targetId: string): Promise<number> {
+    return this.prisma.kinerjaBidangSopRealization.count({
+      where: { targetId, deletedAt: null },
+    });
+  }
+
   private buildSopWhere(filters: SopFilters): Prisma.KinerjaBidangSopWhereInput {
     const where: Prisma.KinerjaBidangSopWhereInput = {
       deletedAt: null,
