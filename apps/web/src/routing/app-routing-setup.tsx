@@ -2,6 +2,9 @@ import { Route, Routes, Navigate } from 'react-router';
 import { Layout1 } from '@/components/layouts/layout-1';
 import { LoginPage } from '@/pages/auth/login-page';
 import { DashboardPage } from '@/pages/workspace/dashboard-page';
+import { SiapCasesPage } from '@/pages/workspace/siap-cases-page';
+import { SiapCaseNewPage } from '@/pages/workspace/siap-case-new-page';
+import { SiapCaseDetailPage } from '@/pages/workspace/siap-case-detail-page';
 import { SiapTasksPage } from '@/pages/workspace/siap-tasks-page';
 import { SiapWorklogsPage } from '@/pages/workspace/siap-worklogs-page';
 import { SiapWorklogTeamPage } from '@/pages/workspace/siap-worklog-team-page';
@@ -215,6 +218,9 @@ export function AppRoutingSetup() {
           <Route path="/layanan/laporan" element={<LayananReportPage />} />
 
           {/* SIAP */}
+          <Route path="/siap/cases" element={<SiapCasesPage />} />
+          <Route path="/siap/cases/new" element={<SiapCaseNewPage />} />
+          <Route path="/siap/cases/:id" element={<SiapCaseDetailPage />} />
           <Route path="/siap/tasks" element={<SiapTasksPage />} />
           <Route path="/siap/worklogs" element={<SiapWorklogsPage />} />
           <Route path="/siap/worklogs/team" element={<SiapWorklogTeamPage />} />

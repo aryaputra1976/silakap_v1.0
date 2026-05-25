@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -11,7 +10,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { SopRealizationStatus } from '@prisma/client';
 import { SopEvidenceInputDto } from './create-sop-realization.dto';
 
 export class UpdateSopRealizationDto {
@@ -31,10 +29,6 @@ export class UpdateSopRealizationDto {
   @IsString()
   @MaxLength(80)
   timeStatus?: string;
-
-  @IsOptional()
-  @IsEnum(SopRealizationStatus)
-  status?: SopRealizationStatus;
 
   @IsOptional()
   @IsString()

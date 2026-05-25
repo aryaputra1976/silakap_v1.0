@@ -19,6 +19,24 @@ const ROUTE_ACCESS_RULES: RouteRule[] = [
   { prefix: '/opd', allowedRoles: OPD_ROLES },
   { prefix: '/dashboard', moduleKey: 'DASHBOARD', allowedRoles: INTERNAL_ROLES },
   {
+    prefix: '/kinerja-bidang/targets',
+    moduleKey: 'KINERJA_BIDANG',
+    requiredPermission: 'monitor',
+    allowedRoles: INTERNAL_ROLES,
+  },
+  {
+    prefix: '/kinerja-bidang/monitoring-kegiatan',
+    moduleKey: 'KINERJA_BIDANG',
+    requiredPermission: 'monitor',
+    allowedRoles: INTERNAL_ROLES,
+  },
+  {
+    prefix: '/kinerja-bidang/monitoring',
+    moduleKey: 'KINERJA_BIDANG',
+    requiredPermission: 'monitor',
+    allowedRoles: INTERNAL_ROLES,
+  },
+  {
     prefix: '/kinerja-bidang/realizations',
     moduleKey: 'KINERJA_BIDANG',
     requiredPermission: 'input',

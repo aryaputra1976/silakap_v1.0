@@ -254,7 +254,6 @@ export interface UpdateSopRealizationPayload {
   realizationQuantity?: number;
   qualityPercent?: number;
   timeStatus?: string;
-  status?: KinerjaSopRealizationStatus;
   title?: string;
   description?: string;
   constraint?: string;

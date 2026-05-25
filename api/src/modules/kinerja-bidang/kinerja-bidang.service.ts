@@ -196,7 +196,6 @@ export class KinerjaBidangService {
     assertEditable(current, 'Realisasi yang sudah approved tidak dapat diedit.');
 
     await this.validateEvidence(dto.evidence ?? []);
-    this.validatePatchApproval(current, dto);
 
     const updated = await this.repository.updateRealization(id, {
       realizationQuantity: dto.realizationQuantity,
@@ -207,7 +206,6 @@ export class KinerjaBidangService {
       constraint: dto.constraint,
       followUp: dto.followUp,
       reviewNote: dto.reviewNote,
-      status: dto.status,
       updatedBy: user.id,
     });
 
@@ -225,30 +223,6 @@ export class KinerjaBidangService {
     }
 
     return this.getRealization(updated.id);
-  }
-
-  private validatePatchApproval(
-    current: KinerjaBidangRealizationRecord,
-    dto: UpdateSopRealizationDto,
-  ) {
-    if (dto.status !== SopRealizationStatus.APPROVED) {
-      return;
-    }
-
-    if (
-      current.status !== SopRealizationStatus.SUBMITTED &&
-      current.status !== SopRealizationStatus.REVIEWED
-    ) {
-      throw new BadRequestException('Hanya realisasi submitted/reviewed yang dapat disetujui.');
-    }
-
-    const nextEvidenceCount = dto.evidence ? dto.evidence.length : current.evidence.length;
-
-    if (nextEvidenceCount === 0) {
-      throw new BadRequestException(
-        'Realisasi belum dapat disetujui karena belum memiliki bukti dukung DMS.',
-      );
-    }
   }
 
   async submitRealization(id: string, user: AuthUser) {
@@ -394,21 +368,28 @@ export class KinerjaBidangService {
     const targets = await this.repository.findTargets(year);
 
     return targets.map((target) => {
+      const approvedRealizations = target.realizations.filter(
+        (item) => item.status === SopRealizationStatus.APPROVED,
+      );
       const realizationQuantity = target.realizations.reduce(
         (total, item) => total + item.realizationQuantity,
         0,
       );
 
-      const approvedRealizationQuantity = target.realizations
-        .filter((item) => item.status === SopRealizationStatus.APPROVED)
-        .reduce((total, item) => total + item.realizationQuantity, 0);
+      const approvedRealizationQuantity = approvedRealizations.reduce(
+        (total, item) => total + item.realizationQuantity,
+        0,
+      );
 
-      const evidenceCount = target.realizations.reduce((total, item) => total + item.evidence.length, 0);
+      const evidenceCount = approvedRealizations.reduce(
+        (total, item) => total + item.evidence.length,
+        0,
+      );
 
       const progressPercent =
         target.targetQuantity <= 0
           ? 0
-          : Math.min(100, Math.round((realizationQuantity / target.targetQuantity) * 100));
+          : Math.min(100, Math.round((approvedRealizationQuantity / target.targetQuantity) * 100));
 
       return {
         targetId: target.id,

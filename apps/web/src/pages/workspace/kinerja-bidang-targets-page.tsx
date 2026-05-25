@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { Plus } from 'lucide-react';
 import {
+  ActionButton,
   DataTable,
   ErrorAlert,
   LoadingState,
@@ -12,8 +15,10 @@ import {
   kinerjaTargetUnitLabel,
   type KinerjaBidangTargetForInput,
 } from '@/lib/api/kinerja-bidang';
+import { buildRealizationCreatePath } from '@/lib/sop/sop-realization-routes';
 
 export function KinerjaBidangTargetsPage() {
+  const navigate = useNavigate();
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [items, setItems] = useState<KinerjaBidangTargetForInput[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +95,27 @@ export function KinerjaBidangTargetsPage() {
               { key: 'target', header: 'Target', render: (item) => `${item.targetQuantity} ${kinerjaTargetUnitLabel(item.targetUnit)}` },
               { key: 'quality', header: 'Kualitas', render: (item) => item.qualityTarget },
               { key: 'time', header: 'Waktu', render: (item) => item.timeTarget },
+              {
+                key: 'actions',
+                header: '',
+                render: (item) => (
+                  <ActionButton
+                    icon={Plus}
+                    onClick={() =>
+                      navigate(
+                        buildRealizationCreatePath({
+                          year,
+                          targetId: item.id,
+                          rhkCode: item.rhkCode,
+                          source: 'monitoring',
+                        }),
+                      )
+                    }
+                  >
+                    Input Realisasi
+                  </ActionButton>
+                ),
+              },
             ]}
           />
         </SectionCard>

@@ -194,17 +194,17 @@ Integrasi SOP PPIK ke Silakap bertujuan untuk:
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | 34 SOP terseed via `POST /api/v1/kinerja-bidang/seed` | ✓ |
+| 1 | 34 SOP terseed via `POST /api/v1/kinerja-bidang/seed-default` | ✓ |
 | 2 | Migration `20260517000100_add_kinerja_bidang_sop_rhk` dijalankan | ✓ |
 | 3 | Tabel: kinerja_bidang_sop, _sop_rhk, _sop_steps, _sop_targets, _sop_realizations, _sop_evidence | ✓ |
 | 4 | 8 kode RHK unik (RHK 1–8) + SEMUA_RHK (wildcard semua) | ✓ |
 | 5 | Foreign key kinerja_bidang_sop_evidence → dms_documents (bukti dukung DMS terhubung) | ✓ |
-| 6 | Seed endpoint terlindungi: `KINERJA_BIDANG_SEED_ROLES` (SUPER_ADMIN, ADMIN, KABID) | ✓ |
+| 6 | Seed endpoint terlindungi: `KINERJA_BIDANG_SEED_ROLES` (SUPER_ADMIN, ADMIN_BKPSDM, KABID) | ✓ |
 | 7 | Seed idempotent: upsert berdasarkan `code`, tidak duplikat | ✓ |
 
 **Prosedur seed (setelah migrate):**
 ```
-POST /api/v1/kinerja-bidang/seed
+POST /api/v1/kinerja-bidang/seed-default
 Authorization: Bearer <token SUPER_ADMIN>
 ```
 
@@ -277,7 +277,7 @@ Authorization: Bearer <token SUPER_ADMIN>
 | `GET /api/v1/kinerja-bidang/targets` | GET | JWT + Roles | ✓ |
 | `GET /api/v1/kinerja-bidang/realizations` | GET | JWT + Roles | ✓ |
 | `GET /api/v1/kinerja-bidang/report` | GET | JWT + Roles | ✓ |
-| `POST /api/v1/kinerja-bidang/seed` | POST | JWT + SEED_ROLES | ✓ |
+| `POST /api/v1/kinerja-bidang/seed-default` | POST | JWT + SEED_ROLES | ✓ |
 | `GET /api/v1/dms/documents` | GET | JWT + DMS_ACCESS_ROLES | ✓ |
 | `GET /api/v1/dms/documents/:id` | GET | JWT + DMS_ACCESS_ROLES | ✓ |
 | `POST /api/v1/dms/documents` | POST | JWT + DMS_ACCESS_ROLES | ✓ |
@@ -308,9 +308,8 @@ Authorization: Bearer <token SUPER_ADMIN>
 
 | Role | Diperlukan Untuk | Status |
 |------|-----------------|--------|
-| `SEKRETARIS` | DMS TERBATAS, Kinerja Bidang review | Belum ada di DB/JWT. DMS TERBATAS tidak mencakup SEKRETARIS. Kinerja Bidang menggunakan `SEKRETARIS` sebagai string tapi role tidak ada. |
+| `SEKRETARIS` | DMS TERBATAS | Belum ada di DB/JWT. DMS TERBATAS tidak mencakup SEKRETARIS. |
 | `AUDITOR` | DMS AUDIT access | Belum ada di DB/JWT. AUDIT level hanya bisa diakses KABID ke atas. |
-| `ADMIN` | Kinerja Bidang write/seed | `kinerja-bidang-roles.constant.ts` pakai `ADMIN` bukan `ADMIN_BKPSDM`. Gap ini tidak memblokir — `SUPER_ADMIN` dan `KABID` tetap bisa seed. |
 
 **Implikasi:**
 - Pengguna dengan role `SEKRETARIS` tidak bisa login DMS (tidak ada di `DMS_ACCESS_ROLES`)
@@ -339,18 +338,18 @@ Dokumen SOP di sidebar "Referensi SOP" (`/dms/documents?category=DOKUMEN_KEBIJAK
 
 Saat ini (fresh install): halaman akan menampilkan empty state — aman.
 
-### 8.5 Kinerja Bidang — Inkonsistensi Role Name
+### 8.5 Kinerja Bidang — Role Name Selaras
 
-`kinerja-bidang-roles.constant.ts` menggunakan nama role generik:
+`kinerja-bidang-roles.constant.ts` sudah memakai role aktif aplikasi:
 ```
-KINERJA_BIDANG_READ_ROLES: ['SUPER_ADMIN', 'ADMIN', 'KEPALA_BADAN', 'SEKRETARIS', 'KABID', 'STAFF']
-KINERJA_BIDANG_WRITE_ROLES: ['SUPER_ADMIN', 'ADMIN', 'KABID', 'STAFF']
+KINERJA_BIDANG_READ_ROLES: SUPER_ADMIN, ADMIN_BKPSDM, KEPALA_BADAN, KABID, ANALIS_MADYA, ANALIS_MUDA, ANALIS_PERTAMA, PENELAAH, PPPK
+KINERJA_BIDANG_WRITE_ROLES: SUPER_ADMIN, ADMIN_BKPSDM, KABID, ANALIS_MADYA, ANALIS_MUDA, ANALIS_PERTAMA, PENELAAH, PPPK
+KINERJA_BIDANG_REVIEW_ROLES: SUPER_ADMIN, ADMIN_BKPSDM, KEPALA_BADAN, KABID
 ```
-Sementara role aktual yang ada di sistem adalah `ADMIN_BKPSDM`, `ANALIS_MADYA`, `ANALIS_MUDA`, `ANALIS_PERTAMA`, `PENELAAH`, `PPPK`.
 
-**Dampak operasional:** ANALIS/PENELAAH/PPPK tidak bisa membaca Kinerja Bidang via API guard (hanya KABID dan SUPER_ADMIN/ADMIN yang cocok). Frontend tetap bisa diakses karena tidak ada route guard frontend.
+**Status:** gap `ADMIN`/`STAFF` legacy sudah ditutup; ANALIS/PENELAAH/PPPK dapat membaca dan menginput sesuai policy frontend, sementara review/approval tetap dibatasi ke pimpinan bidang.
 
-**Fix di masa depan:** Update `kinerja-bidang-roles.constant.ts` untuk mengganti `STAFF` → `ANALIS_PERTAMA`, `PENELAAH`, `PPPK` dan `ADMIN` → `ADMIN_BKPSDM`.
+**Catatan kontrol:** perubahan status realisasi tetap harus melalui endpoint workflow (`submit`, `review`, `approve`, `request-revision`), bukan melalui `PATCH /realizations/:id`.
 
 ### 8.6 SIARSIP
 
