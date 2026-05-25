@@ -619,7 +619,9 @@ export class SidataImportRepository {
             'eselon',
           ]);
           const bupRaw = this.pickRaw(normalizedRaw, ['bup', 'batas_usia_pensiun', 'batas_usia_pensiun_tahun']);
-          const bup = bupRaw !== null ? parseInt(bupRaw, 10) || null : null;
+          const bup = bupRaw !== null
+            ? parseInt(bupRaw, 10) || null
+            : this.inferBupFromJabatanJenjang(jenjang);
 
           const existing = await this.findExistingJabatanInTx(tx, {
             jenisJabatanId: params.jenisJabatanId,
@@ -4250,6 +4252,7 @@ export class SidataImportRepository {
     if (
       jabatan.startsWith('KEPALA BIDANG')
       || jabatan.startsWith('INSPEKTUR PEMBANTU')
+      || jabatan.startsWith('KEPALA INSPEKTUR')
       || jabatan.startsWith('SEKRETARIS CAMAT')
     ) return 'III.b';
     if (
@@ -4262,6 +4265,13 @@ export class SidataImportRepository {
       || jabatan.startsWith('SEKRETARIS LURAH')
     ) return 'IV.a';
 
+    return null;
+  }
+
+  private inferBupFromJabatanJenjang(jenjang: string | null | undefined): number | null {
+    const normalizedJenjang = this.normalizeText(jenjang ?? '');
+    if (normalizedJenjang === '99') return 60;
+    if (['31', '32', '41', '42'].includes(normalizedJenjang)) return 58;
     return null;
   }
 

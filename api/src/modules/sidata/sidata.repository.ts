@@ -35,6 +35,11 @@ const asnInclude = {
       nama: true,
     },
   },
+  jabatanRef: {
+    select: {
+      bup: true,
+    },
+  },
   siasnProfile: {
     select: {
       email: true,

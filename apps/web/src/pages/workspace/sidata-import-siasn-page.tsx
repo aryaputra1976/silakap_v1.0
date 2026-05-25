@@ -56,6 +56,20 @@ function normalizeUnitSearchText(value: string) {
     .replace(/\s+/g, ' ');
 }
 
+function buildUnitPath(unit: SidataUnitKerja, unitById: Map<string, SidataUnitKerja>) {
+  const names: string[] = [];
+  const visited = new Set<string>();
+  let current: SidataUnitKerja | undefined = unit;
+
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    names.unshift(current.nama);
+    current = current.parentId ? unitById.get(current.parentId) : undefined;
+  }
+
+  return names.join(' / ');
+}
+
 function normalizeIssueErrors(value: SiasnImportIssueRow['validationErrors']) {
   if (Array.isArray(value)) return value;
   if (!value) return [];
@@ -306,18 +320,41 @@ export function SidataImportSiasnPage() {
 
   const summaryStatus = summary?.status ?? null;
 
+  const unitById = useMemo(
+    () => new Map(unitOptions.map((unit) => [unit.id, unit])),
+    [unitOptions],
+  );
+
+  const unitPathById = useMemo(
+    () => new Map(unitOptions.map((unit) => [unit.id, buildUnitPath(unit, unitById)])),
+    [unitById, unitOptions],
+  );
+
   const filteredUnitOptions = useMemo(() => {
     const q = normalizeUnitSearchText(unitSearch);
+    const tokens = q.split(' ').filter(Boolean);
 
     return unitOptions
-      .filter((unit) => {
-        if (!q) return true;
+      .map((unit) => {
+        const path = unitPathById.get(unit.id) ?? unit.nama;
+        const normalizedName = normalizeUnitSearchText(unit.nama);
+        const normalizedPath = normalizeUnitSearchText(path);
+        const haystack = normalizeUnitSearchText(`${unit.kode} ${unit.nama} ${path} level ${unit.level}`);
 
-        const haystack = normalizeUnitSearchText(`${unit.kode} ${unit.nama}`);
-        return haystack.includes(q) || q.split(' ').every((token) => haystack.includes(token));
+        let rank = 4;
+        if (!q) rank = 4;
+        else if (normalizedName === q || normalizedPath.endsWith(q)) rank = 0;
+        else if (normalizedName.includes(q)) rank = 1;
+        else if (normalizedPath.includes(q)) rank = 2;
+        else if (tokens.every((token) => haystack.includes(token))) rank = 3;
+
+        return { unit, rank };
       })
+      .filter(({ rank }) => !q || rank < 4)
+      .sort((a, b) => a.rank - b.rank || a.unit.level - b.unit.level || a.unit.nama.localeCompare(b.unit.nama))
+      .map(({ unit }) => unit)
       .slice(0, 40);
-  }, [unitOptions, unitSearch]);
+  }, [unitOptions, unitPathById, unitSearch]);
 
   async function silentRefreshSummary() {
     if (!selectedId) return;
@@ -1070,73 +1107,68 @@ export function SidataImportSiasnPage() {
                           className: 'w-12',
                         },
                         {
-                          key: 'nip',
-                          header: 'NIP',
+                          key: 'asn',
+                          header: 'ASN',
                           render: (item) => (
-                            <span className="font-mono text-xs">{item.nip ?? '—'}</span>
-                          ),
-                          className: 'w-36',
-                        },
-                        {
-                          key: 'nama',
-                          header: 'Nama',
-                          render: (item) => <span className="text-sm">{item.nama ?? '—'}</span>,
-                        },
-                        {
-                          key: 'unit',
-                          header: 'Unit / Jabatan',
-                          render: (item) => (
-                            <div className="text-xs leading-5">
-                              <div className="font-medium text-zinc-800">
-                                {item.unitOrganisasiNama ?? '—'}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-zinc-900">{item.nama ?? '-'}</div>
+                              <div className="mt-1 font-mono text-xs text-zinc-500">
+                                NIP {item.nip ?? '-'}
                               </div>
-                              <div className="text-zinc-500">{item.jabatanNama ?? '—'}</div>
+                            </div>
+                          ),
+                          className: 'w-[260px]',
+                        },
+                        {
+                          key: 'kepegawaian',
+                          header: 'Golongan / Jabatan / Unit',
+                          render: (item) => (
+                            <div className="space-y-2 text-sm leading-5">
+                              <div>
+                                <div className="text-xs font-semibold uppercase text-zinc-500">Golongan</div>
+                                <div className="font-semibold text-zinc-900">{item.golonganNama ?? '-'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase text-zinc-500">Jabatan</div>
+                                <div className="text-zinc-800">{item.jabatanNama ?? '-'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase text-zinc-500">Unit</div>
+                                <div className="text-zinc-700">{item.unitOrganisasiNama ?? '-'}</div>
+                              </div>
                             </div>
                           ),
                         },
                         {
-                          key: 'golongan',
-                          header: 'Golongan',
-                          render: (item) => (
-                            <span className="text-xs">{item.golonganNama ?? '—'}</span>
-                          ),
-                          className: 'w-24',
-                        },
-                        {
-                          key: 'mapping',
-                          header: 'Mapping',
-                          render: (item) => <StatusBadge value={item.mappingStatus} />,
-                          className: 'w-32',
-                        },
-                        {
-                          key: 'validation',
-                          header: 'Validasi',
-                          render: (item) => <StatusBadge value={item.validationStatus} />,
-                          className: 'w-24',
-                        },
-                        {
                           key: 'errors',
-                          header: 'Keterangan',
+                          header: 'Status',
                           render: (item) => {
                             const errors = normalizeIssueErrors(item.validationErrors);
 
-                            if (errors.length === 0) {
-                              return <span className="text-xs text-zinc-400">—</span>;
-                            }
-
                             return (
-                              <ul className="space-y-0.5 text-xs text-rose-700">
-                                {errors.slice(0, 3).map((error, index) => (
-                                  <li key={`${item.id}-${index}`}>• {error}</li>
-                                ))}
-                                {errors.length > 3 && (
-                                  <li className="text-zinc-500">
-                                    +{errors.length - 3} lainnya
-                                  </li>
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  <StatusBadge value={item.mappingStatus} />
+                                  <StatusBadge value={item.validationStatus} />
+                                </div>
+                                {errors.length === 0 ? (
+                                  <span className="text-xs text-zinc-400">-</span>
+                                ) : (
+                                  <ul className="space-y-0.5 text-xs leading-5 text-rose-700">
+                                    {errors.slice(0, 3).map((error, index) => (
+                                      <li key={`${item.id}-${index}`}>- {error}</li>
+                                    ))}
+                                    {errors.length > 3 && (
+                                      <li className="text-zinc-500">
+                                        +{errors.length - 3} lainnya
+                                      </li>
+                                    )}
+                                  </ul>
                                 )}
-                              </ul>
+                              </div>
                             );
                           },
+                          className: 'w-[260px]',
                         },
                         {
                           key: 'action',
@@ -1206,7 +1238,7 @@ export function SidataImportSiasnPage() {
 
       {resolvingIssue ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-3xl rounded-lg border border-[#cfe1da] bg-[#fbfdf8] shadow-2xl">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-[#cfe1da] bg-[#fbfdf8] shadow-2xl">
             <div className="border-b border-[#d8e4d3] p-5">
               <div className="text-lg font-semibold text-[#073b3a]">Mapping Unit Kerja</div>
               <div className="mt-1 text-sm text-[#5b6b58]">
@@ -1217,19 +1249,28 @@ export function SidataImportSiasnPage() {
               </div>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
               <input
                 className={inputClass}
                 onChange={(event) => setUnitSearch(event.target.value)}
-                placeholder="Cari kode atau nama unit kerja..."
+                placeholder="Cari kode, nama unit, atau induk OPD..."
                 value={unitSearch}
               />
+              <div className="rounded-md border border-[#d8e4d3] bg-white/70 p-3 text-xs leading-5 text-[#5b6b58]">
+                Gunakan kata kunci berantai bila nama unit sama, misalnya
+                <span className="font-semibold"> Sekretariat Keuangan</span>,
+                <span className="font-semibold"> Dinas Pendidikan Sub Bagian Keuangan</span>, atau kode unit.
+                Pilihan di bawah menampilkan jalur unit lengkap agar tidak tertukar antar OPD.
+              </div>
 
-              <div className="max-h-80 overflow-auto rounded-lg border border-[#d8e4d3] bg-white">
+              <div className="max-h-64 overflow-auto rounded-lg border border-[#d8e4d3] bg-white">
                 {filteredUnitOptions.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">Unit kerja tidak ditemukan.</div>
                 ) : (
-                  filteredUnitOptions.map((unit) => (
+                  filteredUnitOptions.map((unit) => {
+                    const path = unitPathById.get(unit.id) ?? unit.nama;
+
+                    return (
                     <label
                       className="flex cursor-pointer items-start gap-3 border-b border-[#edf3ea] p-3 text-sm last:border-b-0 hover:bg-[#f1f7ed]"
                       key={unit.id}
@@ -1243,12 +1284,16 @@ export function SidataImportSiasnPage() {
                       />
                       <span>
                         <span className="block font-semibold text-[#073b3a]">{unit.nama}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[#687761]">
+                          {path}
+                        </span>
                         <span className="mt-1 block font-mono text-xs text-[#687761]">
-                          {unit.kode} - Level {unit.level}
+                          Kode {unit.kode} - Level {unit.level}
                         </span>
                       </span>
                     </label>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
@@ -1257,7 +1302,7 @@ export function SidataImportSiasnPage() {
                   Catatan Mapping
                 </label>
                 <textarea
-                  className={`${inputClass} min-h-24 resize-y py-3`}
+                  className={`${inputClass} min-h-20 resize-y py-3`}
                   onChange={(event) => setResolutionNote(event.target.value)}
                   placeholder="Contoh: Unit SIASN menggunakan nomenklatur lama, dipetakan ke unit kerja aktif yang sesuai."
                   value={resolutionNote}
@@ -1268,7 +1313,7 @@ export function SidataImportSiasnPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-[#d8e4d3] p-5">
+            <div className="sticky bottom-0 flex shrink-0 justify-end gap-2 border-t border-[#d8e4d3] bg-[#fbfdf8] p-4 shadow-[0_-8px_18px_rgba(15,45,38,0.08)]">
               <ActionButton
                 disabled={savingResolution}
                 onClick={() => setResolvingIssue(null)}

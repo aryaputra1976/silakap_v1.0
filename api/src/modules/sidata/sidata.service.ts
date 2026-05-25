@@ -849,7 +849,7 @@ export class SidataService {
           asn.siasnProfile?.emailGov,
           asn.siasnProfile?.phone,
           formatCsvDate(asn.siasnProfile?.tmtPns),
-          formatCsvDate(asn.tmtPensiun ?? asn.siasnProfile?.tmtPensiun),
+          formatCsvDate(this.getEffectiveTmtPensiun(asn)),
           formatCsvDateTime(asn.syncedAt),
         ];
       }
@@ -1176,6 +1176,29 @@ export class SidataService {
     return age >= 0 ? age : null;
   }
 
+  private getEffectiveTmtPensiun(asn: AsnRecord): Date | null {
+    return asn.tmtPensiun
+      ?? asn.siasnProfile?.tmtPensiun
+      ?? this.calculateEstimatedTmtPensiun(asn);
+  }
+
+  private calculateEstimatedTmtPensiun(asn: AsnRecord): Date | null {
+    const birthDate = asn.siasnProfile?.tanggalLahir;
+    const bupYears = this.resolveBupYears(asn);
+
+    if (!birthDate || !bupYears) return null;
+
+    return new Date(Date.UTC(
+      birthDate.getUTCFullYear() + bupYears,
+      birthDate.getUTCMonth() + 1,
+      1,
+    ));
+  }
+
+  private resolveBupYears(asn: AsnRecord): number | null {
+    return asn.jabatanRef?.bup ?? null;
+  }
+
   private pickJsonText(value: Record<string, unknown>, keys: string[]): string | null {
     const normalizedValueByKey = new Map(
       Object.entries(value).map(([key, item]) => [this.normalizeJsonKey(key), item]),
@@ -1240,7 +1263,7 @@ export class SidataService {
       jenisAsn: asn.tipePegawai ?? asn.jenisPegawaiNama ?? asn.jenisAsnNama,
       statusAsn: asn.statusAsn ?? asn.detailStatusNama,
       tanggalLahir: asn.siasnProfile?.tanggalLahir?.toISOString() ?? null,
-      tmtPensiun: asn.tmtPensiun?.toISOString() ?? null,
+      tmtPensiun: this.getEffectiveTmtPensiun(asn)?.toISOString() ?? null,
       syncStatus: asn.syncStatus,
       lastSiasnBatchId: asn.lastSiasnBatchId,
       lastSiasnSyncedAt: asn.lastSiasnSyncedAt?.toISOString() ?? null,
