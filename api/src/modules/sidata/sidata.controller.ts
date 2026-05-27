@@ -25,6 +25,7 @@ import {
   SIDATA_ASN_DOCUMENT_MAX_SIZE_BYTES,
   SidataAsnDocumentUploadDto,
   SidataAsnQueryDto,
+  SidataRekapJabatanAsnQueryDto,
   SidataUpdateAsnDto,
 } from './sidata.types';
 
@@ -86,6 +87,14 @@ export class SidataController {
   @Get('rekap/pppk')
   async getRekapPppk(@CurrentUser() user: AuthUser) {
     return ok(await this.sidataService.getRekapPppk(user));
+  }
+
+  @Get('rekap/jabatan/asn')
+  async getRekapJabatanAsn(
+    @Query() query: SidataRekapJabatanAsnQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return ok(await this.sidataService.getRekapJabatanAsn(query, user));
   }
 
   @Get('rekap')

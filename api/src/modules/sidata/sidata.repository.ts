@@ -7,12 +7,14 @@ import {
   RekapFungsionalRow,
   RekapGolonganRow,
   RekapIkhtisarResponse,
+  RekapJabatanAsnRow,
   RekapJenjangRow,
   RekapJKRow,
   RekapPendidikanRow,
   RekapPnsResponse,
   RekapPppkResponse,
   RekapStrukturalEselonRow,
+  RekapStrukturalJabatanRow,
   RekapStrukturalPendidikanRow,
   UnitTreeNode,
 } from './sidata.types';
@@ -372,6 +374,19 @@ export type SidataAsnQualityAggregateRecord = {
 export type SidataAsnQualityBreakdownRecord = {
   label: string;
   total: number;
+};
+
+type RekapJabatanAsnSqlRow = {
+  id: string;
+  nip: string;
+  nama: string;
+  golonganNama: string | null;
+  tmtGolongan: Date | null;
+  jabatanNama: string | null;
+  tmtJabatan: Date | null;
+  opdNama: string | null;
+  unitKerjaNama: string | null;
+  jenisAsn: string | null;
 };
 
 export type SidataAsnQualityDashboardRecord = {
@@ -956,6 +971,133 @@ export class SidataRepository {
     return result;
   }
 
+  async findRekapAsnByJabatanName(params: {
+    jabatanNama: string;
+    unitKerjaId?: string;
+  }): Promise<RekapJabatanAsnRow[]> {
+    const whereSql = await this.buildRekapWhereSql(params.unitKerjaId);
+    const rows = await this.prisma.$queryRaw<RekapJabatanAsnSqlRow[]>(Prisma.sql`
+      SELECT
+        a.id,
+        a.nip,
+        a.nama,
+        a.golongan_nama AS golonganNama,
+        a.tmt_golongan AS tmtGolongan,
+        COALESCE(NULLIF(a.jabatan_nama, ''), rj.nama) AS jabatanNama,
+        a.tmt_jabatan AS tmtJabatan,
+        COALESCE(
+          CASE WHEN uk.level = 1 THEN NULLIF(uk.nama, '') END,
+          CASE WHEN uk1.level = 1 THEN NULLIF(uk1.nama, '') END,
+          CASE WHEN uk2.level = 1 THEN NULLIF(uk2.nama, '') END,
+          CASE WHEN uk3.level = 1 THEN NULLIF(uk3.nama, '') END,
+          CASE WHEN uk4.level = 1 THEN NULLIF(uk4.nama, '') END,
+          NULLIF(uk2.nama, ''),
+          NULLIF(uk1.nama, ''),
+          NULLIF(uk.nama, '')
+        ) AS opdNama,
+        uk.nama AS unitKerjaNama,
+        COALESCE(NULLIF(a.tipe_pegawai, ''), NULLIF(a.jenis_pegawai_nama, ''), NULLIF(a.jenis_asn_nama, '')) AS jenisAsn
+      FROM asn a
+      LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
+      LEFT JOIN unit_kerja uk ON uk.id = a.unit_kerja_id
+      LEFT JOIN unit_kerja uk1 ON uk1.id = uk.parent_id
+      LEFT JOIN unit_kerja uk2 ON uk2.id = uk1.parent_id
+      LEFT JOIN unit_kerja uk3 ON uk3.id = uk2.parent_id
+      LEFT JOIN unit_kerja uk4 ON uk4.id = uk3.parent_id
+      WHERE ${whereSql}
+        AND TRIM(UPPER(COALESCE(NULLIF(a.jabatan_nama, ''), rj.nama, 'TIDAK_DIISI'))) = TRIM(UPPER(${params.jabatanNama}))
+      ORDER BY
+        CASE
+          WHEN a.tipe_pegawai = 'PNS' THEN 1
+          WHEN a.tipe_pegawai = 'PPPK' THEN 2
+          WHEN a.tipe_pegawai = 'PPPK_PARUH_WAKTU' THEN 3
+          ELSE 4
+        END,
+        a.nama ASC,
+        a.nip ASC
+    `);
+
+    return rows.map((row) => ({
+      id: row.id,
+      nip: row.nip,
+      nama: row.nama,
+      golonganNama: row.golonganNama,
+      tmtGolongan: row.tmtGolongan instanceof Date
+        ? row.tmtGolongan.toISOString()
+        : row.tmtGolongan ? String(row.tmtGolongan) : null,
+      jabatanNama: row.jabatanNama,
+      tmtJabatan: row.tmtJabatan instanceof Date
+        ? row.tmtJabatan.toISOString()
+        : row.tmtJabatan ? String(row.tmtJabatan) : null,
+      opdNama: row.opdNama ?? row.unitKerjaNama,
+      unitKerjaNama: row.unitKerjaNama,
+      jenisAsn: row.jenisAsn,
+    }));
+  }
+
+  async findRekapAsnByEselon(params: {
+    eselon: string;
+    unitKerjaId?: string;
+  }): Promise<RekapJabatanAsnRow[]> {
+    const whereSql = await this.buildRekapWhereSql(params.unitKerjaId);
+    const h = this.rekapHelpers();
+    const rows = await this.prisma.$queryRaw<RekapJabatanAsnSqlRow[]>(Prisma.sql`
+      SELECT
+        a.id,
+        a.nip,
+        a.nama,
+        a.golongan_nama AS golonganNama,
+        a.tmt_golongan AS tmtGolongan,
+        COALESCE(NULLIF(a.jabatan_nama, ''), rj.nama) AS jabatanNama,
+        a.tmt_jabatan AS tmtJabatan,
+        COALESCE(
+          CASE WHEN uk.level = 1 THEN NULLIF(uk.nama, '') END,
+          CASE WHEN uk1.level = 1 THEN NULLIF(uk1.nama, '') END,
+          CASE WHEN uk2.level = 1 THEN NULLIF(uk2.nama, '') END,
+          CASE WHEN uk3.level = 1 THEN NULLIF(uk3.nama, '') END,
+          CASE WHEN uk4.level = 1 THEN NULLIF(uk4.nama, '') END,
+          NULLIF(uk2.nama, ''),
+          NULLIF(uk1.nama, ''),
+          NULLIF(uk.nama, '')
+        ) AS opdNama,
+        uk.nama AS unitKerjaNama,
+        COALESCE(NULLIF(a.tipe_pegawai, ''), NULLIF(a.jenis_pegawai_nama, ''), NULLIF(a.jenis_asn_nama, '')) AS jenisAsn
+      FROM asn a
+      LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
+      LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
+      LEFT JOIN unit_kerja uk ON uk.id = a.unit_kerja_id
+      LEFT JOIN unit_kerja uk1 ON uk1.id = uk.parent_id
+      LEFT JOIN unit_kerja uk2 ON uk2.id = uk1.parent_id
+      LEFT JOIN unit_kerja uk3 ON uk3.id = uk2.parent_id
+      LEFT JOIN unit_kerja uk4 ON uk4.id = uk3.parent_id
+      WHERE ${whereSql}
+        AND a.tipe_pegawai = 'PNS'
+        AND UPPER(COALESCE(a.jenis_jabatan_nama,'')) LIKE '%STRUKTURAL%'
+        AND ${h.eselonLabel} = ${params.eselon}
+      ORDER BY
+        a.jabatan_nama ASC,
+        a.nama ASC,
+        a.nip ASC
+    `);
+
+    return rows.map((row) => ({
+      id: row.id,
+      nip: row.nip,
+      nama: row.nama,
+      golonganNama: row.golonganNama,
+      tmtGolongan: row.tmtGolongan instanceof Date
+        ? row.tmtGolongan.toISOString()
+        : row.tmtGolongan ? String(row.tmtGolongan) : null,
+      jabatanNama: row.jabatanNama,
+      tmtJabatan: row.tmtJabatan instanceof Date
+        ? row.tmtJabatan.toISOString()
+        : row.tmtJabatan ? String(row.tmtJabatan) : null,
+      opdNama: row.opdNama ?? row.unitKerjaNama,
+      unitKerjaNama: row.unitKerjaNama,
+      jenisAsn: row.jenisAsn,
+    }));
+  }
+
   async findRekapAsnData(params: { unitKerjaId?: string } = {}): Promise<RekapAsnResponse> {
     type JkSqlRow = { jk: string; cnt: bigint | number };
     type GolruJkSqlRow = { golru: string; jk: string; cnt: bigint | number };
@@ -967,9 +1109,17 @@ export class SidataRepository {
     type EselonPddknSqlRow = { pddkn_label: string; eselon_label: string; cnt: bigint | number };
     type FungsionalJkSqlRow = { jabatan_nama: string; ahli_terampil: string; jk: string; cnt: bigint | number };
 
-    const toN = (v: bigint | number | null | undefined): number => {
+    const toN = (v: bigint | number | string | object | null | undefined): number => {
       if (typeof v === 'bigint') return Number(v);
       if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if (typeof v === 'string') {
+        const parsed = Number(v);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      if (v) {
+        const parsed = Number(v);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
       return 0;
     };
 
@@ -1620,9 +1770,17 @@ export class SidataRepository {
     type EselonPddknSqlRow = { pddkn_label: string; eselon_label: string; cnt: bigint | number };
     type FungsionalJkSqlRow = { jabatan_nama: string; ahli_terampil: string; jk: string; cnt: bigint | number };
 
-    const toN = (v: bigint | number | null | undefined): number => {
+    const toN = (v: bigint | number | string | object | null | undefined): number => {
       if (typeof v === 'bigint') return Number(v);
       if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if (typeof v === 'string') {
+        const parsed = Number(v);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      if (v) {
+        const parsed = Number(v);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
       return 0;
     };
 
@@ -1637,8 +1795,8 @@ export class SidataRepository {
 
     const jkFragment = Prisma.sql`
       CASE
-        WHEN UPPER(COALESCE(sp.jenis_kelamin_nama, '')) IN ('LAKI-LAKI', 'L', 'PRIA', 'LK') THEN 'PRIA'
-        WHEN UPPER(COALESCE(sp.jenis_kelamin_nama, '')) IN ('PEREMPUAN', 'P', 'WANITA', 'PR') THEN 'WANITA'
+        WHEN UPPER(COALESCE(sp.jenis_kelamin_nama, '')) IN ('LAKI-LAKI', 'LAKI LAKI', 'L', 'PRIA', 'LK', 'M', 'MALE', '1') THEN 'PRIA'
+        WHEN UPPER(COALESCE(sp.jenis_kelamin_nama, '')) IN ('PEREMPUAN', 'P', 'WANITA', 'PR', 'F', 'FEMALE', '2') THEN 'WANITA'
         ELSE 'LAINNYA'
       END`;
 
@@ -1740,20 +1898,21 @@ export class SidataRepository {
     type JkRow = { jk: string; cnt: bigint | number };
     type JenjangRow = { kategori: string; jk: string; cnt: bigint | number };
     const h = this.rekapHelpers();
+    const whereSql = await this.buildRekapWhereSql();
 
     const [allJkRows, pppkJkRows, allJenjangRows] = await Promise.all([
       this.prisma.$queryRaw<JkRow[]>(Prisma.sql`
         SELECT ${h.jkFragment} AS jk, COUNT(*) AS cnt
         FROM asn a
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+        WHERE ${whereSql}
         GROUP BY jk`),
 
       this.prisma.$queryRaw<JkRow[]>(Prisma.sql`
         SELECT ${h.jkFragment} AS jk, COUNT(*) AS cnt
         FROM asn a
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+        WHERE ${whereSql}
           AND a.tipe_pegawai IN ('PPPK','PPPK_PARUH_WAKTU')
         GROUP BY jk`),
 
@@ -1770,7 +1929,7 @@ export class SidataRepository {
           COUNT(*) AS cnt
         FROM asn a
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+        WHERE ${whereSql}
         GROUP BY kategori, jk`),
     ]);
 
@@ -1781,19 +1940,29 @@ export class SidataRepository {
     };
     const allJkMap  = toJkMap(allJkRows);
     const pppkJkMap = toJkMap(pppkJkRows);
-    const allJk  = h.toJKRow(allJkMap.get('PRIA') ?? 0, allJkMap.get('WANITA') ?? 0);
-    const pppkJk = h.toJKRow(pppkJkMap.get('PRIA') ?? 0, pppkJkMap.get('WANITA') ?? 0);
+    const allJk  = h.toJKRow(
+      allJkMap.get('PRIA') ?? 0,
+      allJkMap.get('WANITA') ?? 0,
+      allJkMap.get('LAINNYA') ?? 0,
+    );
+    const pppkJk = h.toJKRow(
+      pppkJkMap.get('PRIA') ?? 0,
+      pppkJkMap.get('WANITA') ?? 0,
+      pppkJkMap.get('LAINNYA') ?? 0,
+    );
 
-    const jenjangMap = new Map<string, { pria: number; wanita: number }>();
+    const jenjangMap = new Map<string, { pria: number; wanita: number; lainnya: number }>();
     for (const row of allJenjangRows) {
-      const entry = jenjangMap.get(row.kategori) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') entry.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') entry.wanita += h.toN(row.cnt);
+      const entry = jenjangMap.get(row.kategori) ?? { pria: 0, wanita: 0, lainnya: 0 };
+      const count = h.toN(row.cnt);
+      if (row.jk === 'PRIA') entry.pria += count;
+      else if (row.jk === 'WANITA') entry.wanita += count;
+      else entry.lainnya += count;
       jenjangMap.set(row.kategori, entry);
     }
     const toJenjangRow = (jabatan: string) => {
-      const e = jenjangMap.get(jabatan) ?? { pria: 0, wanita: 0 };
-      const total = e.pria + e.wanita;
+      const e = jenjangMap.get(jabatan) ?? { pria: 0, wanita: 0, lainnya: 0 };
+      const total = e.pria + e.wanita + e.lainnya;
       return { jabatan, pria: e.pria, wanita: e.wanita, total,
         persenPria: total > 0 ? Number(((e.pria / total) * 100).toFixed(2)) : 0,
         persenWanita: total > 0 ? Number(((e.wanita / total) * 100).toFixed(2)) : 0,
@@ -1815,10 +1984,12 @@ export class SidataRepository {
     type PddknRow = { pddkn_label: string; jk: string; cnt: bigint | number };
     type EselonJkRow = { eselon_label: string; jk: string; cnt: bigint | number };
     type EselonPddknRow = { pddkn_label: string; eselon_label: string; cnt: bigint | number };
+    type StrukturalJabatanRow = { jabatan_nama: string; eselon_label: string; jk: string; cnt: bigint | number };
     type FungsionalRow = { jabatan_nama: string; ahli_terampil: string; jk: string; cnt: bigint | number };
     const h = this.rekapHelpers();
+    const whereSql = await this.buildRekapWhereSql();
 
-    const [pnsGolonganRows, pnsPendidikanRows, strukturalEselonRows, strukturalPendidikanRows, fungsionalRows] =
+    const [pnsGolonganRows, pnsPendidikanRows, strukturalEselonRows, strukturalPendidikanRows, strukturalJabatanRows, fungsionalRows] =
       await Promise.all([
         this.prisma.$queryRaw<GolruRow[]>(Prisma.sql`
           SELECT
@@ -1845,7 +2016,7 @@ export class SidataRepository {
             ${h.jkFragment} AS jk, COUNT(*) AS cnt
           FROM asn a
           LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-          WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF' AND a.tipe_pegawai = 'PNS'
+          WHERE ${whereSql} AND a.tipe_pegawai = 'PNS'
           GROUP BY golru, jk`),
 
         this.prisma.$queryRaw<PddknRow[]>(Prisma.sql`
@@ -1853,14 +2024,14 @@ export class SidataRepository {
           FROM asn a
           LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
           LEFT JOIN ${h.eduSubquery} ON edu.asn_id = a.id
-          WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF' AND a.tipe_pegawai = 'PNS'
+          WHERE ${whereSql} AND a.tipe_pegawai = 'PNS'
           GROUP BY pddkn_label, jk`),
 
         this.prisma.$queryRaw<EselonJkRow[]>(Prisma.sql`
           SELECT ${h.eselonLabel} AS eselon_label, ${h.jkFragment} AS jk, COUNT(*) AS cnt
           FROM asn a
           LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-          WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+          WHERE ${whereSql}
             AND a.tipe_pegawai = 'PNS'
             AND UPPER(COALESCE(a.jenis_jabatan_nama,'')) LIKE '%STRUKTURAL%'
           GROUP BY eselon_label, jk`),
@@ -1870,10 +2041,26 @@ export class SidataRepository {
           FROM asn a
           LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
           LEFT JOIN ${h.eduSubquery} ON edu.asn_id = a.id
-          WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+          WHERE ${whereSql}
             AND a.tipe_pegawai = 'PNS'
             AND UPPER(COALESCE(a.jenis_jabatan_nama,'')) LIKE '%STRUKTURAL%'
           GROUP BY pddkn_label, eselon_label`),
+
+        this.prisma.$queryRaw<StrukturalJabatanRow[]>(Prisma.sql`
+          SELECT sub.jabatan_nama, sub.eselon_label, sub.jk, COUNT(*) AS cnt
+          FROM (
+            SELECT
+              COALESCE(NULLIF(a.jabatan_nama,''), rj.nama, 'TIDAK_DIISI') AS jabatan_nama,
+              ${h.eselonLabel} AS eselon_label,
+              ${h.jkFragment} AS jk
+            FROM asn a
+            LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
+            LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
+            WHERE ${whereSql}
+              AND a.tipe_pegawai = 'PNS'
+              AND UPPER(COALESCE(a.jenis_jabatan_nama,'')) LIKE '%STRUKTURAL%'
+          ) sub
+          GROUP BY sub.jabatan_nama, sub.eselon_label, sub.jk`),
 
         this.prisma.$queryRaw<FungsionalRow[]>(Prisma.sql`
           SELECT sub.jabatan_nama, sub.ahli_terampil, sub.jk, COUNT(*) AS cnt
@@ -1890,7 +2077,7 @@ export class SidataRepository {
             LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
             LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
             LEFT JOIN ref_jabatan_fungsional_profile rfp ON rfp.jabatan_id = rj.id
-            WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+            WHERE ${whereSql}
               AND a.tipe_pegawai = 'PNS'
               AND UPPER(COALESCE(a.jenis_jabatan_nama,'')) LIKE '%FUNGSIONAL%'
           ) sub
@@ -1898,20 +2085,22 @@ export class SidataRepository {
       ]);
 
     // Build golongan detail
-    const pnsGolruMap = new Map<string, { pria: number; wanita: number }>();
+    const pnsGolruMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pnsGolonganRows) {
-      const e = pnsGolruMap.get(row.golru) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = pnsGolruMap.get(row.golru) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       pnsGolruMap.set(row.golru, e);
     }
     const pnsGolonganDetail: RekapGolonganRow[] = h.PNS_GOLRU_DETAIL.map((golru) => {
-      const e = pnsGolruMap.get(golru) ?? { pria: 0, wanita: 0 };
-      return { golru, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+      const e = pnsGolruMap.get(golru) ?? { pria: 0, wanita: 0, total: 0 };
+      return { golru, pria: e.pria, wanita: e.wanita, total: e.total };
     });
 
     // Build golongan group
-    const pnsGolruGroupMap = new Map<string, { pria: number; wanita: number }>();
+    const pnsGolruGroupMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pnsGolonganRows) {
       const g = row.golru;
       let grp = 'LAINNYA';
@@ -1919,58 +2108,66 @@ export class SidataRepository {
       else if (g.startsWith('III')) grp = 'III';
       else if (g.startsWith('II/')) grp = 'II';
       else if (g.startsWith('I/')) grp = 'I';
-      const e = pnsGolruGroupMap.get(grp) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = pnsGolruGroupMap.get(grp) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       pnsGolruGroupMap.set(grp, e);
     }
     const pnsGolonganGroup: RekapGolonganRow[] = h.PNS_GOLRU_GROUP.map((golru) => {
-      const e = pnsGolruGroupMap.get(golru) ?? { pria: 0, wanita: 0 };
-      return { golru, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+      const e = pnsGolruGroupMap.get(golru) ?? { pria: 0, wanita: 0, total: 0 };
+      return { golru, pria: e.pria, wanita: e.wanita, total: e.total };
     });
 
     // Build pendidikan detail & group
-    const pnsPddknMap = new Map<string, { pria: number; wanita: number }>();
+    const pnsPddknMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pnsPendidikanRows) {
-      const e = pnsPddknMap.get(row.pddkn_label) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = pnsPddknMap.get(row.pddkn_label) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       pnsPddknMap.set(row.pddkn_label, e);
     }
     const pnsPendidikanDetail: RekapPendidikanRow[] = h.PDDKN_DETAIL_ORDER.map((pddkn) => {
-      const e = pnsPddknMap.get(pddkn) ?? { pria: 0, wanita: 0 };
-      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+      const e = pnsPddknMap.get(pddkn) ?? { pria: 0, wanita: 0, total: 0 };
+      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.total };
     });
-    const pnsPddknGroupMap = new Map<string, { pria: number; wanita: number }>();
+    const pnsPddknGroupMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pnsPendidikanRows) {
       let grp = 'LAINNYA';
       if (['S3','S2','S1/D.IV'].includes(row.pddkn_label)) grp = 'TINGGI';
       else if (['D.III','D.II','D.I'].includes(row.pddkn_label)) grp = 'DIPLOMA';
       else if (['SMA/SMK','SMP','SD'].includes(row.pddkn_label)) grp = 'DSR & MNGH';
-      const e = pnsPddknGroupMap.get(grp) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = pnsPddknGroupMap.get(grp) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       pnsPddknGroupMap.set(grp, e);
     }
     const pnsPendidikanGroup: RekapPendidikanRow[] = h.PDDKN_GROUP_ORDER.map((pddkn) => {
-      const e = pnsPddknGroupMap.get(pddkn) ?? { pria: 0, wanita: 0 };
-      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+      const e = pnsPddknGroupMap.get(pddkn) ?? { pria: 0, wanita: 0, total: 0 };
+      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.total };
     });
 
     // Build eselon detail & group
-    const eselonMap = new Map<string, { pria: number; wanita: number }>();
+    const eselonMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of strukturalEselonRows) {
       if (!row.eselon_label) continue;
-      const e = eselonMap.get(row.eselon_label) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = eselonMap.get(row.eselon_label) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       eselonMap.set(row.eselon_label, e);
     }
     const strukturalEselonDetail: RekapStrukturalEselonRow[] = h.ESELON_SLOTS.map((eselon) => {
-      const e = eselonMap.get(eselon) ?? { pria: 0, wanita: 0 };
-      return { eselon, terisi: e.pria + e.wanita, pria: e.pria, wanita: e.wanita };
+      const e = eselonMap.get(eselon) ?? { pria: 0, wanita: 0, total: 0 };
+      return { eselon, terisi: e.total, pria: e.pria, wanita: e.wanita };
     });
-    const eselonGroupMap = new Map<string, { pria: number; wanita: number }>();
+    const eselonGroupMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of strukturalEselonRows) {
       if (!row.eselon_label) continue;
       let grp = 'LAINNYA';
@@ -1978,14 +2175,16 @@ export class SidataRepository {
       else if (row.eselon_label.startsWith('II.')) grp = 'II';
       else if (row.eselon_label.startsWith('III.')) grp = 'III';
       else if (row.eselon_label.startsWith('IV.')) grp = 'IV';
-      const e = eselonGroupMap.get(grp) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
+      const e = eselonGroupMap.get(grp) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
       eselonGroupMap.set(grp, e);
     }
     const strukturalEselonGroup: RekapStrukturalEselonRow[] = h.ESELON_GROUP_SLOTS.map((eselon) => {
-      const e = eselonGroupMap.get(eselon) ?? { pria: 0, wanita: 0 };
-      return { eselon, terisi: e.pria + e.wanita, pria: e.pria, wanita: e.wanita };
+      const e = eselonGroupMap.get(eselon) ?? { pria: 0, wanita: 0, total: 0 };
+      return { eselon, terisi: e.total, pria: e.pria, wanita: e.wanita };
     });
 
     // Build struktural pendidikan
@@ -2011,42 +2210,69 @@ export class SidataRepository {
       return { pddkn, ...e, total: e.ess1 + e.ess2 + e.ess3 + e.ess4 };
     });
 
+    const strukturalJabatanMap = new Map<string, { namaJabatan: string; eselon: string; pria: number; wanita: number; total: number }>();
+    for (const row of strukturalJabatanRows) {
+      const namaJabatan = row.jabatan_nama || 'TIDAK_DIISI';
+      const eselon = row.eselon_label || '-';
+      const key = `${eselon}:${namaJabatan}`;
+      const entry = strukturalJabatanMap.get(key) ?? { namaJabatan, eselon, pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      entry.total += count;
+      if (row.jk === 'PRIA') entry.pria += count;
+      else if (row.jk === 'WANITA') entry.wanita += count;
+      strukturalJabatanMap.set(key, entry);
+    }
+    const strukturalJabatan: RekapStrukturalJabatanRow[] = Array.from(strukturalJabatanMap.values())
+      .map((row) => ({
+        namaJabatan: row.namaJabatan,
+        eselon: row.eselon,
+        pria: row.pria,
+        wanita: row.wanita,
+        jumlahTotal: row.total,
+      }))
+      .sort((a, b) => a.eselon.localeCompare(b.eselon) || a.namaJabatan.localeCompare(b.namaJabatan));
+
     // Build fungsional
-    type FungsRow = { ahliPria: number; ahliWanita: number; terampilPria: number; terampilWanita: number };
+    type FungsRow = { ahliPria: number; ahliWanita: number; jumlahAhli: number; terampilPria: number; terampilWanita: number; jumlahTerampil: number };
     const fungsMap = new Map<string, FungsRow>();
     for (const row of fungsionalRows) {
-      const e = fungsMap.get(row.jabatan_nama) ?? { ahliPria: 0, ahliWanita: 0, terampilPria: 0, terampilWanita: 0 };
+      const e = fungsMap.get(row.jabatan_nama) ?? { ahliPria: 0, ahliWanita: 0, jumlahAhli: 0, terampilPria: 0, terampilWanita: 0, jumlahTerampil: 0 };
+      const count = h.toN(row.cnt);
       if (row.ahli_terampil === 'AHLI') {
-        if (row.jk === 'PRIA') e.ahliPria += h.toN(row.cnt);
-        else if (row.jk === 'WANITA') e.ahliWanita += h.toN(row.cnt);
+        e.jumlahAhli += count;
+        if (row.jk === 'PRIA') e.ahliPria += count;
+        else if (row.jk === 'WANITA') e.ahliWanita += count;
       } else {
-        if (row.jk === 'PRIA') e.terampilPria += h.toN(row.cnt);
-        else if (row.jk === 'WANITA') e.terampilWanita += h.toN(row.cnt);
+        e.jumlahTerampil += count;
+        if (row.jk === 'PRIA') e.terampilPria += count;
+        else if (row.jk === 'WANITA') e.terampilWanita += count;
       }
       fungsMap.set(row.jabatan_nama, e);
     }
     const fungsionalJabatan: RekapFungsionalRow[] = Array.from(fungsMap.entries())
       .map(([namaJabatan, e]) => ({
         namaJabatan,
-        ahliPria: e.ahliPria, ahliWanita: e.ahliWanita, jumlahAhli: e.ahliPria + e.ahliWanita,
-        terampilPria: e.terampilPria, terampilWanita: e.terampilWanita, jumlahTerampil: e.terampilPria + e.terampilWanita,
-        jumlahTotal: e.ahliPria + e.ahliWanita + e.terampilPria + e.terampilWanita,
+        ahliPria: e.ahliPria, ahliWanita: e.ahliWanita, jumlahAhli: e.jumlahAhli,
+        terampilPria: e.terampilPria, terampilWanita: e.terampilWanita, jumlahTerampil: e.jumlahTerampil,
+        jumlahTotal: e.jumlahAhli + e.jumlahTerampil,
       }))
       .sort((a, b) => a.namaJabatan.localeCompare(b.namaJabatan));
 
-    return { pnsGolonganDetail, pnsGolonganGroup, pnsPendidikanDetail, pnsPendidikanGroup, strukturalEselonDetail, strukturalEselonGroup, strukturalPendidikan, fungsionalJabatan };
+    return { pnsGolonganDetail, pnsGolonganGroup, pnsPendidikanDetail, pnsPendidikanGroup, strukturalEselonDetail, strukturalEselonGroup, strukturalPendidikan, strukturalJabatan, fungsionalJabatan };
   }
 
   // ── PPPK: 2 queries ──────────────────────────────────────────────────────
 
   async findRekapPppkData(): Promise<RekapPppkResponse> {
-    type GolruRow = { golru: string; jk: string; cnt: bigint | number };
-    type PddknRow = { pddkn_label: string; jk: string; cnt: bigint | number };
+    type GolruRow = { jenis_asn: string; golru: string; jk: string; cnt: bigint | number };
+    type PddknRow = { jenis_asn: string; pddkn_label: string; jk: string; cnt: bigint | number };
     const h = this.rekapHelpers();
+    const whereSql = await this.buildRekapWhereSql();
 
     const [pppkGolonganRows, pppkPendidikanRows] = await Promise.all([
       this.prisma.$queryRaw<GolruRow[]>(Prisma.sql`
         SELECT
+          CASE WHEN a.tipe_pegawai = 'PPPK_PARUH_WAKTU' THEN 'PPPK_PARUH_WAKTU' ELSE 'PPPK' END AS jenis_asn,
           CASE
             WHEN UPPER(COALESCE(a.golongan_nama,'')) LIKE '%XI%' THEN 'XI'
             WHEN UPPER(COALESCE(a.golongan_nama,'')) LIKE '%IX%' THEN 'IX'
@@ -2060,77 +2286,78 @@ export class SidataRepository {
           ${h.jkFragment} AS jk, COUNT(*) AS cnt
         FROM asn a
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+        WHERE ${whereSql}
           AND a.tipe_pegawai IN ('PPPK','PPPK_PARUH_WAKTU')
-        GROUP BY golru, jk`),
+        GROUP BY jenis_asn, golru, jk`),
 
       this.prisma.$queryRaw<PddknRow[]>(Prisma.sql`
-        SELECT ${h.pddknDetailLabel} AS pddkn_label, ${h.jkFragment} AS jk, COUNT(*) AS cnt
+        SELECT
+          CASE WHEN a.tipe_pegawai = 'PPPK_PARUH_WAKTU' THEN 'PPPK_PARUH_WAKTU' ELSE 'PPPK' END AS jenis_asn,
+          ${h.pddknDetailLabel} AS pddkn_label,
+          ${h.jkFragment} AS jk,
+          COUNT(*) AS cnt
         FROM asn a
         LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
         LEFT JOIN ${h.eduSubquery} ON edu.asn_id = a.id
-        WHERE a.deleted_at IS NULL AND a.status_asn = 'AKTIF'
+        WHERE ${whereSql}
           AND a.tipe_pegawai IN ('PPPK','PPPK_PARUH_WAKTU')
-        GROUP BY pddkn_label, jk`),
+        GROUP BY jenis_asn, pddkn_label, jk`),
     ]);
 
-    const pppkGolruMap = new Map<string, { pria: number; wanita: number }>();
+    const pppkGolruMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pppkGolonganRows) {
-      const e = pppkGolruMap.get(row.golru) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
-      pppkGolruMap.set(row.golru, e);
+      const key = `${row.jenis_asn}:${row.golru}`;
+      const e = pppkGolruMap.get(key) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
+      pppkGolruMap.set(key, e);
     }
-    const pppkGolongan: RekapGolonganRow[] = h.PPPK_GOLRU_ORDER.map((golru) => {
-      const e = pppkGolruMap.get(golru) ?? { pria: 0, wanita: 0 };
-      return { golru, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+    const toPppkGolonganRows = (jenisAsn: string): RekapGolonganRow[] => h.PPPK_GOLRU_ORDER.map((golru) => {
+      const e = pppkGolruMap.get(`${jenisAsn}:${golru}`) ?? { pria: 0, wanita: 0, total: 0 };
+      return { golru, pria: e.pria, wanita: e.wanita, total: e.total };
     });
+    const pppkGolongan = toPppkGolonganRows('PPPK');
+    const pppkParuhWaktuGolongan = toPppkGolonganRows('PPPK_PARUH_WAKTU');
 
-    const pppkPddknMap = new Map<string, { pria: number; wanita: number }>();
+    const pppkPddknMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pppkPendidikanRows) {
-      const e = pppkPddknMap.get(row.pddkn_label) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
-      pppkPddknMap.set(row.pddkn_label, e);
+      const key = `${row.jenis_asn}:${row.pddkn_label}`;
+      const e = pppkPddknMap.get(key) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
+      pppkPddknMap.set(key, e);
     }
-    const pppkPendidikanDetail: RekapPendidikanRow[] = h.PDDKN_DETAIL_ORDER.map((pddkn) => {
-      const e = pppkPddknMap.get(pddkn) ?? { pria: 0, wanita: 0 };
-      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+    const toPppkPendidikanDetailRows = (jenisAsn: string): RekapPendidikanRow[] => h.PDDKN_DETAIL_ORDER.map((pddkn) => {
+      const e = pppkPddknMap.get(`${jenisAsn}:${pddkn}`) ?? { pria: 0, wanita: 0, total: 0 };
+      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.total };
     });
-    const pppkPddknGroupMap = new Map<string, { pria: number; wanita: number }>();
+    const pppkPendidikanDetail = toPppkPendidikanDetailRows('PPPK');
+    const pppkParuhWaktuPendidikanDetail = toPppkPendidikanDetailRows('PPPK_PARUH_WAKTU');
+
+    const pppkPddknGroupMap = new Map<string, { pria: number; wanita: number; total: number }>();
     for (const row of pppkPendidikanRows) {
       let grp = 'LAINNYA';
       if (['S3','S2','S1/D.IV'].includes(row.pddkn_label)) grp = 'TINGGI';
       else if (['D.III','D.II','D.I'].includes(row.pddkn_label)) grp = 'DIPLOMA';
       else if (['SMA/SMK','SMP','SD'].includes(row.pddkn_label)) grp = 'DSR & MNGH';
-      const e = pppkPddknGroupMap.get(grp) ?? { pria: 0, wanita: 0 };
-      if (row.jk === 'PRIA') e.pria += h.toN(row.cnt);
-      else if (row.jk === 'WANITA') e.wanita += h.toN(row.cnt);
-      pppkPddknGroupMap.set(grp, e);
+      const key = `${row.jenis_asn}:${grp}`;
+      const e = pppkPddknGroupMap.get(key) ?? { pria: 0, wanita: 0, total: 0 };
+      const count = h.toN(row.cnt);
+      e.total += count;
+      if (row.jk === 'PRIA') e.pria += count;
+      else if (row.jk === 'WANITA') e.wanita += count;
+      pppkPddknGroupMap.set(key, e);
     }
-    const pppkPendidikanGroup: RekapPendidikanRow[] = h.PDDKN_GROUP_ORDER.map((pddkn) => {
-      const e = pppkPddknGroupMap.get(pddkn) ?? { pria: 0, wanita: 0 };
-      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.pria + e.wanita };
+    const toPppkPendidikanGroupRows = (jenisAsn: string): RekapPendidikanRow[] => h.PDDKN_GROUP_ORDER.map((pddkn) => {
+      const e = pppkPddknGroupMap.get(`${jenisAsn}:${pddkn}`) ?? { pria: 0, wanita: 0, total: 0 };
+      return { pddkn, pria: e.pria, wanita: e.wanita, total: e.total };
     });
-
-    const pppkParuhWaktuGolongan: RekapGolonganRow[] = h.PPPK_GOLRU_ORDER.map((golru) => ({
-      golru,
-      pria: 0,
-      wanita: 0,
-      total: 0,
-    }));
-    const pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[] = h.PDDKN_DETAIL_ORDER.map((pddkn) => ({
-      pddkn,
-      pria: 0,
-      wanita: 0,
-      total: 0,
-    }));
-    const pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[] = h.PDDKN_GROUP_ORDER.map((pddkn) => ({
-      pddkn,
-      pria: 0,
-      wanita: 0,
-      total: 0,
-    }));
+    const pppkPendidikanGroup = toPppkPendidikanGroupRows('PPPK');
+    const pppkParuhWaktuPendidikanGroup = toPppkPendidikanGroupRows('PPPK_PARUH_WAKTU');
 
     return {
       pppkGolongan,

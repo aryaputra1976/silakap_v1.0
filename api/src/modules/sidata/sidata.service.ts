@@ -23,6 +23,7 @@ import {
   NormalizedAsnFilters,
   RekapAsnResponse,
   RekapIkhtisarResponse,
+  RekapJabatanAsnResponse,
   RekapPnsResponse,
   RekapPppkResponse,
   SIDATA_ADMIN_ROLES,
@@ -36,6 +37,7 @@ import {
   SidataAccessScope,
   SidataAsnQualityDashboardResponse,
   SidataAsnQueryDto,
+  SidataRekapJabatanAsnQueryDto,
   SidataUpdateAsnDto,
   UnitTreeNode,
 } from './sidata.types';
@@ -228,38 +230,63 @@ export class SidataService {
   }
 
   async getRekapIkhtisar(user: AuthUser): Promise<RekapIkhtisarResponse> {
-    const rekap = await this.getRekapAsn(user);
-    return {
-      allJk: rekap.allJk,
-      pppkJk: rekap.pppkJk,
-      allJenjangJabatan: rekap.allJenjangJabatan,
-      pppkJenjangJabatan: rekap.pppkJenjangJabatan,
-    };
+    void user;
+    return this.sidataRepository.findRekapIkhtisarData();
   }
 
   async getRekapPns(user: AuthUser): Promise<RekapPnsResponse> {
-    const rekap = await this.getRekapAsn(user);
-    return {
-      pnsGolonganDetail: rekap.pnsGolonganDetail,
-      pnsGolonganGroup: rekap.pnsGolonganGroup,
-      pnsPendidikanDetail: rekap.pnsPendidikanDetail,
-      pnsPendidikanGroup: rekap.pnsPendidikanGroup,
-      strukturalEselonDetail: rekap.strukturalEselonDetail,
-      strukturalEselonGroup: rekap.strukturalEselonGroup,
-      strukturalPendidikan: rekap.strukturalPendidikan,
-      fungsionalJabatan: rekap.fungsionalJabatan,
-    };
+    void user;
+    return this.sidataRepository.findRekapPnsData();
   }
 
   async getRekapPppk(user: AuthUser): Promise<RekapPppkResponse> {
-    const rekap = await this.getRekapAsn(user);
+    void user;
+    return this.sidataRepository.findRekapPppkData();
+  }
+
+  async getRekapJabatanAsn(
+    query: SidataRekapJabatanAsnQueryDto,
+    user: AuthUser,
+  ): Promise<RekapJabatanAsnResponse> {
+    const jabatanNama = query.jabatanNama?.trim();
+    const eselon = query.eselon?.trim();
+    if (!jabatanNama && !eselon) {
+      throw new BadRequestException('Nama jabatan atau eselon wajib diisi');
+    }
+
+    const scope = this.getAccessScope(user);
+    if (scope === 'UNIT' && !user.unitKerjaId) {
+      throw new ForbiddenException('Akun belum memiliki unit kerja untuk melihat detail jabatan SIDATA');
+    }
+
+    const unitKerjaId = scope === 'UNIT' ? user.unitKerjaId ?? undefined : undefined;
+    const rows = eselon
+      ? await this.sidataRepository.findRekapAsnByEselon({ eselon, unitKerjaId })
+      : await this.sidataRepository.findRekapAsnByJabatanName({
+        jabatanNama: jabatanNama!,
+        unitKerjaId,
+      });
+
+    const groups: RekapJabatanAsnResponse['groups'] = {
+      pns: [],
+      pppk: [],
+      pppkParuhWaktu: [],
+    };
+
+    for (const row of rows) {
+      if (row.jenisAsn === 'PPPK_PARUH_WAKTU') {
+        groups.pppkParuhWaktu.push(row);
+      } else if (row.jenisAsn === 'PPPK') {
+        groups.pppk.push(row);
+      } else {
+        groups.pns.push(row);
+      }
+    }
+
     return {
-      pppkGolongan: rekap.pppkGolongan,
-      pppkPendidikanDetail: rekap.pppkPendidikanDetail,
-      pppkPendidikanGroup: rekap.pppkPendidikanGroup,
-      pppkParuhWaktuGolongan: rekap.pppkParuhWaktuGolongan,
-      pppkParuhWaktuPendidikanDetail: rekap.pppkParuhWaktuPendidikanDetail,
-      pppkParuhWaktuPendidikanGroup: rekap.pppkParuhWaktuPendidikanGroup,
+      jabatanNama: eselon ? `Eselon ${eselon}` : jabatanNama!,
+      total: rows.length,
+      groups,
     };
   }
 
