@@ -169,6 +169,7 @@ export type RekapPendidikanRow = { pddkn: string; pria: number; wanita: number; 
 export type RekapJenjangRow = { jenisAsn?: string; jabatan: string; pria: number; wanita: number; total: number; persenPria: number; persenWanita: number };
 export type RekapStrukturalEselonRow = { eselon: string; terisi: number; pria: number; wanita: number };
 export type RekapStrukturalPendidikanRow = { pddkn: string; ess1: number; ess2: number; ess3: number; ess4: number; total: number };
+export type RekapStrukturalJabatanRow = { namaJabatan: string; eselon: string; pria: number; wanita: number; jumlahTotal: number };
 export type RekapFungsionalRow = { namaJabatan: string; ahliPria: number; ahliWanita: number; jumlahAhli: number; terampilPria: number; terampilWanita: number; jumlahTerampil: number; jumlahTotal: number };
 export type RekapAsnResponse = {
   allJk: RekapJKRow;
@@ -206,6 +207,7 @@ export type RekapPnsResponse = {
   strukturalEselonDetail: RekapStrukturalEselonRow[];
   strukturalEselonGroup: RekapStrukturalEselonRow[];
   strukturalPendidikan: RekapStrukturalPendidikanRow[];
+  strukturalJabatan: RekapStrukturalJabatanRow[];
   fungsionalJabatan: RekapFungsionalRow[];
 };
 
@@ -216,6 +218,29 @@ export type RekapPppkResponse = {
   pppkParuhWaktuGolongan: RekapGolonganRow[];
   pppkParuhWaktuPendidikanDetail: RekapPendidikanRow[];
   pppkParuhWaktuPendidikanGroup: RekapPendidikanRow[];
+};
+
+export type RekapJabatanAsnRow = {
+  id: string;
+  nip: string;
+  nama: string;
+  golonganNama: string | null;
+  tmtGolongan: string | null;
+  jabatanNama: string | null;
+  tmtJabatan: string | null;
+  opdNama: string | null;
+  unitKerjaNama: string | null;
+  jenisAsn: string | null;
+};
+
+export type RekapJabatanAsnResponse = {
+  jabatanNama: string;
+  total: number;
+  groups: {
+    pns: RekapJabatanAsnRow[];
+    pppk: RekapJabatanAsnRow[];
+    pppkParuhWaktu: RekapJabatanAsnRow[];
+  };
 };
 
 export const SIDATA_STATUS_ASN_OPTIONS = [
@@ -323,6 +348,18 @@ export const sidataApi = {
 
   getRekapPppk(): Promise<RekapPppkResponse> {
     return apiClient.get<RekapPppkResponse>('/sidata/rekap/pppk');
+  },
+
+  getRekapJabatanAsn(jabatanNama: string): Promise<RekapJabatanAsnResponse> {
+    return apiClient.get<RekapJabatanAsnResponse>('/sidata/rekap/jabatan/asn', {
+      jabatanNama,
+    });
+  },
+
+  getRekapEselonAsn(eselon: string): Promise<RekapJabatanAsnResponse> {
+    return apiClient.get<RekapJabatanAsnResponse>('/sidata/rekap/jabatan/asn', {
+      eselon,
+    });
   },
 };
 

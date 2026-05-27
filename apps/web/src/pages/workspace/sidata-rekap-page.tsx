@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Loader2, Printer, Search } from 'lucide-react';
+import { Download, Loader2, Printer, Search, X } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { ErrorAlert, LoadingState } from '@/components/workspace/ui';
 import {
@@ -7,7 +7,12 @@ import {
   type RekapAsnResponse,
   type RekapFungsionalRow,
   type RekapGolonganRow,
+  type RekapIkhtisarResponse,
+  type RekapJabatanAsnResponse,
+  type RekapJabatanAsnRow,
   type RekapJenjangRow,
+  type RekapPnsResponse,
+  type RekapPppkResponse,
   type RekapStrukturalEselonRow,
 } from '@/lib/api/sidata';
 import { getErrorMessage } from '@/lib/sidata';
@@ -24,6 +29,9 @@ type AsyncState<T> =
 
 type ReportMetric = { label: string; value: number };
 type SheetRow = Array<string | number>;
+type JabatanDetailTarget =
+  | { type: 'jabatan'; title: string; jabatanNama: string }
+  | { type: 'eselon'; title: string; eselon: string };
 
 const WANITA_COLOR = '#10b981';
 const PRIA_COLOR   = '#f97316';
@@ -35,27 +43,64 @@ export function SidataRekapPage() {
   const [activeTab, setActiveTab]   = useState<ActiveTab>('ikhtisar');
   const [jabSearch, setJabSearch]   = useState('');
   const [jabFilter, setJabFilter]   = useState('Semua');
+  const [selectedJabatan, setSelectedJabatan] = useState<JabatanDetailTarget | null>(null);
 
-  const [rekap, setRekap] = useState<AsyncState<RekapAsnResponse>>({ status: 'idle' });
+  const [ikhtisar, setIkhtisar] = useState<AsyncState<RekapIkhtisarResponse>>({ status: 'idle' });
+  const [pns, setPns] = useState<AsyncState<RekapPnsResponse>>({ status: 'idle' });
+  const [pppk, setPppk] = useState<AsyncState<RekapPppkResponse>>({ status: 'idle' });
+  const [fullRekap, setFullRekap] = useState<AsyncState<RekapAsnResponse>>({ status: 'idle' });
+  const [reportError, setReportError] = useState<string | null>(null);
 
-  async function loadRekap() {
-    setRekap({ status: 'loading' });
+  async function loadIkhtisar() {
+    if (ikhtisar.status === 'loading' || ikhtisar.status === 'done') return;
+    setIkhtisar({ status: 'loading' });
     try {
-      setRekap({ status: 'done', data: await sidataApi.getRekapAsn() });
+      setIkhtisar({ status: 'done', data: await sidataApi.getRekapIkhtisar() });
     } catch (e) {
-      setRekap({ status: 'error', message: getErrorMessage(e, 'Gagal memuat data rekap ASN') });
+      setIkhtisar({ status: 'error', message: getErrorMessage(e, 'Gagal memuat ikhtisar rekap ASN') });
+    }
+  }
+
+  async function loadPns() {
+    if (pns.status === 'loading' || pns.status === 'done') return;
+    setPns({ status: 'loading' });
+    try {
+      setPns({ status: 'done', data: await sidataApi.getRekapPns() });
+    } catch (e) {
+      setPns({ status: 'error', message: getErrorMessage(e, 'Gagal memuat rekap PNS') });
+    }
+  }
+
+  async function loadPppk() {
+    if (pppk.status === 'loading' || pppk.status === 'done') return;
+    setPppk({ status: 'loading' });
+    try {
+      setPppk({ status: 'done', data: await sidataApi.getRekapPppk() });
+    } catch (e) {
+      setPppk({ status: 'error', message: getErrorMessage(e, 'Gagal memuat rekap PPPK') });
     }
   }
 
   useEffect(() => {
-    void loadRekap();
+    void loadIkhtisar();
   }, []);
 
   function handleTabChange(tab: ActiveTab) {
     setActiveTab(tab);
   }
 
-  const rekapData = rekap.status === 'done' ? rekap.data : null;
+  useEffect(() => {
+    if (activeTab === 'golongan' || activeTab === 'pendidikan') {
+      void loadPns();
+      void loadPppk();
+    }
+    if (activeTab === 'jabatan') {
+      void loadPns();
+    }
+  }, [activeTab]);
+
+  const ikhtisarData = ikhtisar.status === 'done' ? ikhtisar.data : null;
+  const fullRekapData = fullRekap.status === 'done' ? fullRekap.data : null;
 
   const today = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
@@ -66,37 +111,86 @@ export function SidataRekapPage() {
     { key: 'jabatan',   label: 'Jabatan'    },
   ];
 
+  function isTabLoading(tab: ActiveTab) {
+    if (tab === 'ikhtisar') return ikhtisar.status === 'loading';
+    if (tab === 'jabatan') return pns.status === 'loading';
+    if (tab === 'golongan' || tab === 'pendidikan') {
+      return pns.status === 'loading' || pppk.status === 'loading';
+    }
+    return false;
+  }
+
+  async function getCompleteRekap() {
+    if (fullRekap.status === 'done') return fullRekap.data;
+
+    setReportError(null);
+    setFullRekap({ status: 'loading' });
+    try {
+      const data = await sidataApi.getRekapAsn();
+      setFullRekap({ status: 'done', data });
+      return data;
+    } catch (e) {
+      const message = getErrorMessage(e, 'Gagal memuat rekap lengkap');
+      setFullRekap({ status: 'error', message });
+      setReportError(message);
+      return null;
+    }
+  }
+
+  async function handleDownloadReport() {
+    const data = await getCompleteRekap();
+    if (data) downloadWorkbook(data, today);
+  }
+
+  async function handlePrintReport() {
+    const data = await getCompleteRekap();
+    if (data) window.setTimeout(() => window.print(), 100);
+  }
+
   return (
-    <div className="space-y-0">
+    <div className="space-y-4">
       {/* ── Green Header ──────────────────────────────────────────────── */}
-      <div className="rounded-xl bg-gradient-to-br from-emerald-700 to-emerald-600 p-5 text-white shadow-md">
-        <div className="flex items-start justify-between">
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-xl font-bold">Rekap ASN Tolitoli</h1>
-            <p className="mt-0.5 text-sm text-emerald-200">Data per {today}</p>
+            <h1 className="text-xl font-semibold text-slate-900">Rekap ASN</h1>
+            <p className="mt-1 text-sm text-slate-500">Ringkasan data ASN aktif per {today}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition-colors"
-          >
-            <Printer className="h-3.5 w-3.5" /> Cetak
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadReport}
+              disabled={fullRekap.status === 'loading'}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {fullRekap.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintReport}
+              disabled={fullRekap.status === 'loading'}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {fullRekap.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Cetak
+            </button>
+          </div>
         </div>
 
         {/* Tab Nav */}
-        <div className="mt-4 flex gap-1 border-b border-white/20 pb-0">
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
           {TABS.map((tab) => {
-            const isLoading = rekap.status === 'loading';
+            const isLoading = isTabLoading(tab.key);
             return (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => handleTabChange(tab.key)}
-                className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.key
-                    ? 'bg-white/15 text-white border-b-2 border-white'
-                    : 'text-emerald-200 hover:text-white hover:bg-white/10'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 {tab.label}
@@ -107,35 +201,42 @@ export function SidataRekapPage() {
         </div>
       </div>
 
+      {reportError ? <ErrorAlert message={reportError} /> : null}
+
       {/* ── Tab Content ───────────────────────────────────────────────── */}
       <div className="mt-4 space-y-4">
 
         {/* IKHTISAR */}
         {activeTab === 'ikhtisar' && (
           <>
-            {rekap.status === 'error' ? <ErrorAlert message={rekap.message} /> : null}
-            {rekapData ? (
+            {ikhtisar.status === 'error' ? <ErrorAlert message={ikhtisar.message} /> : null}
+            {ikhtisarData ? (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* Donut chart */}
+                <div className="grid grid-cols-2 gap-3 lg:col-span-2 md:grid-cols-4">
+                  {getIkhtisarMetrics(ikhtisarData).map((item) => (
+                    <MetricCard key={item.label} label={item.label} value={item.value} />
+                  ))}
+                </div>
+
                 <ContentCard title="Komposisi jenis kelamin">
-                  <GenderDonut row={rekapData.allJk} />
+                  <GenderDonut row={ikhtisarData.allJk} />
                 </ContentCard>
 
-                {/* Golongan bars */}
-                <ContentCard title="Komposisi golongan (PNS)">
-                  <GolonganBars rows={rekapData.pnsGolonganGroup} />
-                </ContentCard>
-
-                {/* Jenjang jabatan */}
-                <ContentCard title="Jenis / Jenjang Jabatan" className="lg:col-span-2">
-                  <JenjangBars rows={rekapData.allJenjangJabatan} total={rekapData.allJk.total} />
+                <ContentCard title="Jenis jabatan">
+                  <JenjangBars rows={ikhtisarData.allJenjangJabatan} total={ikhtisarData.allJk.total} />
                 </ContentCard>
 
                 <div className="lg:col-span-2">
-                  <EksporSection data={rekapData} lastUpdate={today} />
+                  <EksporSection
+                    reportData={fullRekapData}
+                    loading={fullRekap.status === 'loading'}
+                    lastUpdate={today}
+                    onDownload={handleDownloadReport}
+                    onPrint={handlePrintReport}
+                  />
                 </div>
               </div>
-            ) : rekap.status === 'loading' ? (
+            ) : ikhtisar.status === 'loading' ? (
               <LoadingState label="Memuat ikhtisar..." />
             ) : null}
           </>
@@ -143,31 +244,39 @@ export function SidataRekapPage() {
 
         {/* GOLONGAN */}
         {activeTab === 'golongan' && (
-          <GolonganTab rekap={rekap} />
+          <GolonganTab pns={pns} pppk={pppk} />
         )}
 
         {/* PENDIDIKAN */}
         {activeTab === 'pendidikan' && (
-          <PendidikanTab rekap={rekap} />
+          <PendidikanTab pns={pns} pppk={pppk} />
         )}
 
         {/* JABATAN */}
         {activeTab === 'jabatan' && (
           <JabatanTab
-            rekap={rekap}
+            pns={pns}
             search={jabSearch}
             onSearch={setJabSearch}
             filter={jabFilter}
             onFilter={setJabFilter}
+            onOpenJabatan={(jabatanNama) => setSelectedJabatan({ type: 'jabatan', title: jabatanNama, jabatanNama })}
+            onOpenEselon={(eselon) => setSelectedJabatan({ type: 'eselon', title: `Eselon ${eselon}`, eselon })}
           />
         )}
 
       </div>
-      {rekapData ? (
+      {fullRekapData ? (
         <PrintableRekapReport
-          data={rekapData}
+          data={fullRekapData}
           lastUpdate={today}
-          ringkasan={getReportMetrics(rekapData)}
+          ringkasan={getReportMetrics(fullRekapData)}
+        />
+      ) : null}
+      {selectedJabatan ? (
+        <JabatanAsnModal
+          target={selectedJabatan}
+          onClose={() => setSelectedJabatan(null)}
         />
       ) : null}
     </div>
@@ -199,6 +308,17 @@ function ContentCard({
           </div>
         ) : children}
       </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: ReportMetric) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">
+        {value.toLocaleString('id-ID')}
+      </p>
     </div>
   );
 }
@@ -316,6 +436,29 @@ function JenjangBars({ rows, total }: { rows: RekapJenjangRow[]; total: number }
     { key: 'FUNGSIONAL', label: 'Fungsional' },
     { key: 'PELAKSANA', label: 'Pelaksana' },
   ];
+  const hasJenisAsn = rows.some((row) => row.jenisAsn);
+
+  if (!hasJenisAsn) {
+    return (
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.jabatan} className="flex items-center gap-3">
+            <span className="w-28 text-sm font-medium text-zinc-600">{formatJabatanLabel(row.jabatan)}</span>
+            <div className="h-5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className="h-5 rounded-full bg-emerald-600 transition-all duration-500"
+                style={{ width: total > 0 ? `${(row.total / total) * 100}%` : '0%' }}
+              />
+            </div>
+            <span className="w-16 text-right text-sm font-medium tabular-nums text-zinc-700">
+              {row.total.toLocaleString('id-ID')}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const rowByGroup = new Map(
     rows.map((row) => [`${row.jenisAsn ?? 'PNS'}:${row.jabatan}`, row]),
   );
@@ -369,16 +512,20 @@ function JenjangBars({ rows, total }: { rows: RekapJenjangRow[]; total: number }
 // ── Golongan Tab ──────────────────────────────────────────────────────────────
 
 function GolonganTab({
-  rekap,
+  pns,
+  pppk,
 }: {
-  rekap: AsyncState<RekapAsnResponse>;
+  pns: AsyncState<RekapPnsResponse>;
+  pppk: AsyncState<RekapPppkResponse>;
 }) {
-  if (rekap.status === 'loading' || rekap.status === 'idle') {
+  if (pns.status === 'loading' || pppk.status === 'loading' || pns.status === 'idle' || pppk.status === 'idle') {
     return <LoadingState label="Memuat data golongan..." />;
   }
-  if (rekap.status === 'error') return <ErrorAlert message={rekap.message} />;
+  if (pns.status === 'error') return <ErrorAlert message={pns.message} />;
+  if (pppk.status === 'error') return <ErrorAlert message={pppk.message} />;
 
-  const data = rekap.data;
+  const pnsData = pns.data;
+  const pppkData = pppk.data;
 
   return (
     <div className="space-y-4">
@@ -386,22 +533,22 @@ function GolonganTab({
         <ContentCard title="Golongan PNS (Detail)">
           <RekapTable
             headers={['Gol. / Ruang', 'Pria', 'Wanita', 'Total']}
-            rows={data.pnsGolonganDetail.map((r) => [r.golru, r.pria, r.wanita, r.total])}
+            rows={pnsData.pnsGolonganDetail.map((r) => [r.golru, r.pria, r.wanita, r.total])}
           />
         </ContentCard>
         <ContentCard title="Golongan PNS (Kelompok)">
-          <GolonganBars rows={data.pnsGolonganGroup} />
+          <GolonganBars rows={pnsData.pnsGolonganGroup} />
         </ContentCard>
         <ContentCard title="Golongan PPPK">
           <RekapTable
             headers={['Golongan', 'Pria', 'Wanita', 'Total']}
-            rows={data.pppkGolongan.map((r) => [r.golru, r.pria, r.wanita, r.total])}
+            rows={pppkData.pppkGolongan.map((r) => [r.golru, r.pria, r.wanita, r.total])}
           />
         </ContentCard>
         <ContentCard title="Golongan PPPK Paruh Waktu">
           <RekapTable
             headers={['Golongan', 'Pria', 'Wanita', 'Total']}
-            rows={(data.pppkParuhWaktuGolongan ?? []).map((r) => [r.golru, r.pria, r.wanita, r.total])}
+            rows={(pppkData.pppkParuhWaktuGolongan ?? []).map((r) => [r.golru, r.pria, r.wanita, r.total])}
           />
         </ContentCard>
       </div>
@@ -412,41 +559,45 @@ function GolonganTab({
 // ── Pendidikan Tab ────────────────────────────────────────────────────────────
 
 function PendidikanTab({
-  rekap,
+  pns,
+  pppk,
 }: {
-  rekap: AsyncState<RekapAsnResponse>;
+  pns: AsyncState<RekapPnsResponse>;
+  pppk: AsyncState<RekapPppkResponse>;
 }) {
-  if (rekap.status === 'loading' || rekap.status === 'idle') {
+  if (pns.status === 'loading' || pppk.status === 'loading' || pns.status === 'idle' || pppk.status === 'idle') {
     return <LoadingState label="Memuat data pendidikan..." />;
   }
-  if (rekap.status === 'error') return <ErrorAlert message={rekap.message} />;
+  if (pns.status === 'error') return <ErrorAlert message={pns.message} />;
+  if (pppk.status === 'error') return <ErrorAlert message={pppk.message} />;
 
-  const data = rekap.data;
+  const pnsData = pns.data;
+  const pppkData = pppk.data;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <ContentCard title="Pendidikan PNS (Kelompok)">
         <RekapTable
           headers={['Pendidikan', 'Pria', 'Wanita', 'Total']}
-          rows={data.pnsPendidikanGroup.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
+          rows={pnsData.pnsPendidikanGroup.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
         />
       </ContentCard>
       <ContentCard title="Pendidikan PPPK (Kelompok)">
         <RekapTable
           headers={['Pendidikan', 'Pria', 'Wanita', 'Total']}
-          rows={data.pppkPendidikanGroup.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
+          rows={pppkData.pppkPendidikanGroup.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
         />
       </ContentCard>
       <ContentCard title="Pendidikan PPPK Paruh Waktu (Kelompok)">
         <RekapTable
           headers={['Pendidikan', 'Pria', 'Wanita', 'Total']}
-          rows={(data.pppkParuhWaktuPendidikanGroup ?? []).map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
+          rows={(pppkData.pppkParuhWaktuPendidikanGroup ?? []).map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
         />
       </ContentCard>
       <ContentCard title="Pendidikan PNS (Detail)" className="lg:col-span-2">
         <RekapTable
           headers={['Tingkat Pendidikan', 'Pria', 'Wanita', 'Total']}
-          rows={data.pnsPendidikanDetail.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
+          rows={pnsData.pnsPendidikanDetail.map((r) => [r.pddkn, r.pria, r.wanita, r.total])}
         />
       </ContentCard>
     </div>
@@ -464,25 +615,29 @@ const FILTER_KW: Record<string, string[]> = {
 };
 
 function JabatanTab({
-  rekap,
+  pns,
   search,
   onSearch,
   filter,
   onFilter,
+  onOpenJabatan,
+  onOpenEselon,
 }: {
-  rekap: AsyncState<RekapAsnResponse>;
+  pns: AsyncState<RekapPnsResponse>;
   search: string;
   onSearch: (v: string) => void;
   filter: string;
   onFilter: (v: string) => void;
+  onOpenJabatan: (jabatanNama: string) => void;
+  onOpenEselon: (eselon: string) => void;
 }) {
-  if (rekap.status === 'loading' || rekap.status === 'idle') {
+  if (pns.status === 'loading' || pns.status === 'idle') {
     return <LoadingState label="Memuat data jabatan..." />;
   }
-  if (rekap.status === 'error') return <ErrorAlert message={rekap.message} />;
+  if (pns.status === 'error') return <ErrorAlert message={pns.message} />;
 
-  const rows = rekap.data.fungsionalJabatan;
-  const strukturalEselon = rekap.data.strukturalEselonDetail;
+  const rows = pns.data.fungsionalJabatan;
+  const strukturalEselon = pns.data.strukturalEselonDetail;
 
   const filtered = rows.filter((r) => {
     const nm = r.namaJabatan.toLowerCase();
@@ -497,12 +652,36 @@ function JabatanTab({
 
   return (
     <div className="space-y-4">
+      {/* Gender per Jabatan Struktural */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+            <h3 className="font-semibold text-zinc-800">Komposisi gender jabatan struktural</h3>
+            <p className="text-xs text-zinc-500">
+              Klik eselon untuk melihat daftar ASN struktural.
+            </p>
+          </div>
+          <div className="p-4">
+            <GenderEselonTable rows={strukturalEselon} onOpenEselon={onOpenEselon} />
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
+            <h3 className="text-sm font-semibold text-zinc-700">Jumlah jabatan struktural per eselon</h3>
+          </div>
+          <div className="p-4">
+            <EselonGroupBars rows={pns.data.strukturalEselonGroup} onOpenEselon={onOpenEselon} />
+          </div>
+        </div>
+      </div>
+
       {/* Jabatan Fungsional */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <div className="border-b border-zinc-100 bg-emerald-700 px-4 py-3">
-          <h3 className="font-semibold text-white">Jabatan fungsional</h3>
-          <p className="text-xs text-emerald-200">
-            {totalJenis} jenis · {totalPegawai.toLocaleString('id-ID')} pegawai
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+          <h3 className="font-semibold text-zinc-800">Jabatan fungsional</h3>
+          <p className="text-xs text-zinc-500">
+            {totalJenis} jenis - {totalPegawai.toLocaleString('id-ID')} pegawai
           </p>
         </div>
         <div className="p-4 space-y-3">
@@ -536,44 +715,25 @@ function JabatanTab({
           </div>
         </div>
         {/* List */}
-        <div className="divide-y divide-zinc-100 max-h-96 overflow-y-auto">
+        <div className="max-h-96 divide-y divide-zinc-100 overflow-y-auto">
           {filtered.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-zinc-400">Tidak ada jabatan ditemukan</p>
           ) : (
-            filtered.map((r) => <JabatanListItem key={r.namaJabatan} row={r} />)
+            filtered.map((r) => (
+              <JabatanListItem
+                key={r.namaJabatan}
+                row={r}
+                onOpen={() => onOpenJabatan(r.namaJabatan)}
+              />
+            ))
           )}
-        </div>
-      </div>
-
-      {/* Gender per Jabatan Struktural */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-100 bg-emerald-700 px-4 py-3">
-            <h3 className="font-semibold text-white">Komposisi gender jabatan struktural</h3>
-            <p className="text-xs text-emerald-200">
-              Struktural — {strukturalEselon.reduce((s, r) => s + r.terisi, 0).toLocaleString('id-ID')} orang
-            </p>
-          </div>
-          <div className="p-4">
-            <GenderEselonTable rows={strukturalEselon} />
-          </div>
-        </div>
-
-        {/* Struktural Pendidikan */}
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
-            <h3 className="text-sm font-semibold text-zinc-700">Jumlah jabatan struktural per eselon</h3>
-          </div>
-          <div className="p-4">
-            <EselonGroupBars rows={rekap.data.strukturalEselonGroup} />
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function JabatanListItem({ row }: { row: RekapFungsionalRow }) {
+function JabatanListItem({ row, onOpen }: { row: RekapFungsionalRow; onOpen: () => void }) {
   const BADGE_COLORS = [
     'bg-emerald-50 text-emerald-700',
     'bg-blue-50 text-blue-700',
@@ -583,7 +743,11 @@ function JabatanListItem({ row }: { row: RekapFungsionalRow }) {
   const colorIdx = Math.abs(row.namaJabatan.charCodeAt(0) + row.namaJabatan.length) % BADGE_COLORS.length;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+    >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-zinc-800 truncate">{row.namaJabatan}</p>
         <p className="text-xs text-zinc-400">
@@ -593,13 +757,183 @@ function JabatanListItem({ row }: { row: RekapFungsionalRow }) {
       <span className={`rounded-full px-3 py-0.5 text-sm font-bold tabular-nums ${BADGE_COLORS[colorIdx]}`}>
         {row.jumlahTotal.toLocaleString('id-ID')}
       </span>
+    </button>
+  );
+}
+
+type JabatanAsnGroupKey = 'pns' | 'pppk' | 'pppkParuhWaktu';
+
+const JABATAN_ASN_GROUPS: Array<{ key: JabatanAsnGroupKey; label: string }> = [
+  { key: 'pns', label: 'PNS' },
+  { key: 'pppk', label: 'PPPK' },
+  { key: 'pppkParuhWaktu', label: 'PPPK Paruh Waktu' },
+];
+
+function JabatanAsnModal({
+  target,
+  onClose,
+}: {
+  target: JabatanDetailTarget;
+  onClose: () => void;
+}) {
+  const [activeGroup, setActiveGroup] = useState<JabatanAsnGroupKey>('pns');
+  const [state, setState] = useState<AsyncState<RekapJabatanAsnResponse>>({ status: 'loading' });
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      setState({ status: 'loading' });
+      try {
+        const data = target.type === 'eselon'
+          ? await sidataApi.getRekapEselonAsn(target.eselon)
+          : await sidataApi.getRekapJabatanAsn(target.jabatanNama);
+        if (!ignore) setState({ status: 'done', data });
+      } catch (e) {
+        if (!ignore) {
+          setState({ status: 'error', message: getErrorMessage(e, 'Gagal memuat daftar ASN jabatan') });
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [target]);
+
+  const data = state.status === 'done' ? state.data : null;
+  const rows = data?.groups[activeGroup] ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold text-slate-900">{target.title}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {data ? `${data.total.toLocaleString('id-ID')} ASN` : 'Memuat daftar ASN...'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => data && downloadJabatanAsnWorkbook(data)}
+              disabled={!data}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => data && printJabatanAsnReport(data)}
+              disabled={!data}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Printer className="h-4 w-4" />
+              Cetak
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              aria-label="Tutup"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="border-b border-slate-100 px-5 py-3">
+          <div className="flex flex-wrap gap-2">
+            {JABATAN_ASN_GROUPS.map((group) => {
+              const total = data?.groups[group.key].length ?? 0;
+              const active = activeGroup === group.key;
+              return (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => setActiveGroup(group.key)}
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    active ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {group.label} ({total.toLocaleString('id-ID')})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          {state.status === 'loading' ? <LoadingState label="Memuat daftar ASN..." /> : null}
+          {state.status === 'error' ? <ErrorAlert message={state.message} /> : null}
+          {data && rows.length === 0 ? (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+              Tidak ada ASN pada kelompok ini.
+            </p>
+          ) : null}
+          {data && rows.length > 0 ? <JabatanAsnTable rows={rows} /> : null}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function JabatanAsnTable({ rows }: { rows: RekapJabatanAsnRow[] }) {
+  return (
+    <table className="w-full min-w-[920px] text-sm">
+      <thead>
+        <tr className="border-b border-slate-200 bg-slate-50">
+          <th className="px-3 py-2 text-left font-semibold text-slate-600">NIP/Nama</th>
+          <th className="px-3 py-2 text-left font-semibold text-slate-600">Gol/TMT Gol</th>
+          <th className="px-3 py-2 text-left font-semibold text-slate-600">Jabatan/TMT Jabatan</th>
+          <th className="px-3 py-2 text-left font-semibold text-slate-600">OPD/Unit Kerja</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {rows.map((row) => {
+          const unitDetail = row.unitKerjaNama && row.unitKerjaNama !== row.opdNama
+            ? row.unitKerjaNama
+            : null;
+
+          return (
+            <tr key={row.id} className="hover:bg-slate-50">
+              <td className="px-3 py-2 align-top">
+                <p className="font-medium text-slate-800">{row.nip}</p>
+                <p className="text-slate-600">{row.nama}</p>
+              </td>
+              <td className="px-3 py-2 align-top text-slate-600">
+                <p>{row.golonganNama ?? '-'}</p>
+                <p className="text-xs text-slate-400">{formatShortDate(row.tmtGolongan)}</p>
+              </td>
+              <td className="px-3 py-2 align-top text-slate-600">
+                <p>{row.jabatanNama ?? '-'}</p>
+                <p className="text-xs text-slate-400">{formatShortDate(row.tmtJabatan)}</p>
+              </td>
+              <td className="px-3 py-2 align-top text-slate-600">
+                <p className="font-medium text-slate-700">{row.opdNama ?? '-'}</p>
+                {unitDetail ? <p className="text-xs text-slate-400">{unitDetail}</p> : null}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
 // ── Gender Eselon Table ───────────────────────────────────────────────────────
 
-function GenderEselonTable({ rows }: { rows: RekapStrukturalEselonRow[] }) {
+function GenderEselonTable({
+  rows,
+  onOpenEselon,
+}: {
+  rows: RekapStrukturalEselonRow[];
+  onOpenEselon: (eselon: string) => void;
+}) {
   const totalTerisi = rows.reduce((s, r) => s + r.terisi, 0);
   const totalWanita = rows.reduce((s, r) => s + r.wanita, 0);
   const rasioWanitaPct = totalTerisi > 0
@@ -627,8 +961,12 @@ function GenderEselonTable({ rows }: { rows: RekapStrukturalEselonRow[] }) {
           {rows.map((r) => {
             const pct = r.terisi > 0 ? Math.round((r.wanita / r.terisi) * 100) : 0;
             return (
-              <tr key={r.eselon}>
-                <td className="py-2 font-medium text-zinc-700">{r.eselon}</td>
+              <tr
+                key={r.eselon}
+                className={r.terisi > 0 ? 'cursor-pointer hover:bg-zinc-50' : ''}
+                onClick={() => r.terisi > 0 && onOpenEselon(r.eselon)}
+              >
+                <td className="py-2 font-medium text-zinc-700">Eselon {r.eselon}</td>
                 <td className="py-2 text-right tabular-nums text-zinc-600">{r.terisi}</td>
                 <td className="py-2 text-right tabular-nums text-zinc-600">{r.pria}</td>
                 <td className="py-2 text-right tabular-nums text-zinc-600">{r.wanita}</td>
@@ -659,13 +997,25 @@ function GenderEselonTable({ rows }: { rows: RekapStrukturalEselonRow[] }) {
 
 // ── Eselon Group Bars ─────────────────────────────────────────────────────────
 
-function EselonGroupBars({ rows }: { rows: RekapStrukturalEselonRow[] }) {
+function EselonGroupBars({
+  rows,
+  onOpenEselon,
+}: {
+  rows: RekapStrukturalEselonRow[];
+  onOpenEselon: (eselon: string) => void;
+}) {
   const maxTerisi = Math.max(...rows.map((r) => r.terisi), 1);
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
   return (
     <div className="space-y-3">
       {rows.map((r, i) => (
-        <div key={r.eselon} className="space-y-1">
+        <button
+          key={r.eselon}
+          type="button"
+          disabled={r.terisi === 0}
+          onClick={() => onOpenEselon(r.eselon)}
+          className="block w-full space-y-1 text-left disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-600">
             <span className="font-medium">Eselon {r.eselon}</span>
             <span className="tabular-nums">{r.terisi.toLocaleString('id-ID')} posisi</span>
@@ -683,7 +1033,7 @@ function EselonGroupBars({ rows }: { rows: RekapStrukturalEselonRow[] }) {
             <span>Pria: {r.pria}</span>
             <span>Wanita: {r.wanita}</span>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -711,11 +1061,11 @@ function RekapTable({
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b-2 border-emerald-700 bg-emerald-700">
+        <tr className="border-b border-zinc-200 bg-zinc-50">
           {headers.map((h, i) => (
             <th
               key={h}
-              className={`px-2 py-2 text-xs font-semibold text-white ${i === 0 ? 'text-left' : 'text-right'}`}
+              className={`px-2 py-2 text-xs font-semibold text-zinc-600 ${i === 0 ? 'text-left' : 'text-right'}`}
             >
               {h}
             </th>
@@ -737,7 +1087,7 @@ function RekapTable({
         ))}
       </tbody>
       <tfoot>
-        <tr className="border-t-2 border-emerald-200 bg-emerald-50/60">
+        <tr className="border-t border-zinc-200 bg-zinc-50">
           {headers.map((_, i) => (
             <td
               key={i}
@@ -754,139 +1104,142 @@ function RekapTable({
 
 // ── Ekspor Section ────────────────────────────────────────────────────────────
 
+function downloadWorkbook(data: RekapAsnResponse, lastUpdate: string) {
+  const ringkasan = getReportMetrics(data);
+  const workbook = buildExcelWorkbook([
+    {
+      name: 'Ringkasan',
+      rows: [
+        ['REKAPITULASI DATA ASN - KABUPATEN TOLITOLI'],
+        [`Data per ${lastUpdate}`],
+        [],
+        ['Indikator', 'Jumlah'],
+        ...ringkasan.map((item): SheetRow => [item.label, item.value]),
+      ],
+    },
+    {
+      name: 'Jenis Kelamin',
+      rows: [
+        ['Jenis Kelamin', 'Jumlah', 'Persentase'],
+        ['Pria', data.allJk.pria, `${data.allJk.persenPria}%`],
+        ['Wanita', data.allJk.wanita, `${data.allJk.persenWanita}%`],
+        ['Belum terbaca', data.allJk.lainnya, data.allJk.total > 0 ? `${Number(((data.allJk.lainnya / data.allJk.total) * 100).toFixed(2))}%` : '0%'],
+        ['Total', data.allJk.total, '100%'],
+      ],
+    },
+    {
+      name: 'Jenis ASN Jabatan',
+      rows: [
+        ['Jenis ASN', 'Jenjang Jabatan', 'Pria', 'Wanita', 'Total', '% Pria', '% Wanita'],
+        ...data.allJenjangJabatan.map((r): SheetRow => [
+          formatJenisAsnLabel(r.jenisAsn),
+          formatJabatanLabel(r.jabatan),
+          r.pria,
+          r.wanita,
+          r.total,
+          `${r.persenPria}%`,
+          `${r.persenWanita}%`,
+        ]),
+      ],
+    },
+    {
+      name: 'Golongan PNS',
+      rows: [
+        ['Golongan', 'Pria', 'Wanita', 'Total'],
+        ...data.pnsGolonganDetail.map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
+      ],
+    },
+    {
+      name: 'Pendidikan PNS',
+      rows: [
+        ['Pendidikan', 'Pria', 'Wanita', 'Total'],
+        ...data.pnsPendidikanDetail.map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
+      ],
+    },
+    {
+      name: 'Struktural Eselon',
+      rows: [
+        ['Eselon', 'Total', 'Pria', 'Wanita'],
+        ...data.strukturalEselonDetail.map((r): SheetRow => [r.eselon, r.terisi, r.pria, r.wanita]),
+      ],
+    },
+    {
+      name: 'Jabatan Fungsional',
+      rows: [
+        ['Nama Jabatan', 'Ahli Pria', 'Ahli Wanita', 'Jumlah Ahli', 'Terampil Pria', 'Terampil Wanita', 'Jumlah Terampil', 'Total'],
+        ...data.fungsionalJabatan.map((r): SheetRow => [
+          r.namaJabatan,
+          r.ahliPria,
+          r.ahliWanita,
+          r.jumlahAhli,
+          r.terampilPria,
+          r.terampilWanita,
+          r.jumlahTerampil,
+          r.jumlahTotal,
+        ]),
+      ],
+    },
+    {
+      name: 'Golongan PPPK',
+      rows: [
+        ['Golongan', 'Pria', 'Wanita', 'Total'],
+        ...data.pppkGolongan.map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
+      ],
+    },
+    {
+      name: 'Golongan PPPK PW',
+      rows: [
+        ['Golongan', 'Pria', 'Wanita', 'Total'],
+        ...(data.pppkParuhWaktuGolongan ?? []).map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
+      ],
+    },
+    {
+      name: 'Pendidikan PPPK',
+      rows: [
+        ['Pendidikan', 'Pria', 'Wanita', 'Total'],
+        ...data.pppkPendidikanDetail.map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
+      ],
+    },
+    {
+      name: 'Pendidikan PPPK PW',
+      rows: [
+        ['Pendidikan', 'Pria', 'Wanita', 'Total'],
+        ...(data.pppkParuhWaktuPendidikanDetail ?? []).map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
+      ],
+    },
+  ]);
+
+  const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rekap-asn-tolitoli-${new Date().toISOString().slice(0, 7)}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function EksporSection({
-  data,
+  reportData,
+  loading,
   lastUpdate,
+  onDownload,
+  onPrint,
 }: {
-  data: RekapAsnResponse | null;
+  reportData: RekapAsnResponse | null;
+  loading: boolean;
   lastUpdate: string;
+  onDownload: () => void;
+  onPrint: () => void;
 }) {
-  const canExport = !!data;
-  const formatNumber = (value: number) => value.toLocaleString('id-ID');
-  const ringkasan = data ? getReportMetrics(data) : [];
-
-  function downloadWorkbook() {
-    if (!data) return;
-
-    const workbook = buildExcelWorkbook([
-      {
-        name: 'Ringkasan',
-        rows: [
-          ['REKAPITULASI DATA ASN - KABUPATEN TOLITOLI'],
-          [`Data per ${lastUpdate}`],
-          [],
-          ['Indikator', 'Jumlah'],
-          ...ringkasan.map((item): SheetRow => [item.label, item.value]),
-        ],
-      },
-      {
-        name: 'Jenis Kelamin',
-        rows: [
-          ['Jenis Kelamin', 'Jumlah', 'Persentase'],
-          ['Pria', data.allJk.pria, `${data.allJk.persenPria}%`],
-          ['Wanita', data.allJk.wanita, `${data.allJk.persenWanita}%`],
-          ['Belum terbaca', data.allJk.lainnya, data.allJk.total > 0 ? `${Number(((data.allJk.lainnya / data.allJk.total) * 100).toFixed(2))}%` : '0%'],
-          ['Total', data.allJk.total, '100%'],
-        ],
-      },
-      {
-        name: 'Jenis ASN Jabatan',
-        rows: [
-          ['Jenis ASN', 'Jenjang Jabatan', 'Pria', 'Wanita', 'Total', '% Pria', '% Wanita'],
-          ...data.allJenjangJabatan.map((r): SheetRow => [
-            formatJenisAsnLabel(r.jenisAsn),
-            formatJabatanLabel(r.jabatan),
-            r.pria,
-            r.wanita,
-            r.total,
-            `${r.persenPria}%`,
-            `${r.persenWanita}%`,
-          ]),
-        ],
-      },
-      {
-        name: 'Golongan PNS',
-        rows: [
-          ['Golongan', 'Pria', 'Wanita', 'Total'],
-          ...data.pnsGolonganDetail.map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
-        ],
-      },
-      {
-        name: 'Pendidikan PNS',
-        rows: [
-          ['Pendidikan', 'Pria', 'Wanita', 'Total'],
-          ...data.pnsPendidikanDetail.map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
-        ],
-      },
-      {
-        name: 'Struktural Eselon',
-        rows: [
-          ['Eselon', 'Total', 'Pria', 'Wanita'],
-          ...data.strukturalEselonDetail.map((r): SheetRow => [r.eselon, r.terisi, r.pria, r.wanita]),
-        ],
-      },
-      {
-        name: 'Jabatan Fungsional',
-        rows: [
-          ['Nama Jabatan', 'Ahli Pria', 'Ahli Wanita', 'Jumlah Ahli', 'Terampil Pria', 'Terampil Wanita', 'Jumlah Terampil', 'Total'],
-          ...data.fungsionalJabatan.map((r): SheetRow => [
-            r.namaJabatan,
-            r.ahliPria,
-            r.ahliWanita,
-            r.jumlahAhli,
-            r.terampilPria,
-            r.terampilWanita,
-            r.jumlahTerampil,
-            r.jumlahTotal,
-          ]),
-        ],
-      },
-      {
-        name: 'Golongan PPPK',
-        rows: [
-          ['Golongan', 'Pria', 'Wanita', 'Total'],
-          ...data.pppkGolongan.map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
-        ],
-      },
-      {
-        name: 'Golongan PPPK PW',
-        rows: [
-          ['Golongan', 'Pria', 'Wanita', 'Total'],
-          ...(data.pppkParuhWaktuGolongan ?? []).map((r): SheetRow => [r.golru, r.pria, r.wanita, r.total]),
-        ],
-      },
-      {
-        name: 'Pendidikan PPPK',
-        rows: [
-          ['Pendidikan', 'Pria', 'Wanita', 'Total'],
-          ...data.pppkPendidikanDetail.map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
-        ],
-      },
-      {
-        name: 'Pendidikan PPPK PW',
-        rows: [
-          ['Pendidikan', 'Pria', 'Wanita', 'Total'],
-          ...(data.pppkParuhWaktuPendidikanDetail ?? []).map((r): SheetRow => [r.pddkn, r.pria, r.wanita, r.total]),
-        ],
-      },
-    ]);
-
-    const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rekap-asn-tolitoli-${new Date().toISOString().slice(0, 7)}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const ringkasan = reportData ? getReportMetrics(reportData) : [];
 
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div className="border-b border-zinc-100 bg-emerald-700 px-4 py-3">
-        <h3 className="font-semibold text-white">Laporan dan ekspor</h3>
-        <p className="text-xs text-emerald-200">Rekap utama per {lastUpdate}</p>
+      <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+        <h3 className="font-semibold text-zinc-800">Laporan dan ekspor</h3>
+        <p className="text-xs text-zinc-500">Rekap lengkap dimuat saat Excel atau cetak dijalankan.</p>
       </div>
-      {data ? (
+      {reportData ? (
         <div className="border-b border-zinc-100 p-4">
           <h4 className="mb-3 text-sm font-semibold text-zinc-700">Ringkasan laporan</h4>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -894,25 +1247,31 @@ function EksporSection({
               <div key={item.label} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
                 <p className="text-xs text-zinc-500">{item.label}</p>
                 <p className="mt-1 text-lg font-bold tabular-nums text-zinc-800">
-                  {formatNumber(item.value)}
+                  {item.value.toLocaleString('id-ID')}
                 </p>
               </div>
             ))}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="border-b border-zinc-100 px-4 py-3 text-sm text-zinc-500">
+          Tampilan tab tetap ringan. Rekap lengkap hanya diambil ketika dibutuhkan untuk laporan.
+        </div>
+      )}
       <div className="divide-y divide-zinc-100">
         <ExportRow
           label="Unduh Excel rekap lengkap"
           desc="Multi-sheet: ringkasan, jenis ASN, golongan, pendidikan, dan jabatan"
-          disabled={!canExport}
-          onClick={downloadWorkbook}
+          disabled={loading}
+          loading={loading}
+          onClick={onDownload}
         />
         <ExportRow
           label="Cetak / simpan PDF laporan"
           desc="Layout laporan lengkap siap cetak A4"
-          disabled={!canExport}
-          onClick={() => window.print()}
+          disabled={loading}
+          loading={loading}
+          onClick={onPrint}
         />
       </div>
       <div className="border-t border-zinc-100 px-4 py-3 text-xs text-zinc-400">
@@ -922,9 +1281,156 @@ function EksporSection({
   );
 }
 
+function toJabatanSheetRows(rows: RekapJabatanAsnRow[]): SheetRow[] {
+  return rows.map((row) => [
+    row.nip,
+    row.nama,
+    row.golonganNama ?? '-',
+    formatShortDate(row.tmtGolongan),
+    row.jabatanNama ?? '-',
+    formatShortDate(row.tmtJabatan),
+    row.opdNama ?? '-',
+    row.unitKerjaNama && row.unitKerjaNama !== row.opdNama ? row.unitKerjaNama : '-',
+  ]);
+}
+
+function downloadJabatanAsnWorkbook(data: RekapJabatanAsnResponse) {
+  const headers: SheetRow = ['NIP', 'Nama', 'Gol', 'TMT Gol', 'Jabatan', 'TMT Jabatan', 'OPD', 'Unit Kerja'];
+  const columns = [130, 180, 54, 82, 280, 92, 260, 320];
+  const buildRows = (rows: RekapJabatanAsnRow[]): SheetRow[] => [
+    [data.jabatanNama],
+    [`Total ${rows.length.toLocaleString('id-ID')} ASN`],
+    [],
+    headers,
+    ...toJabatanSheetRows(rows),
+  ];
+
+  const workbook = buildExcelWorkbook([
+    {
+      name: 'PNS',
+      columns,
+      titleRowIndexes: [0],
+      headerRowIndexes: [3],
+      freezeRowCount: 4,
+      rows: buildRows(data.groups.pns),
+    },
+    {
+      name: 'PPPK',
+      columns,
+      titleRowIndexes: [0],
+      headerRowIndexes: [3],
+      freezeRowCount: 4,
+      rows: buildRows(data.groups.pppk),
+    },
+    {
+      name: 'PPPK Paruh Waktu',
+      columns,
+      titleRowIndexes: [0],
+      headerRowIndexes: [3],
+      freezeRowCount: 4,
+      rows: buildRows(data.groups.pppkParuhWaktu),
+    },
+  ]);
+
+  const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `asn-jabatan-${slugifyFileName(data.jabatanNama)}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function printJabatanAsnReport(data: RekapJabatanAsnResponse) {
+  const printWindow = window.open('', '_blank', 'width=1024,height=768');
+  if (!printWindow) return;
+
+  const renderRows = (rows: RekapJabatanAsnRow[]) => rows.map((row) => {
+    const unitDetail = row.unitKerjaNama && row.unitKerjaNama !== row.opdNama
+      ? `<br><span>${escapeHtml(row.unitKerjaNama)}</span>`
+      : '';
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(row.nip)}</strong><br>${escapeHtml(row.nama)}</td>
+        <td>${escapeHtml(row.golonganNama ?? '-')}<br><span>${escapeHtml(formatShortDate(row.tmtGolongan))}</span></td>
+        <td>${escapeHtml(row.jabatanNama ?? '-')}<br><span>${escapeHtml(formatShortDate(row.tmtJabatan))}</span></td>
+        <td><strong>${escapeHtml(row.opdNama ?? '-')}</strong>${unitDetail}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const renderGroup = (label: string, rows: RekapJabatanAsnRow[]) => `
+    <h2>${escapeHtml(label)} (${rows.length.toLocaleString('id-ID')})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>NIP/NAMA</th>
+          <th>Gol/TMT Gol</th>
+          <th>Jabatan/TMT Jabatan</th>
+          <th>OPD/Unit Kerja</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.length > 0 ? renderRows(rows) : '<tr><td colspan="4">Tidak ada data</td></tr>'}
+      </tbody>
+    </table>
+  `;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(data.jabatanNama)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+          h1 { font-size: 18px; margin: 0 0 4px; }
+          h2 { break-before: auto; font-size: 14px; margin: 18px 0 8px; }
+          p { color: #475569; margin: 0 0 14px; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
+          th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; vertical-align: top; }
+          th { background: #f1f5f9; }
+          span { color: #64748b; }
+        </style>
+      </head>
+      <body>
+        <h1>Daftar ASN Jabatan</h1>
+        <p>${escapeHtml(data.jabatanNama)} - Total ${data.total.toLocaleString('id-ID')} ASN</p>
+        ${renderGroup('PNS', data.groups.pns)}
+        ${renderGroup('PPPK', data.groups.pppk)}
+        ${renderGroup('PPPK Paruh Waktu', data.groups.pppkParuhWaktu)}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 function formatJenisAsnLabel(value: string | null | undefined) {
   if (value === 'PPPK_PARUH_WAKTU') return 'PPPK Paruh Waktu';
   return value ?? '-';
+}
+
+function formatShortDate(value: string | null | undefined) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function getIkhtisarMetrics(data: RekapIkhtisarResponse): ReportMetric[] {
+  const totalPppk = data.pppkJk.total;
+  return [
+    { label: 'Total ASN', value: data.allJk.total },
+    { label: 'PNS', value: Math.max(data.allJk.total - totalPppk, 0) },
+    { label: 'PPPK', value: totalPppk },
+    { label: 'Wanita', value: data.allJk.wanita },
+  ];
 }
 
 function getReportMetrics(data: RekapAsnResponse): ReportMetric[] {
@@ -962,21 +1468,66 @@ function escapeXml(value: string | number) {
     .replace(/"/g, '&quot;');
 }
 
+function escapeHtml(value: string | number) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function slugifyFileName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'jabatan';
+}
+
 function toSheetName(value: string) {
   return value.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
 }
 
-function buildExcelWorkbook(sheets: Array<{ name: string; rows: SheetRow[] }>) {
+function buildExcelWorkbook(sheets: Array<{
+  name: string;
+  rows: SheetRow[];
+  columns?: number[];
+  headerRowIndexes?: number[];
+  titleRowIndexes?: number[];
+  freezeRowCount?: number;
+}>) {
   const worksheets = sheets.map((sheet) => {
-    const rows = sheet.rows.map((row) => {
+    const headerRows = new Set(sheet.headerRowIndexes ?? []);
+    const titleRows = new Set(sheet.titleRowIndexes ?? []);
+    const columns = sheet.columns
+      ? sheet.columns.map((width) => `<Column ss:Width="${width}"/>`).join('')
+      : '';
+
+    const rows = sheet.rows.map((row, rowIndex) => {
       const cells = row.map((cell) => {
         const type = typeof cell === 'number' ? 'Number' : 'String';
-        return `<Cell><Data ss:Type="${type}">${escapeXml(cell)}</Data></Cell>`;
+        const styleId = titleRows.has(rowIndex)
+          ? 'Title'
+          : headerRows.has(rowIndex) ? 'Header' : 'Cell';
+        return `<Cell ss:StyleID="${styleId}"><Data ss:Type="${type}">${escapeXml(cell)}</Data></Cell>`;
       }).join('');
-      return `<Row>${cells}</Row>`;
+      return `<Row ss:AutoFitHeight="1">${cells}</Row>`;
     }).join('');
+    const worksheetOptions = sheet.freezeRowCount
+      ? `<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+          <FreezePanes/>
+          <FrozenNoSplit/>
+          <SplitHorizontal>${sheet.freezeRowCount}</SplitHorizontal>
+          <TopRowBottomPane>${sheet.freezeRowCount}</TopRowBottomPane>
+          <ActivePane>2</ActivePane>
+        </WorksheetOptions>`
+      : '';
 
-    return `<Worksheet ss:Name="${escapeXml(toSheetName(sheet.name))}"><Table>${rows}</Table></Worksheet>`;
+    return `<Worksheet ss:Name="${escapeXml(toSheetName(sheet.name))}">
+      <Table>${columns}${rows}</Table>
+      ${worksheetOptions}
+    </Worksheet>`;
   }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -985,6 +1536,20 @@ function buildExcelWorkbook(sheets: Array<{ name: string; rows: SheetRow[] }>) {
   xmlns:o="urn:schemas-microsoft-com:office:office"
   xmlns:x="urn:schemas-microsoft-com:office:excel"
   xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="Cell">
+      <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+    </Style>
+    <Style ss:ID="Title">
+      <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+      <Font ss:Bold="1" ss:Size="12"/>
+    </Style>
+    <Style ss:ID="Header">
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+      <Font ss:Bold="1"/>
+      <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
   ${worksheets}
 </Workbook>`;
 }
@@ -1177,11 +1742,13 @@ function ExportRow({
   desc,
   onClick,
   disabled,
+  loading,
 }: {
   label: string;
   desc: string;
   onClick: () => void;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <button
@@ -1194,7 +1761,11 @@ function ExportRow({
         <p className="text-sm font-medium text-zinc-800">{label}</p>
         <p className="text-xs text-zinc-400">{desc}</p>
       </div>
-      <Download className="h-4 w-4 text-zinc-400" />
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+      ) : (
+        <Download className="h-4 w-4 text-zinc-400" />
+      )}
     </button>
   );
 }
