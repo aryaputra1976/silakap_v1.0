@@ -1,5 +1,5 @@
 import { Edit3, Paperclip, Send } from 'lucide-react';
-import type { SiapWorklog, SiapWorklogStatus } from '@/lib/api/types';
+import type { SiapWorklog } from '@/lib/api/types';
 import {
   ActionButton,
   DataTable,
@@ -7,6 +7,11 @@ import {
   formatDateTime,
   StatusBadge,
 } from '@/components/workspace/ui';
+import {
+  worklogCategoryLabel,
+  worklogStatusLabel,
+  worklogStatusTone,
+} from '@/lib/siap/siap-labels';
 
 export function SiapWorklogTable({
   rows,
@@ -36,7 +41,7 @@ export function SiapWorklogTable({
                 {formatDate(item.workDate)}
               </div>
               <div className="text-xs text-muted-foreground">
-                {item.category}
+                {worklogCategoryLabel(item.category)}
               </div>
             </div>
           ),
@@ -68,14 +73,14 @@ export function SiapWorklogTable({
           header: 'Status',
           render: (item) => (
             <StatusBadge
-              value={item.status}
+              value={worklogStatusLabel(item.status)}
               tone={worklogStatusTone(item.status)}
             />
           ),
         },
         {
           key: 'review',
-          header: 'Review',
+          header: 'Tinjauan',
           render: (item) => (
             <div className="text-sm">
               <div>{item.reviewer?.name ?? '-'}</div>
@@ -119,12 +124,12 @@ export function SiapWorklogTable({
                   icon={Send}
                   onClick={() => onSubmit(item.id)}
                 >
-                  Submit
+                  Kirim
                 </ActionButton>
               ) : null}
 
               {!canEdit(item) && !canSubmit(item) ? (
-                <StatusBadge value="LOCKED" tone="neutral" />
+                <StatusBadge value="Terkunci" tone="neutral" />
               ) : null}
             </div>
           ),
@@ -142,18 +147,3 @@ function canSubmit(item: SiapWorklog) {
   return item.status === 'DRAFT' || item.status === 'REVISION_REQUIRED';
 }
 
-function worklogStatusTone(status: SiapWorklogStatus) {
-  if (status === 'APPROVED') {
-    return 'success' as const;
-  }
-
-  if (status === 'SUBMITTED') {
-    return 'info' as const;
-  }
-
-  if (status === 'REVISION_REQUIRED' || status === 'REJECTED') {
-    return 'danger' as const;
-  }
-
-  return 'warning' as const;
-}

@@ -36,6 +36,11 @@ import {
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
+import {
+  worklogCategoryLabel,
+  worklogStatusLabel,
+  worklogStatusTone,
+} from '@/lib/siap/siap-labels';
 
 const worklogStatuses: SiapWorklogStatus[] = [
   'DRAFT',
@@ -69,8 +74,8 @@ export function SiapWorklogTeamPage() {
       const result = await apiClient.get<PaginatedResult<SiapWorklog>>(
         '/siap/worklogs/team',
         {
-          q,
-          status,
+          q: q || undefined,
+          status: status || undefined,
           page: 1,
           limit: 25,
         },
@@ -81,7 +86,7 @@ export function SiapWorklogTeamPage() {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Gagal memuat review buku kerja',
+          : 'Gagal memuat tinjauan buku kerja',
       );
     } finally {
       setLoading(false);
@@ -124,7 +129,7 @@ export function SiapWorklogTeamPage() {
     }
 
     if (reviewMode === 'REVISION' && !reviewNote.trim()) {
-      setError('Catatan revisi wajib diisi');
+      setError('Catatan perbaikan wajib diisi');
       return;
     }
 
@@ -149,7 +154,7 @@ export function SiapWorklogTeamPage() {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Gagal memproses review',
+          : 'Gagal memproses tinjauan',
       );
     } finally {
       setWorkingId('');
@@ -191,9 +196,9 @@ export function SiapWorklogTeamPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Review Buku Kerja Staf"
-        description="Kabid/Admin memeriksa, menyetujui, atau mengembalikan buku kerja staf untuk revisi."
-        meta={<StatusBadge value={`${summary.total} WORKLOG`} tone="info" />}
+        title="Tinjau Buku Kerja"
+        description="Periksa kegiatan harian staf, setujui jika sudah sesuai, atau minta perbaikan bila masih perlu dilengkapi."
+        meta={<StatusBadge value={`${summary.total} buku kerja`} tone="info" />}
         actions={
           <ActionButton icon={RefreshCcw} onClick={() => void load()} variant="secondary">
             Refresh
@@ -212,19 +217,19 @@ export function SiapWorklogTeamPage() {
         />
         <StatCard
           icon={ClipboardCheck}
-          label="Menunggu Review"
+          label="Menunggu Tinjauan"
           value={summary.submitted}
           tone="info"
         />
         <StatCard
           icon={RotateCcw}
-          label="Revisi"
+          label="Perlu Perbaikan"
           value={summary.revision}
           tone="danger"
         />
         <StatCard
           icon={CheckCircle2}
-          label="Approved"
+          label="Disetujui"
           value={summary.approved}
           tone="success"
         />
@@ -234,7 +239,7 @@ export function SiapWorklogTeamPage() {
         <FilterBar>
           <input
             className={inputClass}
-            placeholder="Cari staf/kegiatan/output"
+            placeholder="Cari nama staf, kegiatan, atau output"
             value={q}
             onChange={(event) => setQ(event.target.value)}
             onKeyDown={(event) => {
@@ -252,7 +257,7 @@ export function SiapWorklogTeamPage() {
             <option value="">Semua status</option>
             {worklogStatuses.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {worklogStatusLabel(item)}
               </option>
             ))}
           </select>
@@ -265,7 +270,7 @@ export function SiapWorklogTeamPage() {
 
       {attachmentTarget ? (
         <SectionCard
-          title="Bukti Dukung Buku Kerja"
+          title="Bukti Dukung"
           description={`${attachmentTarget.user.name} · ${attachmentTarget.title}`}
           actions={
             <ActionButton
@@ -287,7 +292,7 @@ export function SiapWorklogTeamPage() {
             columns={[
               {
                 key: 'name',
-                header: 'Bukti',
+                header: 'Dokumen',
                 render: (item) => (
                   <div>
                     <div className="font-semibold text-zinc-950">
@@ -321,7 +326,7 @@ export function SiapWorklogTeamPage() {
                     onClick={() => void downloadAttachment(item)}
                     variant="secondary"
                   >
-                    Download
+                    Unduh
                   </ActionButton>
                 ),
               },
@@ -335,7 +340,7 @@ export function SiapWorklogTeamPage() {
           title={
             reviewMode === 'APPROVE'
               ? 'Setujui Buku Kerja'
-              : 'Kembalikan untuk Revisi'
+              : 'Minta Perbaikan Buku Kerja'
           }
           description={reviewTarget.title}
           actions={
@@ -355,6 +360,14 @@ export function SiapWorklogTeamPage() {
                 {formatDate(reviewTarget.workDate)}
               </div>
               <div>
+                <span className="font-semibold">Kategori:</span>{' '}
+                {worklogCategoryLabel(reviewTarget.category)}
+              </div>
+              <div>
+                <span className="font-semibold">Kegiatan:</span>{' '}
+                {reviewTarget.title}
+              </div>
+              <div>
                 <span className="font-semibold">Output:</span>{' '}
                 {reviewTarget.output ?? '-'}
               </div>
@@ -367,8 +380,8 @@ export function SiapWorklogTeamPage() {
             <Field
               label={
                 reviewMode === 'APPROVE'
-                  ? 'Catatan Review Opsional'
-                  : 'Catatan Revisi'
+                  ? 'Catatan untuk staf'
+                  : 'Catatan perbaikan'
               }
             >
               <textarea
@@ -379,7 +392,7 @@ export function SiapWorklogTeamPage() {
                 placeholder={
                   reviewMode === 'APPROVE'
                     ? 'Contoh: Buku kerja sudah sesuai.'
-                    : 'Jelaskan bagian yang harus diperbaiki.'
+                    : 'Jelaskan bagian yang harus diperbaiki atau dilengkapi.'
                 }
               />
             </Field>
@@ -394,7 +407,7 @@ export function SiapWorklogTeamPage() {
                 type="submit"
                 variant={reviewMode === 'APPROVE' ? 'primary' : 'danger'}
               >
-                {reviewMode === 'APPROVE' ? 'Approve' : 'Minta Revisi'}
+                {reviewMode === 'APPROVE' ? 'Setujui' : 'Kirim Catatan Perbaikan'}
               </ActionButton>
             </div>
           </form>
@@ -402,16 +415,16 @@ export function SiapWorklogTeamPage() {
       ) : null}
 
       <SectionCard
-        title="Antrian Review"
-        description="Gunakan approve jika buku kerja sudah sesuai, atau revision jika perlu perbaikan."
+        title="Antrian Tinjauan"
+        description="Gunakan Setujui jika buku kerja sudah sesuai, atau Minta Perbaikan jika perlu dilengkapi."
       >
         {loading ? (
-          <LoadingState label="Memuat antrian review" />
+          <LoadingState label="Memuat antrian buku kerja" />
         ) : (
           <DataTable
             items={rows}
             rowKey={(item) => item.id}
-            empty="Belum ada buku kerja staf"
+            empty="Belum ada buku kerja yang perlu ditinjau"
             columns={[
               {
                 key: 'staff',
@@ -429,14 +442,14 @@ export function SiapWorklogTeamPage() {
               },
               {
                 key: 'workDate',
-                header: 'Tanggal',
+                header: 'Tanggal / Kategori',
                 render: (item) => (
                   <div>
                     <div className="font-semibold text-zinc-900">
                       {formatDate(item.workDate)}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {item.category}
+                      {worklogCategoryLabel(item.category)}
                     </div>
                   </div>
                 ),
@@ -475,14 +488,14 @@ export function SiapWorklogTeamPage() {
                 header: 'Status',
                 render: (item) => (
                   <StatusBadge
-                    value={item.status}
+                    value={worklogStatusLabel(item.status)}
                     tone={worklogStatusTone(item.status)}
                   />
                 ),
               },
               {
                 key: 'reviewed',
-                header: 'Review',
+                header: 'Tinjauan',
                 render: (item) => (
                   <div className="text-sm">
                     <div>{item.reviewer?.name ?? '-'}</div>
@@ -516,18 +529,18 @@ export function SiapWorklogTeamPage() {
                           icon={CheckCircle2}
                           onClick={() => openReview(item, 'APPROVE')}
                         >
-                          Approve
+                          Setujui
                         </ActionButton>
                         <ActionButton
                           icon={Edit3}
                           onClick={() => openReview(item, 'REVISION')}
                           variant="danger"
                         >
-                          Revisi
+                          Minta Perbaikan
                         </ActionButton>
                       </>
                     ) : (
-                      <StatusBadge value="NO ACTION" tone="neutral" />
+                      <StatusBadge value="-" tone="neutral" />
                     )}
                   </div>
                 ),
@@ -538,22 +551,6 @@ export function SiapWorklogTeamPage() {
       </SectionCard>
     </div>
   );
-}
-
-function worklogStatusTone(status: SiapWorklogStatus) {
-  if (status === 'APPROVED') {
-    return 'success' as const;
-  }
-
-  if (status === 'SUBMITTED') {
-    return 'info' as const;
-  }
-
-  if (status === 'REVISION_REQUIRED' || status === 'REJECTED') {
-    return 'danger' as const;
-  }
-
-  return 'warning' as const;
 }
 
 const textareaClass = `${inputClass} min-h-28 py-2`;

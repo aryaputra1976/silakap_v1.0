@@ -15,9 +15,16 @@ import {
   SectionCard,
   StatusBadge,
   Toolbar,
-  WorkflowBadge,
 } from '@/components/workspace/ui';
 import { useAuth } from '@/lib/auth/session';
+import {
+  caseStatusLabel,
+  caseStatusTone,
+  priorityLabel,
+  priorityTone,
+  serviceTypeLabel,
+  workflowStateLabel,
+} from '@/lib/siap/siap-labels';
 
 const SERVICE_TYPES = [
   'KENAIKAN_PANGKAT',
@@ -31,12 +38,6 @@ const SERVICE_TYPES = [
 ];
 
 const CASE_STATUSES = ['DRAFT', 'ACTIVE', 'COMPLETED', 'CLOSED'];
-
-const PRIORITY_TONE: Record<string, 'neutral' | 'warning' | 'danger'> = {
-  NORMAL: 'neutral',
-  URGENT: 'warning',
-  CRITICAL: 'danger',
-};
 
 const CREATE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPD_OPERATOR', 'ASN'];
 
@@ -79,9 +80,9 @@ export function SiapCasesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Daftar Kasus SIAP"
-        description="Manajemen kasus layanan kepegawaian berbasis prosedur workflow."
-        meta={<StatusBadge value={`${data?.total ?? 0} KASUS`} tone="info" />}
+        title="Daftar Kasus"
+        description="Pantau kasus layanan kepegawaian yang sedang berjalan."
+        meta={<StatusBadge value={`${data?.total ?? 0} kasus`} tone="info" />}
         actions={
           canCreate ? (
             <ActionButton icon={FilePlus} onClick={() => navigate('/siap/cases/new')}>
@@ -109,7 +110,7 @@ export function SiapCasesPage() {
             <option value="">Semua jenis layanan</option>
             {SERVICE_TYPES.map((st) => (
               <option key={st} value={st}>
-                {st.replace(/_/g, ' ')}
+                {serviceTypeLabel(st)}
               </option>
             ))}
           </select>
@@ -121,7 +122,7 @@ export function SiapCasesPage() {
             <option value="">Semua status</option>
             {CASE_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {caseStatusLabel(s)}
               </option>
             ))}
           </select>
@@ -154,7 +155,7 @@ export function SiapCasesPage() {
                   <div>
                     <div className="font-medium">{item.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {item.serviceType.replace(/_/g, ' ')}
+                      {serviceTypeLabel(item.serviceType)}
                     </div>
                   </div>
                 ),
@@ -174,25 +175,30 @@ export function SiapCasesPage() {
               },
               {
                 key: 'currentState',
-                header: 'State',
+                header: 'Tahap',
                 render: (item) => (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                    {item.currentState}
+                    {workflowStateLabel(item.currentState)}
                   </span>
                 ),
               },
               {
                 key: 'status',
                 header: 'Status',
-                render: (item) => <WorkflowBadge value={item.status} />,
+                render: (item) => (
+                  <StatusBadge
+                    value={caseStatusLabel(item.status)}
+                    tone={caseStatusTone(item.status)}
+                  />
+                ),
               },
               {
                 key: 'priority',
                 header: 'Prioritas',
                 render: (item) => (
                   <StatusBadge
-                    value={item.priority}
-                    tone={PRIORITY_TONE[item.priority] ?? 'neutral'}
+                    value={priorityLabel(item.priority)}
+                    tone={priorityTone(item.priority)}
                   />
                 ),
               },

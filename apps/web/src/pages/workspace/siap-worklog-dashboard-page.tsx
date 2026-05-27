@@ -25,6 +25,11 @@ import {
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
+import {
+  worklogCategoryLabel,
+  worklogStatusLabel,
+  worklogStatusTone,
+} from '@/lib/siap/siap-labels';
 
 export function SiapWorklogDashboardPage() {
   const [dashboard, setDashboard] = useState<SiapWorklogTeamDashboard | null>(
@@ -90,13 +95,13 @@ export function SiapWorklogDashboardPage() {
     <div className="space-y-5">
       <PageHeader
         title="Dashboard Buku Kerja Bidang"
-        description="Monitoring harian staf: update buku kerja, antrian review, output, volume, dan kendala."
-        meta={<StatusBadge value="KABID MONITORING" tone="dark" />}
+        description="Pantau pengisian buku kerja harian staf, hasil pekerjaan, volume, dan kendala."
+        meta={<StatusBadge value="Monitoring Kabid" tone="dark" />}
         actions={
           <>
             <Link to="/siap/worklogs/team">
               <ActionButton icon={ClipboardCheck} variant="secondary">
-                Review Buku Kerja
+                Tinjau Buku Kerja
               </ActionButton>
             </Link>
             <ActionButton icon={RefreshCcw} onClick={() => void load()}>
@@ -107,7 +112,7 @@ export function SiapWorklogDashboardPage() {
               onClick={() => void downloadExport('excel')}
               variant="secondary"
             >
-              Export Excel
+              Excel
             </ActionButton>
 
             <ActionButton
@@ -115,7 +120,7 @@ export function SiapWorklogDashboardPage() {
               onClick={() => void downloadExport('pdf')}
               variant="secondary"
             >
-              Export PDF
+              PDF
             </ActionButton>            
           </>
         }
@@ -188,9 +193,9 @@ export function SiapWorklogDashboardPage() {
             />
             <StatCard
               icon={ClipboardCheck}
-              label="Menunggu Review"
+              label="Menunggu Tinjauan"
               value={summary.pendingReview}
-              description="Buku kerja SUBMITTED"
+              description="Buku kerja yang sudah dikirim"
               tone={summary.pendingReview > 0 ? 'warning' : 'success'}
             />
             <StatCard
@@ -205,13 +210,13 @@ export function SiapWorklogDashboardPage() {
           <section className="grid gap-3 md:grid-cols-3">
             <StatCard
               icon={CheckCircle2}
-              label="Approved Periode"
+              label="Disetujui Periode"
               value={summary.approvedInPeriod}
               tone="success"
             />
             <StatCard
               icon={AlertTriangle}
-              label="Perlu Revisi"
+              label="Perlu Perbaikan"
               value={summary.revisionInPeriod}
               tone={summary.revisionInPeriod > 0 ? 'danger' : 'success'}
             />
@@ -270,7 +275,7 @@ export function SiapWorklogDashboardPage() {
                   header: 'Periode',
                   render: (item) => (
                     <div className="text-sm">
-                      <div>{item.worklogCount} worklog</div>
+                      <div>{item.worklogCount} buku kerja</div>
                       <div className="text-xs text-muted-foreground">
                         Volume {item.totalVolume}
                       </div>
@@ -282,10 +287,10 @@ export function SiapWorklogDashboardPage() {
                   header: 'Status',
                   render: (item) => (
                     <div className="flex flex-wrap gap-1">
-                      <StatusBadge value={`APP ${item.approved}`} tone="success" />
-                      <StatusBadge value={`SUB ${item.submitted}`} tone="info" />
+                      <StatusBadge value={`Disetujui ${item.approved}`} tone="success" />
+                      <StatusBadge value={`Dikirim ${item.submitted}`} tone="info" />
                       <StatusBadge
-                        value={`REV ${item.revisionRequired}`}
+                        value={`Perbaikan ${item.revisionRequired}`}
                         tone={item.revisionRequired > 0 ? 'danger' : 'neutral'}
                       />
                     </div>
@@ -355,8 +360,8 @@ export function SiapWorklogDashboardPage() {
             </SectionCard>
 
             <SectionCard
-              title="Antrian Review"
-              description="Buku kerja SUBMITTED yang perlu segera direview."
+              title="Antrian Tinjauan"
+              description="Buku kerja yang sudah dikirim dan perlu segera ditinjau."
             >
               <WorklogMiniTable items={dashboard.pendingReview} />
             </SectionCard>
@@ -394,7 +399,7 @@ export function SiapWorklogDashboardPage() {
                         {item.title}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {item.category}
+                        {worklogCategoryLabel(item.category)}
                       </div>
                     </div>
                   ),
@@ -411,7 +416,12 @@ export function SiapWorklogDashboardPage() {
                 {
                   key: 'status',
                   header: 'Status',
-                  render: (item) => <StatusBadge value={item.status} />,
+                  render: (item) => (
+                    <StatusBadge
+                      value={worklogStatusLabel(item.status)}
+                      tone={worklogStatusTone(item.status)}
+                    />
+                  ),
                 },
               ]}
             />
@@ -427,7 +437,7 @@ function WorklogMiniTable({ items }: { items: SiapWorklog[] }) {
     <DataTable
       items={items}
       rowKey={(item) => item.id}
-      empty="Tidak ada antrian review"
+      empty="Tidak ada antrian tinjauan"
       columns={[
         {
           key: 'staff',
@@ -458,7 +468,12 @@ function WorklogMiniTable({ items }: { items: SiapWorklog[] }) {
         {
           key: 'status',
           header: 'Status',
-          render: (item) => <StatusBadge value={item.status} tone="info" />,
+          render: (item) => (
+            <StatusBadge
+              value={worklogStatusLabel(item.status)}
+              tone={worklogStatusTone(item.status)}
+            />
+          ),
         },
       ]}
     />

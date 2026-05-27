@@ -31,6 +31,10 @@ import {
   StatusBadge,
   Toolbar,
 } from '@/components/workspace/ui';
+import {
+  worklogStatusLabel,
+  worklogStatusTone,
+} from '@/lib/siap/siap-labels';
 
 export function SiapWorklogExecutivePage() {
   const [dashboard, setDashboard] =
@@ -95,8 +99,8 @@ export function SiapWorklogExecutivePage() {
     <div className="space-y-5">
       <PageHeader
         title="Dashboard Pimpinan SIAP"
-        description="Executive monitoring buku kerja lintas bidang: kepatuhan update, output, kendala, antrian review, dan unit yang perlu perhatian."
-        meta={<StatusBadge value="KABAN / EXECUTIVE MONITORING" tone="dark" />}
+        description="Pantau buku kerja lintas bidang: kepatuhan pengisian, hasil pekerjaan, kendala, dan unit yang perlu perhatian."
+        meta={<StatusBadge value="Monitoring Pimpinan" tone="dark" />}
         actions={
           <>
             <Link to="/siap/worklogs/dashboard">
@@ -112,7 +116,7 @@ export function SiapWorklogExecutivePage() {
               onClick={() => void downloadExport('excel')}
               variant="secondary"
             >
-              Export Excel
+              Excel
             </ActionButton>
 
             <ActionButton
@@ -120,7 +124,7 @@ export function SiapWorklogExecutivePage() {
               onClick={() => void downloadExport('pdf')}
               variant="secondary"
             >
-              Export PDF
+              PDF
             </ActionButton>            
           </>
         }
@@ -188,7 +192,7 @@ export function SiapWorklogExecutivePage() {
               icon={ShieldAlert}
               label="Unit Perlu Perhatian"
               value={dashboard.executiveNotes.attentionNeededUnits}
-              description={`${dashboard.executiveNotes.highRiskUnitCount} unit high risk`}
+              description={`${dashboard.executiveNotes.highRiskUnitCount} unit risiko tinggi`}
               tone={
                 dashboard.executiveNotes.attentionNeededUnits > 0
                   ? 'danger'
@@ -197,9 +201,9 @@ export function SiapWorklogExecutivePage() {
             />
             <StatCard
               icon={ClipboardCheck}
-              label="Antrian Review"
+              label="Antrian Tinjauan"
               value={summary.pendingReview}
-              description="Buku kerja SUBMITTED lintas bidang"
+              description="Buku kerja yang sudah dikirim"
               tone={summary.pendingReview > 0 ? 'warning' : 'success'}
             />
             <StatCard
@@ -220,13 +224,13 @@ export function SiapWorklogExecutivePage() {
             />
             <StatCard
               icon={CheckCircle2}
-              label="Approved"
+              label="Disetujui"
               value={summary.approvedInPeriod}
               tone="success"
             />
             <StatCard
               icon={AlertTriangle}
-              label="Perlu Revisi"
+              label="Perlu Perbaikan"
               value={summary.revisionInPeriod}
               tone={summary.revisionInPeriod > 0 ? 'danger' : 'success'}
             />
@@ -263,7 +267,7 @@ export function SiapWorklogExecutivePage() {
                 },
                 {
                   key: 'health',
-                  header: 'Health',
+                  header: 'Kondisi',
                   render: (item) => (
                     <StatusBadge
                       value={`${item.healthScore}%`}
@@ -295,15 +299,15 @@ export function SiapWorklogExecutivePage() {
                 },
                 {
                   key: 'review',
-                  header: 'Review',
+                  header: 'Tinjauan',
                   render: (item) => (
                     <div className="flex flex-wrap gap-1">
                       <StatusBadge
-                        value={`SUB ${item.pendingReview}`}
+                        value={`Dikirim ${item.pendingReview}`}
                         tone={item.pendingReview > 0 ? 'warning' : 'success'}
                       />
                       <StatusBadge
-                        value={`REV ${item.revisionRequired}`}
+                        value={`Perbaikan ${item.revisionRequired}`}
                         tone={item.revisionRequired > 0 ? 'danger' : 'neutral'}
                       />
                     </div>
@@ -314,7 +318,7 @@ export function SiapWorklogExecutivePage() {
                   header: 'Output',
                   render: (item) => (
                     <div className="text-sm">
-                      <div>{item.worklogCount} worklog</div>
+                      <div>{item.worklogCount} buku kerja</div>
                       <div className="text-xs text-muted-foreground">
                         Volume {item.totalVolume}
                       </div>
@@ -353,8 +357,8 @@ export function SiapWorklogExecutivePage() {
 
           <section className="grid gap-5 xl:grid-cols-2">
             <SectionCard
-              title="Antrian Review Lintas Bidang"
-              description="Buku kerja yang menunggu review Kabid/pejabat terkait."
+              title="Antrian Tinjauan Lintas Bidang"
+              description="Buku kerja yang menunggu tinjauan Kabid atau pejabat terkait."
             >
               <WorklogMiniTable items={dashboard.pendingReview.slice(0, 8)} />
             </SectionCard>
@@ -396,7 +400,7 @@ function RiskUnitList({ items }: { items: SiapWorklogDashboardUnitRow[] }) {
                 {item.unit.nama}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {item.totalStaff} staf · {item.worklogCount} worklog · volume{' '}
+                {item.totalStaff} staf - {item.worklogCount} buku kerja - volume{' '}
                 {item.totalVolume}
               </div>
             </div>
@@ -412,7 +416,7 @@ function RiskUnitList({ items }: { items: SiapWorklogDashboardUnitRow[] }) {
               tone={item.notUpdatedToday > 0 ? 'danger' : 'success'}
             />
             <StatusBadge
-              value={`${item.pendingReview} review`}
+              value={`${item.pendingReview} tinjauan`}
               tone={item.pendingReview > 0 ? 'warning' : 'success'}
             />
             <StatusBadge
@@ -466,7 +470,7 @@ function WorklogMiniTable({ items }: { items: SiapWorklog[] }) {
     <DataTable
       items={items}
       rowKey={(item) => item.id}
-      empty="Tidak ada antrian review"
+      empty="Tidak ada antrian tinjauan"
       columns={[
         {
           key: 'staff',
@@ -497,7 +501,12 @@ function WorklogMiniTable({ items }: { items: SiapWorklog[] }) {
         {
           key: 'status',
           header: 'Status',
-          render: (item) => <StatusBadge value={item.status} tone="info" />,
+          render: (item) => (
+            <StatusBadge
+              value={worklogStatusLabel(item.status)}
+              tone={worklogStatusTone(item.status)}
+            />
+          ),
         },
       ]}
     />

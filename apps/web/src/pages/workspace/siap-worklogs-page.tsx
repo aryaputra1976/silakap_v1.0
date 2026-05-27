@@ -165,7 +165,7 @@ export function SiapWorklogsPage() {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Gagal submit buku kerja',
+          : 'Gagal mengirim buku kerja',
       );
     } finally {
       setWorkingId('');
@@ -311,8 +311,8 @@ export function SiapWorklogsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Buku Kerja Saya"
-        description="Catat aktivitas harian, output pekerjaan, volume, kendala, dan submit untuk direview Kabid."
-        meta={<StatusBadge value={`${summary.total} WORKLOG`} tone="info" />}
+        description="Catat aktivitas harian, hasil pekerjaan, volume, kendala, lalu kirim untuk ditinjau Kabid."
+        meta={<StatusBadge value={`${summary.total} buku kerja`} tone="info" />}
         actions={
           <>
             <ActionButton icon={Plus} onClick={openCreateForm}>
@@ -375,7 +375,7 @@ export function SiapWorklogsPage() {
 
       <SectionCard
         title="Daftar Buku Kerja"
-        description="Submit buku kerja setelah data aktivitas dan output sudah benar."
+        description="Kirim buku kerja setelah kegiatan dan hasil pekerjaan sudah benar."
       >
         {loading ? (
           <LoadingState label="Memuat buku kerja" />

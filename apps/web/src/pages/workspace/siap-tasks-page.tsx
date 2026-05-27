@@ -27,9 +27,15 @@ import {
   SlaBadge,
   StatusBadge,
   Toolbar,
-  WorkflowBadge,
 } from '@/components/workspace/ui';
 import { useAuth } from '@/lib/auth/session';
+import {
+  priorityLabel,
+  priorityTone,
+  taskStatusLabel,
+  taskStatusTone,
+  taskTypeLabel,
+} from '@/lib/siap/siap-labels';
 
 const taskStatuses = [
   { value: 'ASSIGNED', label: 'Belum Dikerjakan' },
@@ -81,7 +87,7 @@ export function SiapTasksPage() {
       setData(tasks);
       setOverdueTotal(overdue.total);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Gagal memuat task');
+      setError(caught instanceof ApiError ? caught.message : 'Gagal memuat tugas');
     } finally {
       setLoading(false);
     }
@@ -125,7 +131,7 @@ export function SiapTasksPage() {
       await apiClient.post(`/siap/tasks/${id}/${action}`, action === 'complete' ? { note: 'Selesai dari workspace' } : undefined);
       await load();
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Aksi task gagal');
+      setError(caught instanceof ApiError ? caught.message : 'Aksi tugas gagal');
     } finally {
       setWorkingId('');
     }
@@ -190,19 +196,19 @@ export function SiapTasksPage() {
       <section className="grid gap-3 md:grid-cols-3">
         <SlaSummaryTile
           icon={AlertTriangle}
-          label="SLA Overdue"
+          label="Terlambat"
           value={overdueTotal}
           tone={overdueTotal > 0 ? 'danger' : 'success'}
         />
         <SlaSummaryTile
           icon={Clock3}
-          label="Due <= 24 Jam"
+          label="Batas <= 24 Jam"
           value={dueSoonVisible}
           tone={dueSoonVisible > 0 ? 'warning' : 'success'}
         />
         <SlaSummaryTile
           icon={CheckCircle2}
-          label="Task Aktif Terlihat"
+          label="Tugas Aktif"
           value={activeVisible}
           tone="neutral"
         />
@@ -210,7 +216,7 @@ export function SiapTasksPage() {
 
       {lastSlaResult ? (
         <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-          SLA processor: {lastSlaResult.total} kandidat,{' '}
+          Hasil pengecekan keterlambatan: {lastSlaResult.total} kandidat,{' '}
           {lastSlaResult.escalated} dieskalasi, {lastSlaResult.failed} gagal.
         </div>
       ) : null}
@@ -226,7 +232,7 @@ export function SiapTasksPage() {
             <option value="DISPOSISI">Disposisi</option>
             <option value="TINDAK_LANJUT">Tindak Lanjut</option>
             <option value="VERIFIKASI">Verifikasi</option>
-            <option value="APPROVAL">Approval</option>
+            <option value="APPROVAL">Persetujuan</option>
           </select>
           <select
             className={inputClass}
@@ -245,12 +251,12 @@ export function SiapTasksPage() {
 
       <SectionCard title="Daftar Tugas">
         {loading ? (
-          <LoadingState label="Memuat task SIAP" />
+          <LoadingState label="Memuat tugas SIAP" />
         ) : (
           <DataTable
             items={data?.items ?? []}
             rowKey={(item) => item.id}
-            empty="Belum ada task"
+            empty="Belum ada tugas"
             columns={[
               {
                 key: 'title',
@@ -258,7 +264,7 @@ export function SiapTasksPage() {
                 render: (item) => (
                   <div>
                     <div className="font-semibold text-zinc-950">{item.title}</div>
-                    <div className="text-xs text-muted-foreground">{item.taskType}</div>
+                    <div className="text-xs text-muted-foreground">{taskTypeLabel(item.taskType)}</div>
                   </div>
                 ),
               },
@@ -267,14 +273,32 @@ export function SiapTasksPage() {
                 header: 'Kasus',
                 render: (item) => (
                   <div>
-                    <div className="font-medium text-zinc-900">{item.case?.caseNumber ?? item.caseId}</div>
+                    <div className="font-medium text-zinc-900">{item.case?.caseNumber ?? '-'}</div>
                     <div className="text-xs text-muted-foreground">{item.case?.asn?.nama ?? '-'}</div>
                   </div>
                 ),
               },
-              { key: 'status', header: 'Status', render: (item) => <WorkflowBadge value={item.status} /> },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (item) => (
+                  <StatusBadge
+                    value={taskStatusLabel(item.status)}
+                    tone={taskStatusTone(item.status)}
+                  />
+                ),
+              },
               { key: 'sla', header: 'SLA', render: (item) => <SlaBadge dueDate={item.dueDate} status={item.status} /> },
-              { key: 'priority', header: 'Prioritas', render: (item) => <StatusBadge value={item.priority} /> },
+              {
+                key: 'priority',
+                header: 'Prioritas',
+                render: (item) => (
+                  <StatusBadge
+                    value={priorityLabel(item.priority)}
+                    tone={priorityTone(item.priority)}
+                  />
+                ),
+              },
               { key: 'due', header: 'Batas Waktu', render: (item) => formatDate(item.dueDate) },
               {
                 key: 'actions',

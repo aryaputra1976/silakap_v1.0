@@ -6,6 +6,7 @@ import {
   inputClass,
   Toolbar,
 } from '@/components/workspace/ui';
+import { worklogStatusLabel } from '@/lib/siap/siap-labels';
 
 const worklogStatuses: SiapWorklogStatus[] = [
   'DRAFT',
@@ -33,7 +34,7 @@ export function SiapWorklogFilterBar({
       <FilterBar>
         <input
           className={inputClass}
-          placeholder="Cari judul/output/kendala"
+          placeholder="Cari kegiatan, hasil, atau kendala"
           value={q}
           onChange={(event) => onQChange(event.target.value)}
           onKeyDown={(event) => {
@@ -51,7 +52,7 @@ export function SiapWorklogFilterBar({
           <option value="">Semua status</option>
           {worklogStatuses.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {worklogStatusLabel(item)}
             </option>
           ))}
         </select>

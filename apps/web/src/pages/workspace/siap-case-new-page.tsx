@@ -22,7 +22,7 @@ const SERVICE_TYPES = [
 
 const PRIORITIES = [
   { value: 'NORMAL', label: 'Normal' },
-  { value: 'URGENT', label: 'Urgen' },
+  { value: 'HIGH', label: 'Urgen' },
   { value: 'CRITICAL', label: 'Kritis' },
 ];
 

@@ -21,10 +21,21 @@ import {
   SectionCard,
   StatusBadge,
   Timeline,
-  WorkflowBadge,
   inputClass,
 } from '@/components/workspace/ui';
 import { useAuth } from '@/lib/auth/session';
+import {
+  caseStatusLabel,
+  caseStatusTone,
+  priorityLabel,
+  priorityTone,
+  serviceTypeLabel,
+  taskStatusLabel,
+  taskStatusTone,
+  taskTypeLabel,
+  workflowActionLabel,
+  workflowStateLabel,
+} from '@/lib/siap/siap-labels';
 
 const ASSIGN_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'ANALIS_MADYA', 'ANALIS_MUDA'];
 const CREATE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'OPD_OPERATOR', 'ASN'];
@@ -34,12 +45,6 @@ type ModalState =
   | { type: 'assign'; taskId: string; assignedTo: string; note: string }
   | { type: 'return'; taskId: string; reason: string; targetRole: string }
   | null;
-
-const PRIORITY_TONE: Record<string, 'neutral' | 'warning' | 'danger'> = {
-  NORMAL: 'neutral',
-  URGENT: 'warning',
-  CRITICAL: 'danger',
-};
 
 const SLA_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
   ON_TRACK: 'success',
@@ -88,7 +93,7 @@ export function SiapCaseDetailPage() {
       const res = await siapApi.submitCase(id);
       setCaseData(res);
     } catch (caught) {
-      setActionError(caught instanceof ApiError ? caught.message : 'Gagal submit kasus');
+      setActionError(caught instanceof ApiError ? caught.message : 'Gagal mengirim kasus');
     } finally {
       setWorking('');
     }
@@ -168,13 +173,13 @@ export function SiapCaseDetailPage() {
         description={caseData.title}
         meta={
           <div className="flex flex-wrap items-center gap-2">
-            <WorkflowBadge value={caseData.status} />
+            <StatusBadge value={caseStatusLabel(caseData.status)} tone={caseStatusTone(caseData.status)} />
             <StatusBadge
-              value={caseData.priority}
-              tone={PRIORITY_TONE[caseData.priority] ?? 'neutral'}
+              value={priorityLabel(caseData.priority)}
+              tone={priorityTone(caseData.priority)}
             />
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-              {caseData.currentState}
+              {workflowStateLabel(caseData.currentState)}
             </span>
           </div>
         }
@@ -195,10 +200,10 @@ export function SiapCaseDetailPage() {
       <SectionCard title="Ringkasan Kasus">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <InfoField label="Jenis Layanan">
-            {caseData.serviceType.replace(/_/g, ' ')}
+            {serviceTypeLabel(caseData.serviceType)}
           </InfoField>
-          <InfoField label="Status">{caseData.status}</InfoField>
-          <InfoField label="Prioritas">{caseData.priority}</InfoField>
+          <InfoField label="Status">{caseStatusLabel(caseData.status)}</InfoField>
+          <InfoField label="Prioritas">{priorityLabel(caseData.priority)}</InfoField>
           {caseData.asn && (
             <InfoField label="ASN Terkait">
               <div>{caseData.asn.nama}</div>
@@ -207,7 +212,7 @@ export function SiapCaseDetailPage() {
           )}
           <InfoField label="Dibuat">{formatDateTime(caseData.createdAt)}</InfoField>
           {caseData.submittedAt && (
-            <InfoField label="Disubmit">{formatDateTime(caseData.submittedAt)}</InfoField>
+            <InfoField label="Dikirim">{formatDateTime(caseData.submittedAt)}</InfoField>
           )}
           {caseData.completedAt && (
             <InfoField label="Diselesaikan">{formatDateTime(caseData.completedAt)}</InfoField>
@@ -286,7 +291,7 @@ export function SiapCaseDetailPage() {
               <tbody>
                 {(caseData.slaTracking as SiapSlaTracking[]).map((sla) => (
                   <tr key={sla.id} className="border-b border-border/50">
-                    <td className="py-2 pr-4 font-mono text-xs">{sla.workflowState}</td>
+                    <td className="py-2 pr-4 text-xs">{workflowStateLabel(sla.workflowState)}</td>
                     <td className="py-2 pr-4 text-xs">{formatDate(sla.startedAt)}</td>
                     <td className="py-2 pr-4 text-xs">{formatDate(sla.dueAt)}</td>
                     <td className="py-2 pr-4 text-xs">
@@ -318,14 +323,14 @@ export function SiapCaseDetailPage() {
             {(caseData.workflowLogs as WorkflowLog[]).map((log) => (
               <div key={log.id} className="rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">{log.action}</span>
+                  <span className="font-semibold">{workflowActionLabel(log.action)}</span>
                   {log.fromState && (
                     <>
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{log.fromState}</span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{workflowStateLabel(log.fromState)}</span>
                       <span className="text-muted-foreground">→</span>
                     </>
                   )}
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{log.toState}</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{workflowStateLabel(log.toState)}</span>
                 </div>
                 {log.note && <p className="mt-1 text-muted-foreground">{log.note}</p>}
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -473,14 +478,14 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-sm">{task.title}</span>
-          <WorkflowBadge value={task.status} />
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{task.taskType}</span>
+          <StatusBadge value={taskStatusLabel(task.status)} tone={taskStatusTone(task.status)} />
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{taskTypeLabel(task.taskType)}</span>
         </div>
         {task.description && (
           <p className="mt-1 text-xs text-muted-foreground">{task.description}</p>
         )}
         <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {task.dueDate && <span>Due: {formatDate(task.dueDate)}</span>}
+          {task.dueDate && <span>Batas: {formatDate(task.dueDate)}</span>}
           {task.assignedTo && (
             <span>
               Ditugaskan ke:{' '}
@@ -532,7 +537,7 @@ function TaskRow({
           </ActionButton>
         )}
         {!isActive && (
-          <StatusBadge value={task.status} tone="neutral" />
+          <StatusBadge value={taskStatusLabel(task.status)} tone={taskStatusTone(task.status)} />
         )}
       </div>
     </div>

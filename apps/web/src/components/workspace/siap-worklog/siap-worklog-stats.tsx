@@ -24,19 +24,19 @@ export function SiapWorklogStats({
       />
       <StatCard
         icon={Send}
-        label="Submitted"
+        label="Menunggu Tinjauan"
         value={summary.submitted}
         tone="info"
       />
       <StatCard
         icon={Edit3}
-        label="Perlu Revisi"
+        label="Perlu Perbaikan"
         value={summary.revision}
         tone="danger"
       />
       <StatCard
         icon={CheckCircle2}
-        label="Approved"
+        label="Disetujui"
         value={summary.approved}
         tone="success"
       />
