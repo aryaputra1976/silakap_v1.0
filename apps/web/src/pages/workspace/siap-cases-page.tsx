@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilePlus } from 'lucide-react';
 import { ApiError, apiClient } from '@/lib/api/client';
@@ -98,7 +98,7 @@ export function SiapCasesPage() {
         <FilterBar>
           <input
             className={inputClass}
-            placeholder="Cari nomor/judul kasus..."
+            placeholder="Cari nomor, judul, nama ASN, atau NIP..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -143,7 +143,7 @@ export function SiapCasesPage() {
                 key: 'caseNumber',
                 header: 'No. Kasus',
                 render: (item) => (
-                  <span className="font-mono text-xs font-semibold text-primary">
+                  <span className="whitespace-nowrap font-mono text-xs font-semibold text-primary">
                     {item.caseNumber}
                   </span>
                 ),
@@ -170,7 +170,7 @@ export function SiapCasesPage() {
                       <div className="text-xs text-muted-foreground">{item.asn.nip}</div>
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground">Belum dikaitkan</span>
                   ),
               },
               {
@@ -214,3 +214,4 @@ export function SiapCasesPage() {
     </div>
   );
 }
+
