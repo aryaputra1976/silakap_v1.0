@@ -23,6 +23,9 @@ import {
   Timeline,
   inputClass,
 } from '@/components/workspace/ui';
+import { SiapCaseDocumentsPanel } from '@/components/workspace/siap/siap-case-documents-panel';
+import { SiapCaseProgressPanel } from '@/components/workspace/siap/siap-case-progress-panel';
+import { SiapCaseWorklogsPanel } from '@/components/workspace/siap/siap-case-worklogs-panel';
 import { useAuth } from '@/lib/auth/session';
 import {
   caseStatusLabel,
@@ -196,6 +199,12 @@ export function SiapCaseDetailPage() {
 
       {actionError ? <ErrorAlert message={actionError} /> : null}
 
+      <SiapCaseProgressPanel
+        caseId={caseData.id}
+        tasks={caseData.tasks}
+        slaTracking={caseData.slaTracking}
+      />
+
       {/* Case info */}
       <SectionCard title="Ringkasan Kasus">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -310,6 +319,18 @@ export function SiapCaseDetailPage() {
           </div>
         </SectionCard>
       )}
+
+      <SiapCaseDocumentsPanel
+        caseId={caseData.id}
+        caseNumber={caseData.caseNumber}
+        asnId={caseData.asnId}
+      />
+
+      <SiapCaseWorklogsPanel
+        caseId={caseData.id}
+        caseNumber={caseData.caseNumber}
+        tasks={caseData.tasks}
+      />
 
       {/* Timeline */}
       <SectionCard title="Riwayat Kasus">
