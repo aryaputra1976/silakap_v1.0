@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Users, Plus, RefreshCcw, Loader2, Pencil, Trash2, CheckCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Building2, CheckCircle, DatabaseZap, Loader2, Pencil, Plus, RefreshCcw, Trash2, Users, X } from 'lucide-react';
 import {
   ActionButton,
   DataTable,
@@ -16,19 +16,26 @@ import {
   bezettingStatusLabel,
   bezettingStatusTone,
   type SiformenBezetting,
-  type CreateBezettingPayload,
+  type SiformenJabatan,
   type UpdateBezettingPayload,
   type SiformenBezettingStatus,
 } from '@/lib/api/siformen';
+import {
+  useBezettingList,
+  useCreateBezetting,
+  useUpdateBezetting,
+  useDeleteBezetting,
+  useGenerateBezettingFromJabatan,
+} from '@/lib/siformen/hooks';
 import { useAuth } from '@/lib/auth/session';
 import { getPrimaryRole } from '@/lib/rbac/roles';
 
 const WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'ANALIS_MADYA'];
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM'];
-
 const CURRENT_YEAR = new Date().getFullYear();
 
 type FormState = {
+  jabatanId: string;
   namaJabatan: string;
   unitKerja: string;
   tahun: number;
@@ -41,10 +48,11 @@ type FormState = {
   keterangan: string;
 };
 
-const emptyForm = (): FormState => ({
+const emptyForm = (tahun = CURRENT_YEAR): FormState => ({
+  jabatanId: '',
   namaJabatan: '',
   unitKerja: '',
-  tahun: CURRENT_YEAR,
+  tahun,
   nip: '',
   namaAsn: '',
   pangkat: '',
@@ -60,66 +68,95 @@ export function SiformenBezettingPage() {
   const canWrite = role ? WRITE_ROLES.includes(role) : false;
   const canAdmin = role ? ADMIN_ROLES.includes(role) : false;
 
-  const [items, setItems] = useState<SiformenBezetting[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const [tahun, setTahun] = useState(String(CURRENT_YEAR));
-  const [statusIsi, setStatusIsi] = useState('');
+  const [tahunFilter, setTahunFilter] = useState(String(CURRENT_YEAR));
+  const [statusIsiFilter, setStatusIsiFilter] = useState('');
   const [page, setPage] = useState(1);
 
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<SiformenBezetting | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
-  const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [generateResult, setGenerateResult] = useState<{ created: number; skipped: number } | null>(null);
 
-  const load = useCallback(() => {
-    let mounted = true;
-    setLoading(true);
-    setError('');
+  // Jabatan picker
+  const [jabatanSearch, setJabatanSearch] = useState('');
+  const [jabatanResults, setJabatanResults] = useState<SiformenJabatan[]>([]);
+  const [jabatanSearchLoading, setJabatanSearchLoading] = useState(false);
+  const [showJabatanDropdown, setShowJabatanDropdown] = useState(false);
+  const jabatanDropdownRef = useRef<HTMLDivElement>(null);
 
-    siformenApi
-      .listBezetting({
-        tahun: tahun || undefined,
-        statusIsi: statusIsi || undefined,
-        page,
-        limit: 20,
-      })
-      .then((result) => {
-        if (mounted) {
-          setItems(result.items);
-          setTotal(result.total);
-        }
-      })
-      .catch((caught) => {
-        if (mounted) setError(caught instanceof Error ? caught.message : 'Gagal memuat data bezetting');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+  // ── Queries & mutations ────────────────────────────────────────────────────
+  const { data, isLoading, error, refetch } = useBezettingList({
+    tahun: tahunFilter || undefined,
+    statusIsi: statusIsiFilter || undefined,
+    page,
+    limit: 20,
+  });
+  const createBez = useCreateBezetting();
+  const updateBez = useUpdateBezetting();
+  const deleteBez = useDeleteBezetting();
+  const generateMut = useGenerateBezettingFromJabatan();
 
-    return () => { mounted = false; };
-  }, [tahun, statusIsi, page]);
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / 20);
+  const errMsg = (error as Error)?.message ?? '';
 
+  const filled = items.filter((i) => i.statusIsi === 'FILLED').length;
+  const vacant = items.filter((i) => i.statusIsi === 'VACANT').length;
+  const acting = items.filter((i) => i.statusIsi === 'ACTING').length;
+
+  // Jabatan search autocomplete
   useEffect(() => {
-    const cleanup = load();
-    return cleanup;
-  }, [load]);
+    if (!jabatanSearch.trim()) { setJabatanResults([]); return; }
+    setJabatanSearchLoading(true);
+    const timer = setTimeout(() => {
+      siformenApi.listJabatan({ q: jabatanSearch, jenisJabatan: 'STRUKTURAL', isActive: 'true', limit: 10 })
+        .then((r) => setJabatanResults(r.items))
+        .catch(() => setJabatanResults([]))
+        .finally(() => setJabatanSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [jabatanSearch]);
+
+  function selectJabatan(jabatan: SiformenJabatan) {
+    setForm((f) => ({
+      ...f,
+      jabatanId: jabatan.id,
+      namaJabatan: jabatan.namaJabatan,
+      unitKerja: jabatan.unitKerjaRef?.nama ?? jabatan.unitKerja,
+    }));
+    setJabatanSearch('');
+    setJabatanResults([]);
+    setShowJabatanDropdown(false);
+  }
+
+  function clearJabatan() {
+    setForm((f) => ({ ...f, jabatanId: '', namaJabatan: '', unitKerja: '' }));
+  }
+
+  function handleGenerate() {
+    const tahun = tahunFilter ? Number(tahunFilter) : CURRENT_YEAR;
+    if (!confirm(`Generate bezetting KOSONG untuk semua jabatan struktural aktif tahun ${tahun}?`)) return;
+    setGenerateResult(null);
+    generateMut.mutate(tahun, {
+      onSuccess: (r) => setGenerateResult(r),
+    });
+  }
 
   function openCreate() {
     setEditItem(null);
-    setForm({ ...emptyForm(), tahun: tahun ? Number(tahun) : CURRENT_YEAR });
+    setForm(emptyForm(tahunFilter ? Number(tahunFilter) : CURRENT_YEAR));
     setFormError('');
+    setJabatanSearch('');
     setShowForm(true);
   }
 
   function openEdit(item: SiformenBezetting) {
     setEditItem(item);
     setForm({
+      jabatanId: item.jabatanId ?? '',
       namaJabatan: item.namaJabatan,
       unitKerja: item.unitKerja,
       tahun: item.tahun,
@@ -132,19 +169,41 @@ export function SiformenBezettingPage() {
       keterangan: item.keterangan ?? '',
     });
     setFormError('');
+    setJabatanSearch('');
     setShowForm(true);
   }
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!form.namaJabatan || !form.unitKerja) {
       setFormError('Nama jabatan dan unit kerja wajib diisi');
       return;
     }
-    setFormLoading(true);
     setFormError('');
-    try {
-      if (editItem) {
-        const payload: UpdateBezettingPayload = {
+
+    if (editItem) {
+      const payload: UpdateBezettingPayload = {
+        namaJabatan: form.namaJabatan,
+        unitKerja: form.unitKerja,
+        tahun: form.tahun,
+        nip: form.nip || undefined,
+        namaAsn: form.namaAsn || undefined,
+        pangkat: form.pangkat || undefined,
+        golongan: form.golongan || undefined,
+        tmtJabatan: form.tmtJabatan || undefined,
+        statusIsi: form.statusIsi,
+        keterangan: form.keterangan || undefined,
+      };
+      updateBez.mutate(
+        { id: editItem.id, payload },
+        {
+          onSuccess: () => setShowForm(false),
+          onError: (e) => setFormError((e as Error).message),
+        },
+      );
+    } else {
+      createBez.mutate(
+        {
+          jabatanId: form.jabatanId || undefined,
           namaJabatan: form.namaJabatan,
           unitKerja: form.unitKerja,
           tahun: form.tahun,
@@ -155,50 +214,24 @@ export function SiformenBezettingPage() {
           tmtJabatan: form.tmtJabatan || undefined,
           statusIsi: form.statusIsi,
           keterangan: form.keterangan || undefined,
-        };
-        await siformenApi.updateBezetting(editItem.id, payload);
-      } else {
-        const payload: CreateBezettingPayload = {
-          namaJabatan: form.namaJabatan,
-          unitKerja: form.unitKerja,
-          tahun: form.tahun,
-          nip: form.nip || undefined,
-          namaAsn: form.namaAsn || undefined,
-          pangkat: form.pangkat || undefined,
-          golongan: form.golongan || undefined,
-          tmtJabatan: form.tmtJabatan || undefined,
-          statusIsi: form.statusIsi,
-          keterangan: form.keterangan || undefined,
-        };
-        await siformenApi.createBezetting(payload);
-      }
-      setShowForm(false);
-      load();
-    } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : 'Gagal menyimpan data');
-    } finally {
-      setFormLoading(false);
+        },
+        {
+          onSuccess: () => setShowForm(false),
+          onError: (e) => setFormError((e as Error).message),
+        },
+      );
     }
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     if (!confirm('Hapus data bezetting ini?')) return;
-    setActionLoading(id);
-    setActionError('');
-    try {
-      await siformenApi.deleteBezetting(id);
-      load();
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : 'Gagal menghapus data');
-    } finally {
-      setActionLoading(null);
-    }
+    setDeletingId(id);
+    deleteBez.mutate(id, {
+      onSettled: () => setDeletingId(null),
+    });
   }
 
-  const filled = items.filter((i) => i.statusIsi === 'FILLED').length;
-  const vacant = items.filter((i) => i.statusIsi === 'VACANT').length;
-  const acting = items.filter((i) => i.statusIsi === 'ACTING').length;
-  const totalPages = Math.ceil(total / 20);
+  const formLoading = createBez.isPending || updateBez.isPending;
 
   return (
     <div className="space-y-5">
@@ -213,14 +246,14 @@ export function SiformenBezettingPage() {
         }
         actions={
           <div className="flex gap-2">
-            <ActionButton
-              icon={loading ? Loader2 : RefreshCcw}
-              variant="secondary"
-              disabled={loading}
-              onClick={load}
-            >
+            <ActionButton icon={isLoading ? Loader2 : RefreshCcw} variant="secondary" disabled={isLoading} onClick={() => refetch()}>
               Refresh
             </ActionButton>
+            {canAdmin ? (
+              <ActionButton icon={generateMut.isPending ? Loader2 : DatabaseZap} variant="secondary" disabled={generateMut.isPending} onClick={handleGenerate}>
+                {generateMut.isPending ? 'Generating…' : 'Generate dari Jabatan'}
+              </ActionButton>
+            ) : null}
             {canWrite ? (
               <ActionButton icon={Plus} variant="primary" onClick={openCreate}>
                 Tambah Posisi
@@ -230,8 +263,23 @@ export function SiformenBezettingPage() {
         }
       />
 
-      {error ? <ErrorAlert message={error} /> : null}
-      {actionError ? <ErrorAlert message={actionError} /> : null}
+      {errMsg ? <ErrorAlert message={errMsg} /> : null}
+      {generateMut.error ? <ErrorAlert message={(generateMut.error as Error).message} /> : null}
+      {deleteBez.error ? <ErrorAlert message={(deleteBez.error as Error).message} /> : null}
+
+      {generateResult ? (
+        <div className="flex items-center justify-between rounded-lg border border-green-300 bg-green-50 px-4 py-3 dark:border-green-700 dark:bg-green-950">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+              Generate selesai — {generateResult.created} posisi dibuat, {generateResult.skipped} sudah ada (dilewati).
+            </p>
+          </div>
+          <button onClick={() => setGenerateResult(null)} className="text-green-600 hover:text-green-800 dark:text-green-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Terisi" value={String(filled)} tone="success" icon={Users} />
@@ -239,55 +287,77 @@ export function SiformenBezettingPage() {
         <StatCard label="Plt" value={String(acting)} tone="warning" icon={Users} />
       </div>
 
-      {/* Form */}
       {showForm ? (
-        <SectionCard
-          title={editItem ? 'Edit Bezetting' : 'Tambah Posisi Bezetting'}
-          description="Isi data pengisian jabatan"
-        >
+        <SectionCard title={editItem ? 'Edit Bezetting' : 'Tambah Posisi Bezetting'} description="Isi data pengisian jabatan">
           <div className="grid gap-3 sm:grid-cols-2">
+            {!editItem ? (
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Pilih Jabatan <span className="text-destructive">*</span>
+                </label>
+                {form.jabatanId ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-blue-300 bg-blue-50 p-2.5 dark:border-blue-700 dark:bg-blue-950">
+                    <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 truncate">{form.namaJabatan}</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">{form.unitKerja}</p>
+                    </div>
+                    <button type="button" onClick={clearJabatan} className="shrink-0 rounded p-0.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative" ref={jabatanDropdownRef}>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={jabatanSearch}
+                        onChange={(e) => { setJabatanSearch(e.target.value); setShowJabatanDropdown(true); }}
+                        onFocus={() => setShowJabatanDropdown(true)}
+                        placeholder="Cari nama jabatan struktural..."
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring pr-8"
+                      />
+                      {jabatanSearchLoading && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                    </div>
+                    {showJabatanDropdown && jabatanResults.length > 0 && (
+                      <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900 max-h-60 overflow-y-auto">
+                        {jabatanResults.map((jabatan) => (
+                          <button key={jabatan.id} type="button" onMouseDown={() => selectJabatan(jabatan)} className="w-full px-3 py-2.5 text-left hover:bg-accent first:rounded-t-lg last:rounded-b-lg">
+                            <p className="text-sm font-medium text-foreground truncate">{jabatan.namaJabatan}</p>
+                            <p className="text-xs text-muted-foreground">{jabatan.unitKerjaRef?.nama ?? jabatan.unitKerja}{jabatan.eselonLevel ? ` · Eselon ${jabatan.eselonLevel}` : ''}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showJabatanDropdown && jabatanSearch && !jabatanSearchLoading && jabatanResults.length === 0 && (
+                      <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-muted-foreground shadow-lg dark:bg-gray-900">
+                        Tidak ada jabatan untuk "{jabatanSearch}"
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">Pilih dari peta jabatan struktural. Nama jabatan dan unit kerja akan terisi otomatis.</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Nama Jabatan</label>
+                  <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.namaJabatan} onChange={(e) => setForm((f) => ({ ...f, namaJabatan: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit Kerja</label>
+                  <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.unitKerja} onChange={(e) => setForm((f) => ({ ...f, unitKerja: e.target.value }))} />
+                </div>
+              </>
+            )}
+
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Nama Jabatan <span className="text-destructive">*</span>
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.namaJabatan}
-                onChange={(e) => setForm((f) => ({ ...f, namaJabatan: e.target.value }))}
-                placeholder="Nama jabatan"
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Tahun <span className="text-destructive">*</span></label>
+              <input type="number" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.tahun} onChange={(e) => setForm((f) => ({ ...f, tahun: Number(e.target.value) }))} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Unit Kerja <span className="text-destructive">*</span>
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.unitKerja}
-                onChange={(e) => setForm((f) => ({ ...f, unitKerja: e.target.value }))}
-                placeholder="Unit kerja"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Tahun <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="number"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.tahun}
-                onChange={(e) => setForm((f) => ({ ...f, tahun: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Status Isi
-              </label>
-              <select
-                className="w-full rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.statusIsi}
-                onChange={(e) => setForm((f) => ({ ...f, statusIsi: e.target.value as SiformenBezettingStatus }))}
-              >
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Status Isi</label>
+              <select className="w-full rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.statusIsi} onChange={(e) => setForm((f) => ({ ...f, statusIsi: e.target.value as SiformenBezettingStatus }))}>
                 <option value="VACANT">Kosong</option>
                 <option value="FILLED">Terisi</option>
                 <option value="ACTING">Plt</option>
@@ -295,106 +365,48 @@ export function SiformenBezettingPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">NIP</label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.nip}
-                onChange={(e) => setForm((f) => ({ ...f, nip: e.target.value }))}
-                placeholder="NIP ASN"
-              />
+              <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.nip} onChange={(e) => setForm((f) => ({ ...f, nip: e.target.value }))} placeholder="NIP ASN" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Nama ASN
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.namaAsn}
-                onChange={(e) => setForm((f) => ({ ...f, namaAsn: e.target.value }))}
-                placeholder="Nama lengkap ASN"
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Nama ASN</label>
+              <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.namaAsn} onChange={(e) => setForm((f) => ({ ...f, namaAsn: e.target.value }))} placeholder="Nama lengkap ASN" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Pangkat
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.pangkat}
-                onChange={(e) => setForm((f) => ({ ...f, pangkat: e.target.value }))}
-                placeholder="cth. Penata Muda Tk.I"
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Pangkat</label>
+              <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.pangkat} onChange={(e) => setForm((f) => ({ ...f, pangkat: e.target.value }))} placeholder="cth. Penata Muda Tk.I" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Golongan
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.golongan}
-                onChange={(e) => setForm((f) => ({ ...f, golongan: e.target.value }))}
-                placeholder="cth. III/b"
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Golongan</label>
+              <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.golongan} onChange={(e) => setForm((f) => ({ ...f, golongan: e.target.value }))} placeholder="cth. III/b" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                TMT Jabatan
-              </label>
-              <input
-                type="date"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.tmtJabatan}
-                onChange={(e) => setForm((f) => ({ ...f, tmtJabatan: e.target.value }))}
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">TMT Jabatan</label>
+              <input type="date" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.tmtJabatan} onChange={(e) => setForm((f) => ({ ...f, tmtJabatan: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Keterangan
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                value={form.keterangan}
-                onChange={(e) => setForm((f) => ({ ...f, keterangan: e.target.value }))}
-                placeholder="Catatan tambahan"
-              />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Keterangan</label>
+              <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring" value={form.keterangan} onChange={(e) => setForm((f) => ({ ...f, keterangan: e.target.value }))} placeholder="Catatan tambahan" />
             </div>
           </div>
           {formError ? <p className="mt-2 text-sm text-destructive">{formError}</p> : null}
           <div className="mt-4 flex gap-2">
-            <ActionButton
-              icon={formLoading ? Loader2 : CheckCircle}
-              variant="primary"
-              disabled={formLoading}
-              onClick={() => void handleSubmit()}
-            >
+            <ActionButton icon={formLoading ? Loader2 : CheckCircle} variant="primary" disabled={formLoading} onClick={handleSubmit}>
               {editItem ? 'Simpan Perubahan' : 'Tambah Posisi'}
             </ActionButton>
-            <ActionButton variant="secondary" onClick={() => setShowForm(false)}>
-              Batal
-            </ActionButton>
+            <ActionButton variant="secondary" onClick={() => setShowForm(false)}>Batal</ActionButton>
           </div>
         </SectionCard>
       ) : null}
 
-      <SectionCard
-        title="Daftar Bezetting"
-        description="Data pengisian jabatan berdasarkan filter tahun dan status"
-      >
+      <SectionCard title="Daftar Bezetting" description="Data pengisian jabatan berdasarkan filter tahun dan status">
         <FilterBar>
-          <select
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
-            value={tahun}
-            onChange={(e) => { setTahun(e.target.value); setPage(1); }}
-          >
+          <select className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring" value={tahunFilter} onChange={(e) => { setTahunFilter(e.target.value); setPage(1); }}>
             <option value="">Semua Tahun</option>
             {[CURRENT_YEAR + 1, CURRENT_YEAR, CURRENT_YEAR - 1].map((y) => (
               <option key={y} value={String(y)}>{y}</option>
             ))}
           </select>
-          <select
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
-            value={statusIsi}
-            onChange={(e) => { setStatusIsi(e.target.value); setPage(1); }}
-          >
+          <select className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring" value={statusIsiFilter} onChange={(e) => { setStatusIsiFilter(e.target.value); setPage(1); }}>
             <option value="">Semua Status</option>
             <option value="FILLED">Terisi</option>
             <option value="VACANT">Kosong</option>
@@ -402,7 +414,7 @@ export function SiformenBezettingPage() {
           </select>
         </FilterBar>
 
-        {loading ? (
+        {isLoading ? (
           <LoadingState label="Memuat data bezetting" />
         ) : (
           <DataTable<SiformenBezetting>
@@ -416,74 +428,45 @@ export function SiformenBezettingPage() {
                 render: (item) => (
                   <div>
                     <div className="font-medium text-foreground">{item.namaJabatan}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{item.unitKerja}</div>
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Building2 className="h-3 w-3 shrink-0" />
+                      <span>{item.unitKerja}</span>
+                    </div>
                   </div>
                 ),
               },
-              {
-                key: 'tahun',
-                header: 'Tahun',
-                render: (item) => (
-                  <span className="text-sm text-foreground">{item.tahun}</span>
-                ),
-              },
+              { key: 'tahun', header: 'Tahun', render: (item) => <span className="text-sm text-foreground">{item.tahun}</span> },
               {
                 key: 'asn',
                 header: 'ASN',
-                render: (item) =>
-                  item.namaAsn ? (
-                    <div className="text-sm">
-                      <div className="text-foreground">{item.namaAsn}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.nip ?? '—'} · {item.golongan ?? '—'}
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ),
+                render: (item) => item.namaAsn ? (
+                  <div className="text-sm">
+                    <div className="text-foreground">{item.namaAsn}</div>
+                    <div className="text-xs text-muted-foreground">{item.nip ?? '—'} · {item.golongan ?? '—'}</div>
+                  </div>
+                ) : <span className="text-xs text-muted-foreground">—</span>,
               },
               {
                 key: 'status',
                 header: 'Status',
-                render: (item) => (
-                  <StatusBadge
-                    value={bezettingStatusLabel(item.statusIsi)}
-                    tone={bezettingStatusTone(item.statusIsi)}
-                  />
-                ),
+                render: (item) => <StatusBadge value={bezettingStatusLabel(item.statusIsi)} tone={bezettingStatusTone(item.statusIsi)} />,
               },
               ...(canWrite
-                ? [
-                    {
-                      key: 'actions',
-                      header: '',
-                      render: (item: SiformenBezetting) => {
-                        const busy = actionLoading === item.id;
-                        return (
-                          <div className="flex gap-1.5">
-                            <ActionButton
-                              icon={Pencil}
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => openEdit(item)}
-                            >
-                              Edit
-                            </ActionButton>
-                            {canAdmin ? (
-                              <ActionButton
-                                icon={busy ? Loader2 : Trash2}
-                                variant="danger"
-                                disabled={busy}
-                                onClick={() => void handleDelete(item.id)}
-                              >
-                                Hapus
-                              </ActionButton>
-                            ) : null}
-                          </div>
-                        );
-                      },
+                ? [{
+                    key: 'actions',
+                    header: '',
+                    render: (item: SiformenBezetting) => {
+                      const busy = deletingId === item.id;
+                      return (
+                        <div className="flex gap-1">
+                          <ActionButton icon={Pencil} variant="ghost" disabled={busy} onClick={() => openEdit(item)} />
+                          {canAdmin ? (
+                            <ActionButton icon={busy ? Loader2 : Trash2} variant="danger" disabled={busy} onClick={() => handleDelete(item.id)} />
+                          ) : null}
+                        </div>
+                      );
                     },
-                  ]
+                  }]
                 : []),
             ]}
           />
@@ -493,21 +476,9 @@ export function SiformenBezettingPage() {
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
             <span>Total: {total} posisi</span>
             <div className="flex gap-1">
-              <button
-                className="rounded border border-border px-2 py-1 disabled:opacity-40"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ←
-              </button>
+              <button className="rounded border border-border px-2 py-1 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>←</button>
               <span className="px-2 py-1">{page} / {totalPages}</span>
-              <button
-                className="rounded border border-border px-2 py-1 disabled:opacity-40"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                →
-              </button>
+              <button className="rounded border border-border px-2 py-1 disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>→</button>
             </div>
           </div>
         ) : (

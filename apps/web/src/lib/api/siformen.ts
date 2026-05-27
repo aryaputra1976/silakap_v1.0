@@ -137,6 +137,99 @@ export interface SiformenDashboard {
   abk: { total: number };
 }
 
+export interface ProyeksiStats {
+  totalBezetting: number;
+  totalAbk: number;
+  kekurangan: number;
+  totalBup5Thn: number;
+  totalKebutuhan: number;
+}
+
+export interface ProyeksiSummary {
+  stats: ProyeksiStats;
+  bupPerTahun: { tahun: number; jumlah: number }[];
+}
+
+export type StatusPosisi = 'aktif' | 'kandidat_hapus' | 'dihapus';
+export type JenisJabatan = 'struktural_jpt' | 'struktural_lama' | 'STRUKTURAL' | 'fungsional' | 'FUNGSIONAL' | 'pelaksana' | 'PELAKSANA' | string;
+
+export interface ProyeksiJabatanItem {
+  id: string;
+  kodeJabatan: string;
+  namaJabatan: string;
+  jenisJabatan: JenisJabatan;
+  eselonLevel: string | null;
+  kelasJabatan: number | null;
+  levelKesetaraan: number | null;
+  statusPosisi: StatusPosisi;
+  flagDelayering: boolean;
+  bezetting: number;
+  abk: number;
+  gap: number;
+  bupPerTahun: { tahun: number; jumlahPensiun: number }[];
+}
+
+export interface ProyeksiUnitKerja {
+  unitKerja: string;
+  unitKerjaId: string | null;
+  flagDelayering: boolean;
+  tipe: string | null;
+  subGrupA: ProyeksiJabatanItem[];
+  subGrupB: ProyeksiJabatanItem[];
+  subGrupC: ProyeksiJabatanItem[];
+  bupPerTahun: { tahun: number; jumlah: number }[];
+  totalBezetting: number;
+  totalAbk: number;
+  totalGap: number;
+  totalBup5Thn: number;
+}
+
+export interface BupEntry {
+  tahun: number;
+  jumlahPensiun: number;
+}
+
+export interface UpsertBupPayload {
+  jabatanId: string;
+  tahun: number;
+  jumlahPensiun: number;
+}
+
+export interface BupItem {
+  id: string;
+  nip: string;
+  nama: string;
+  jabatanNama: string | null;
+  jenisJabatanNama: string | null;
+  unorNama: string | null;
+  unitKerjaId: string | null;
+  tmtPensiun: string | null;
+  golonganNama: string | null;
+  tipePegawai: string | null;
+  unitKerja: { nama: string } | null;
+}
+
+export interface RekapPegawai {
+  totalAktif: number;
+  byTipePegawai: { tipe: string; count: number }[];
+  byJenisJabatan: { jenis: string; count: number }[];
+}
+
+export interface ProyeksiQuery {
+  tahunBezetting?: number | string;
+  unitKerjaId?: string;
+  jenisJabatan?: string;
+  q?: string;
+}
+
+export interface BupQuery {
+  tahun?: number | string;
+  unitKerjaId?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
 export interface JabatanQuery {
   q?: string;
   jenisJabatan?: string;
@@ -334,6 +427,38 @@ export const siformenApi = {
     return apiClient.get<SiformenDashboard>('/siformen/dashboard', tahun ? { tahun } : {});
   },
 
+  // Proyeksi
+  getProyeksiSummary() {
+    return apiClient.get<ProyeksiSummary>('/siformen/proyeksi/summary');
+  },
+  getProyeksi(query: ProyeksiQuery = {}) {
+    return apiClient.get<ProyeksiUnitKerja[]>('/siformen/proyeksi', cleanQuery(query));
+  },
+
+  // BUP (ASN pensiun list)
+  getBupList(query: BupQuery = {}) {
+    return apiClient.get<SiformenPaginatedResult<BupItem>>('/siformen/bup', cleanQuery(query));
+  },
+
+  // BUP per jabatan (SiformenBup table)
+  getBupPerJabatan(jabatanId: string) {
+    return apiClient.get<BupEntry[]>(`/siformen/bup/jabatan/${jabatanId}`);
+  },
+  upsertBup(payload: UpsertBupPayload) {
+    return apiClient.post<BupEntry>('/siformen/bup/upsert', payload);
+  },
+  bulkUpsertBup(items: UpsertBupPayload[]) {
+    return apiClient.post<{ upserted: number }>('/siformen/bup/bulk-upsert', { items });
+  },
+  generateBupFromAsn(tahunMulai = 2024, tahunAkhir = 2028) {
+    return apiClient.post<{ created: number }>('/siformen/bup/generate-from-asn', { tahunMulai, tahunAkhir });
+  },
+
+  // Rekap Pegawai
+  getRekapPegawai() {
+    return apiClient.get<RekapPegawai>('/siformen/rekap-pegawai');
+  },
+
   // Jabatan Fungsional Ref
   getFilterOptions() {
     return apiClient.get<{ rumpunJabatan: string[]; instansiPembina: string[] }>(
@@ -398,8 +523,22 @@ export const siformenApi = {
   deleteJabatan(id: string) {
     return apiClient.delete<null>(`/siformen/jabatan/${id}`);
   },
+  addJabatanFromRef(payload: { refId: string; unitKerja: string; kodeJabatan?: string }) {
+    return apiClient.post<SiformenJabatan>('/siformen/jabatan/from-ref', payload);
+  },
+  syncJabatanFromAsn() {
+    return apiClient.post<{ created: number; matched: number; skipped: number }>(
+      '/siformen/jabatan/sync-from-asn',
+    );
+  },
 
   // Bezetting
+  generateBezettingFromJabatan(tahun: number) {
+    return apiClient.post<{ created: number; skipped: number }>(
+      '/siformen/bezetting/generate-from-jabatan',
+      { tahun },
+    );
+  },
   listBezetting(query: BezettingQuery = {}) {
     return apiClient.get<SiformenPaginatedResult<SiformenBezetting>>(
       '/siformen/bezetting',

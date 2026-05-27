@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, Building2, CheckCircle, DatabaseZap, Link2, Loader2, Pencil, Plus, RefreshCcw, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { BookOpen, Building2, CheckCircle, DatabaseZap, Link2, Loader2, Pencil, Plus, RefreshCcw, RefreshCw, Trash2, X } from 'lucide-react';
 import {
   ActionButton,
   DataTable,
@@ -17,10 +17,16 @@ import {
   type CreateJabatanPayload,
   type UpdateJabatanPayload,
 } from '@/lib/api/siformen';
+import {
+  useJabatanList,
+  useCreateJabatan,
+  useUpdateJabatan,
+  useDeleteJabatan,
+  useGenerateJabatanFromUnitKerja,
+  useSyncJabatanFromAsn,
+} from '@/lib/siformen/hooks';
 import { useAuth } from '@/lib/auth/session';
 import { getPrimaryRole } from '@/lib/rbac/roles';
-
-
 
 const WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID', 'ANALIS_MADYA'];
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_BKPSDM'];
@@ -51,13 +57,6 @@ export function SiformenJabatanPage() {
   const canWrite = role ? WRITE_ROLES.includes(role) : false;
   const canAdmin = role ? ADMIN_ROLES.includes(role) : false;
 
-  const [items, setItems] = useState<SiformenJabatan[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
   const [q, setQ] = useState('');
   const [jenisJabatan, setJenisJabatan] = useState('');
   const [page, setPage] = useState(1);
@@ -65,65 +64,66 @@ export function SiformenJabatanPage() {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<SiformenJabatan | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
-  const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Generate state
-  const [generateLoading, setGenerateLoading] = useState(false);
-  const [generateError, setGenerateError] = useState('');
   const [generateResult, setGenerateResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ created: number; matched: number; skipped: number } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Ref picker state
+  // Ref picker
   const [selectedRef, setSelectedRef] = useState<SiformenJabatanFungsionalRef | null>(null);
   const [refSearch, setRefSearch] = useState('');
   const [refResults, setRefResults] = useState<SiformenJabatanFungsionalRef[]>([]);
   const [refSearchLoading, setRefSearchLoading] = useState(false);
   const [showRefDropdown, setShowRefDropdown] = useState(false);
   const refSearchRef = useRef<HTMLInputElement>(null);
-  const refDropdownRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(() => {
-    let mounted = true;
-    setLoading(true);
-    setError('');
+  // ── Queries & mutations ────────────────────────────────────────────────────
+  const { data, isLoading, error, refetch } = useJabatanList({
+    q: q || undefined,
+    jenisJabatan: jenisJabatan || undefined,
+    page,
+    limit: 20,
+  });
+  const createJabatan = useCreateJabatan();
+  const updateJabatan = useUpdateJabatan();
+  const deleteJabatan = useDeleteJabatan();
+  const generateMut = useGenerateJabatanFromUnitKerja();
+  const syncMut = useSyncJabatanFromAsn();
 
-    siformenApi
-      .listJabatan({ q: q || undefined, jenisJabatan: jenisJabatan || undefined, page, limit: 20 })
-      .then((result) => {
-        if (mounted) {
-          setItems(result.items);
-          setTotal(result.total);
-        }
-      })
-      .catch((caught) => {
-        if (mounted) setError(caught instanceof Error ? caught.message : 'Gagal memuat data jabatan');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / 20);
+  const errMsg = (error as Error)?.message ?? '';
 
-    return () => { mounted = false; };
-  }, [q, jenisJabatan, page]);
-
+  // ── Ref search (autocomplete — kept as local effect) ──────────────────────
   useEffect(() => {
-    const cleanup = load();
-    return cleanup;
-  }, [load]);
+    if (!refSearch.trim()) { setRefResults([]); return; }
+    setRefSearchLoading(true);
+    const timer = setTimeout(() => {
+      siformenApi.listJabatanFungsionalRef({ q: refSearch, limit: 8 })
+        .then((r) => setRefResults(r.items))
+        .catch(() => setRefResults([]))
+        .finally(() => setRefSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [refSearch]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleGenerate() {
     if (!confirm('Generate jabatan struktural dari data Unit Kerja? Jabatan yang sudah ada akan diperbarui.')) return;
-    setGenerateLoading(true);
-    setGenerateError('');
     setGenerateResult(null);
-    try {
-      const result = await siformenApi.generateJabatanFromUnitKerja();
-      setGenerateResult(result);
-      load();
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : 'Gagal generate jabatan dari Unit Kerja');
-    } finally {
-      setGenerateLoading(false);
-    }
+    generateMut.mutate(undefined, {
+      onSuccess: (r) => setGenerateResult(r),
+    });
+  }
+
+  async function handleSync() {
+    if (!confirm('Sinkronisasi jabatan Fungsional & Pelaksana dari data ASN aktif? Data yang sudah ada tidak akan digandakan.')) return;
+    setSyncResult(null);
+    syncMut.mutate(undefined, {
+      onSuccess: (r) => setSyncResult(r),
+    });
   }
 
   function openCreate() {
@@ -154,23 +154,6 @@ export function SiformenJabatanPage() {
     setShowForm(true);
   }
 
-  // Search refs with debounce
-  useEffect(() => {
-    if (!refSearch.trim()) {
-      setRefResults([]);
-      return;
-    }
-    setRefSearchLoading(true);
-    const timer = setTimeout(() => {
-      siformenApi
-        .listJabatanFungsionalRef({ q: refSearch, limit: 8 })
-        .then((r) => setRefResults(r.items))
-        .catch(() => setRefResults([]))
-        .finally(() => setRefSearchLoading(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [refSearch]);
-
   function selectRef(ref: SiformenJabatanFungsionalRef) {
     setSelectedRef(ref);
     setForm((f) => ({
@@ -194,23 +177,29 @@ export function SiformenJabatanPage() {
       setFormError('Kode, nama, dan unit kerja wajib diisi');
       return;
     }
-    setFormLoading(true);
     setFormError('');
-    try {
-      if (editItem) {
-        const payload: UpdateJabatanPayload = {
-          namaJabatan: form.namaJabatan,
-          jenisJabatan: form.jenisJabatan,
-          unitKerja: form.unitKerja,
-          eselonLevel: form.eselonLevel || undefined,
-          satuanKerja: form.satuanKerja || undefined,
-          kualifikasiPendidikan: form.kualifikasiPendidikan || undefined,
-          isActive: form.isActive,
-          jabatanFungsionalRefId: form.jabatanFungsionalRefId ?? null,
-        };
-        await siformenApi.updateJabatan(editItem.id, payload);
-      } else {
-        await siformenApi.createJabatan({
+
+    if (editItem) {
+      const payload: UpdateJabatanPayload = {
+        namaJabatan: form.namaJabatan,
+        jenisJabatan: form.jenisJabatan,
+        unitKerja: form.unitKerja,
+        eselonLevel: form.eselonLevel || undefined,
+        satuanKerja: form.satuanKerja || undefined,
+        kualifikasiPendidikan: form.kualifikasiPendidikan || undefined,
+        isActive: form.isActive,
+        jabatanFungsionalRefId: form.jabatanFungsionalRefId ?? null,
+      };
+      updateJabatan.mutate(
+        { id: editItem.id, payload },
+        {
+          onSuccess: () => setShowForm(false),
+          onError: (e) => setFormError((e as Error).message),
+        },
+      );
+    } else {
+      createJabatan.mutate(
+        {
           kodeJabatan: form.kodeJabatan,
           namaJabatan: form.namaJabatan,
           jenisJabatan: form.jenisJabatan,
@@ -219,32 +208,24 @@ export function SiformenJabatanPage() {
           satuanKerja: form.satuanKerja || undefined,
           kualifikasiPendidikan: form.kualifikasiPendidikan || undefined,
           jabatanFungsionalRefId: form.jabatanFungsionalRefId,
-        });
-      }
-      setShowForm(false);
-      load();
-    } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : 'Gagal menyimpan data');
-    } finally {
-      setFormLoading(false);
+        },
+        {
+          onSuccess: () => setShowForm(false),
+          onError: (e) => setFormError((e as Error).message),
+        },
+      );
     }
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     if (!confirm('Hapus data jabatan ini?')) return;
-    setActionLoading(id);
-    setActionError('');
-    try {
-      await siformenApi.deleteJabatan(id);
-      load();
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : 'Gagal menghapus data');
-    } finally {
-      setActionLoading(null);
-    }
+    setDeletingId(id);
+    deleteJabatan.mutate(id, {
+      onSettled: () => setDeletingId(null),
+    });
   }
 
-  const totalPages = Math.ceil(total / 20);
+  const formLoading = createJabatan.isPending || updateJabatan.isPending;
 
   return (
     <div className="space-y-5">
@@ -260,22 +241,32 @@ export function SiformenJabatanPage() {
         actions={
           <div className="flex gap-2">
             <ActionButton
-              icon={loading ? Loader2 : RefreshCcw}
+              icon={isLoading ? Loader2 : RefreshCcw}
               variant="secondary"
-              disabled={loading}
-              onClick={load}
+              disabled={isLoading}
+              onClick={() => refetch()}
             >
               Refresh
             </ActionButton>
             {canAdmin ? (
-              <ActionButton
-                icon={generateLoading ? Loader2 : DatabaseZap}
-                variant="secondary"
-                disabled={generateLoading}
-                onClick={() => void handleGenerate()}
-              >
-                {generateLoading ? 'Generating…' : 'Generate dari Unit Kerja'}
-              </ActionButton>
+              <>
+                <ActionButton
+                  icon={generateMut.isPending ? Loader2 : DatabaseZap}
+                  variant="secondary"
+                  disabled={generateMut.isPending}
+                  onClick={() => void handleGenerate()}
+                >
+                  {generateMut.isPending ? 'Generating…' : 'Generate dari Unit Kerja'}
+                </ActionButton>
+                <ActionButton
+                  icon={syncMut.isPending ? Loader2 : RefreshCw}
+                  variant="secondary"
+                  disabled={syncMut.isPending}
+                  onClick={() => void handleSync()}
+                >
+                  {syncMut.isPending ? 'Sinkronisasi…' : 'Sync dari ASN'}
+                </ActionButton>
+              </>
             ) : null}
             {canWrite ? (
               <ActionButton icon={Plus} variant="primary" onClick={openCreate}>
@@ -286,11 +277,27 @@ export function SiformenJabatanPage() {
         }
       />
 
-      {error ? <ErrorAlert message={error} /> : null}
-      {actionError ? <ErrorAlert message={actionError} /> : null}
-      {generateError ? <ErrorAlert message={generateError} /> : null}
+      {errMsg ? <ErrorAlert message={errMsg} /> : null}
+      {generateMut.error ? <ErrorAlert message={(generateMut.error as Error).message} /> : null}
+      {syncMut.error ? <ErrorAlert message={(syncMut.error as Error).message} /> : null}
+      {deleteJabatan.error ? <ErrorAlert message={(deleteJabatan.error as Error).message} /> : null}
 
-      {/* Generate result */}
+      {syncResult ? (
+        <div className="flex items-center justify-between rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 dark:border-blue-700 dark:bg-blue-950">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              Sinkronisasi selesai — {syncResult.created} jabatan dibuat,{' '}
+              {syncResult.matched} ter-link ke referensi nasional,{' '}
+              {syncResult.skipped} dilewati (sudah ada).
+            </p>
+          </div>
+          <button onClick={() => setSyncResult(null)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+
       {generateResult ? (
         <div className="flex items-center justify-between rounded-lg border border-green-300 bg-green-50 px-4 py-3 dark:border-green-700 dark:bg-green-950">
           <div className="flex items-center gap-2">
@@ -305,7 +312,6 @@ export function SiformenJabatanPage() {
         </div>
       ) : null}
 
-      {/* Form */}
       {showForm ? (
         <SectionCard
           title={editItem ? 'Edit Jabatan' : 'Tambah Jabatan'}
@@ -381,7 +387,7 @@ export function SiformenJabatanPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="relative" ref={refDropdownRef}>
+                  <div className="relative">
                     <div className="relative">
                       <input
                         ref={refSearchRef}
@@ -439,9 +445,7 @@ export function SiformenJabatanPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Eselon
-              </label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Eselon</label>
               <input
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                 value={form.eselonLevel ?? ''}
@@ -450,9 +454,7 @@ export function SiformenJabatanPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Satuan Kerja
-              </label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Satuan Kerja</label>
               <input
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                 value={form.satuanKerja ?? ''}
@@ -461,9 +463,7 @@ export function SiformenJabatanPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Kualifikasi Pendidikan
-              </label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Kualifikasi Pendidikan</label>
               <input
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                 value={form.kualifikasiPendidikan ?? ''}
@@ -480,9 +480,7 @@ export function SiformenJabatanPage() {
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                   className="size-4"
                 />
-                <label htmlFor="isActive" className="text-sm text-foreground">
-                  Jabatan Aktif
-                </label>
+                <label htmlFor="isActive" className="text-sm text-foreground">Jabatan Aktif</label>
               </div>
             ) : null}
           </div>
@@ -496,20 +494,14 @@ export function SiformenJabatanPage() {
             >
               {editItem ? 'Simpan Perubahan' : 'Tambah Jabatan'}
             </ActionButton>
-            <ActionButton
-              variant="secondary"
-              onClick={() => setShowForm(false)}
-            >
+            <ActionButton variant="secondary" onClick={() => setShowForm(false)}>
               Batal
             </ActionButton>
           </div>
         </SectionCard>
       ) : null}
 
-      <SectionCard
-        title="Daftar Jabatan"
-        description="Referensi jabatan yang terdaftar di sistem"
-      >
+      <SectionCard title="Daftar Jabatan" description="Referensi jabatan yang terdaftar di sistem">
         <FilterBar>
           <input
             className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring"
@@ -528,7 +520,7 @@ export function SiformenJabatanPage() {
           </select>
         </FilterBar>
 
-        {loading ? (
+        {isLoading ? (
           <LoadingState label="Memuat data jabatan" />
         ) : (
           <DataTable<SiformenJabatan>
@@ -556,7 +548,6 @@ export function SiformenJabatanPage() {
                         </span>
                       )}
                     </div>
-                    {/* Show unit kerja name from FK ref for disambiguation, fallback to denormalized string */}
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                       {item.unitKerjaRef ? (
                         <>
@@ -577,10 +568,8 @@ export function SiformenJabatanPage() {
                   <StatusBadge
                     value={item.jenisJabatan}
                     tone={
-                      item.jenisJabatan === 'STRUKTURAL'
-                        ? 'info'
-                        : item.jenisJabatan === 'FUNGSIONAL'
-                          ? 'success'
+                      item.jenisJabatan === 'STRUKTURAL' ? 'info'
+                        : item.jenisJabatan === 'FUNGSIONAL' ? 'success'
                           : 'neutral'
                     }
                   />
@@ -609,26 +598,17 @@ export function SiformenJabatanPage() {
                       key: 'actions',
                       header: '',
                       render: (item: SiformenJabatan) => {
-                        const busy = actionLoading === item.id;
+                        const busy = deletingId === item.id;
                         return (
-                          <div className="flex gap-1.5">
-                            <ActionButton
-                              icon={Pencil}
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => openEdit(item)}
-                            >
-                              Edit
-                            </ActionButton>
+                          <div className="flex gap-1">
+                            <ActionButton icon={Pencil} variant="ghost" disabled={busy} onClick={() => openEdit(item)} />
                             {canAdmin ? (
                               <ActionButton
                                 icon={busy ? Loader2 : Trash2}
                                 variant="danger"
                                 disabled={busy}
-                                onClick={() => void handleDelete(item.id)}
-                              >
-                                Hapus
-                              </ActionButton>
+                                onClick={() => handleDelete(item.id)}
+                              />
                             ) : null}
                           </div>
                         );
@@ -644,23 +624,9 @@ export function SiformenJabatanPage() {
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
             <span>Total: {total} jabatan</span>
             <div className="flex gap-1">
-              <button
-                className="rounded border border-border px-2 py-1 disabled:opacity-40"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ←
-              </button>
-              <span className="px-2 py-1">
-                {page} / {totalPages}
-              </span>
-              <button
-                className="rounded border border-border px-2 py-1 disabled:opacity-40"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                →
-              </button>
+              <button className="rounded border border-border px-2 py-1 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>←</button>
+              <span className="px-2 py-1">{page} / {totalPages}</span>
+              <button className="rounded border border-border px-2 py-1 disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>→</button>
             </div>
           </div>
         ) : (

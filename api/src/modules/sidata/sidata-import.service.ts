@@ -1307,7 +1307,7 @@ export class SidataImportService implements OnModuleInit {
     const hPendidikan = h(['pendidikan_terakhir', 'pendidikan', 'pendidikan terakhir', 'pendidikan_nama', 'pendidikan nama', 'tingkat pendidikan']);
     const hNamaSekolah = h(['nama_sekolah', 'sekolah', 'nama sekolah', 'institusi', 'nama_institusi']);
     const hTmtPns = h(['tmt_pns', 'tmt_cpns', 'tmt pns', 'tmt cpns', 'tmt_kerja', 'tmt kerja']);
-    const hTmtPensiun = h(['tmt_pensiun', 'tmt pensiun', 'bup', 'tanggal_pensiun', 'tgl pensiun', 'tanggal bup', 'batas usia pensiun']);
+    const hTmtPensiun = h(['tmt_pensiun', 'tmt pensiun', 'tanggal_pensiun', 'tgl pensiun', 'tanggal bup']);
     const hStatusKepeg = h([
       'kedudukan_hukum_nama', 'kedudukan hukum nama',
       'status_kepegawaian', 'status kepegawaian',

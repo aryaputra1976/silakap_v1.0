@@ -93,6 +93,9 @@ import { SiformenJabatanFungsionalRefPage } from '@/pages/workspace/siformen-jab
 import { SiformenBezettingPage } from '@/pages/workspace/siformen-bezetting-page';
 import { SiformenFormasiPage } from '@/pages/workspace/siformen-formasi-page';
 import { SiformenAbkPage } from '@/pages/workspace/siformen-abk-page';
+import { SiformenBupPage } from '@/pages/workspace/siformen-bup-page';
+import { SiformenRekapPegawaiPage } from '@/pages/workspace/siformen-rekap-pegawai-page';
+import { SiformenProfilDaerahPage } from '@/pages/workspace/siformen-profil-daerah-page';
 import { SidataArsipPage } from '@/pages/workspace/sidata-arsip-page';
 import { SidataArsipDetailPage } from '@/pages/workspace/sidata-arsip-detail-page';
 import { RefGajiPokokPage } from '@/pages/workspace/ref-gaji-pokok-page';
@@ -233,13 +236,16 @@ export function AppRoutingSetup() {
           {/* WORKING CALENDAR */}
           <Route path="/working-calendar" element={<WorkingCalendarPage />} />
 
-          {/* SIFORMEN — Formasi & Bezetting ASN */}
+          {/* SIFORMEN — Proyeksi Kebutuhan Pegawai */}
           <Route path="/siformen" element={<SiformenDashboardPage />} />
+          <Route path="/siformen/rekap-pegawai" element={<SiformenRekapPegawaiPage />} />
+          <Route path="/siformen/profil-daerah" element={<SiformenProfilDaerahPage />} />
           <Route path="/siformen/jabatan" element={<SiformenJabatanPage />} />
           <Route path="/siformen/jabatan-fungsional-ref" element={<SiformenJabatanFungsionalRefPage />} />
+          <Route path="/siformen/abk" element={<SiformenAbkPage />} />
+          <Route path="/siformen/bup" element={<SiformenBupPage />} />
           <Route path="/siformen/bezetting" element={<SiformenBezettingPage />} />
           <Route path="/siformen/formasi" element={<SiformenFormasiPage />} />
-          <Route path="/siformen/abk" element={<SiformenAbkPage />} />
 
           {/* ADMIN CONTROL */}
           <Route path="/admin/rbac" element={<AdminRbacPage />} />

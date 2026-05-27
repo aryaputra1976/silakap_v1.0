@@ -92,22 +92,20 @@ type IssueTab = 'issues' | 'needs-review' | 'invalid';
 type TipePegawai = 'PNS' | 'PPPK' | 'PPPK_PARUH_WAKTU';
 
 const ISSUE_TABS: Array<{ key: IssueTab; label: string }> = [
-  { key: 'issues', label: 'Semua Issue' },
+  { key: 'issues', label: 'Semua Masalah' },
   { key: 'needs-review', label: 'Perlu Review' },
-  { key: 'invalid', label: 'Invalid' },
+  { key: 'invalid', label: 'Tidak Valid' },
 ];
 
 const TIPE_PEGAWAI_OPTIONS: Array<{
   value: TipePegawai;
   label: string;
-  description: string;
   activeClass: string;
   inactiveClass: string;
 }> = [
   {
     value: 'PNS',
     label: 'PNS',
-    description: 'Pegawai Negeri Sipil',
     activeClass: 'border-blue-600 bg-blue-600 text-white',
     inactiveClass:
       'border-border bg-white text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700',
@@ -115,7 +113,6 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
   {
     value: 'PPPK',
     label: 'PPPK',
-    description: 'Pegawai Pemerintah dengan Perjanjian Kerja',
     activeClass: 'border-violet-600 bg-violet-600 text-white',
     inactiveClass:
       'border-border bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700',
@@ -123,7 +120,6 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
   {
     value: 'PPPK_PARUH_WAKTU',
     label: 'PPPK Paruh Waktu',
-    description: 'PPPK dengan jam kerja paruh waktu',
     activeClass: 'border-orange-500 bg-orange-500 text-white',
     inactiveClass:
       'border-border bg-white text-zinc-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700',
@@ -132,56 +128,6 @@ const TIPE_PEGAWAI_OPTIONS: Array<{
 
 const BLOCKED_COMMIT_STATUSES = ['PROCESSING', 'COMMITTED', 'FAILED', 'CANCELLED'];
 const PAGE_SIZE = 20;
-
-const IMPORT_GUIDE_STEPS = [
-  {
-    title: 'Export dari SIASN',
-    description: 'Download file ASN dari SIASN sesuai jenis pegawai: PNS, PPPK, atau PPPK Paruh Waktu.',
-    icon: FileSpreadsheet,
-  },
-  {
-    title: 'Upload ke SIDATA',
-    description: 'Pilih jenis ASN yang sama dengan file, lalu upload file .xlsx ke halaman Import SIASN.',
-    icon: Upload,
-  },
-  {
-    title: 'Validasi Batch',
-    description: 'Cek total baris, valid, invalid, perlu review, dan baris yang belum punya referensi.',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'Ekstrak Referensi',
-    description: 'Jika ada referensi baru dari file SIASN, ekstrak dulu agar mapping jabatan/unit/golongan lebih lengkap.',
-    icon: Network,
-  },
-  {
-    title: 'Mapping Referensi',
-    description: 'Jalankan map atau remap referensi sampai tidak ada invalid, unmapped, dan needs review.',
-    icon: GitCompareArrows,
-  },
-  {
-    title: 'Review & Koreksi',
-    description: 'Buka daftar issue, perbaiki mapping unit/jabatan/golongan, lalu catat alasan bila ada koreksi manual.',
-    icon: PencilLine,
-  },
-  {
-    title: 'Commit ke Master ASN',
-    description: 'Commit hanya jika quality gate aman. Data master diperbarui dan status sinkronisasi ikut dihitung.',
-    icon: CheckCircle2,
-  },
-  {
-    title: 'Cek Dashboard & Laporan',
-    description: 'Periksa Dashboard SIDATA, Master ASN, Rekonsiliasi, Riwayat Import, dan Laporan Resmi.',
-    icon: Sparkles,
-  },
-];
-
-const IMPORT_GUIDE_CHECKLIST = [
-  'File SIASN harus .xlsx dan sesuai jenis ASN yang dipilih.',
-  'Jangan commit batch sebelum invalid, unmapped, dan needs review selesai.',
-  'Jika export SIASN berbeda dengan koreksi lokal, data akan ditandai CONFLICT untuk direview.',
-  'Setiap laporan SIDATA harus memperhatikan batch dan tanggal sinkron terakhir.',
-];
 
 function getTipePegawaiLabel(importType: string): string {
   if (importType === 'SIASN_ASN_PNS') return 'PNS';
@@ -231,34 +177,102 @@ function getAsnCommitBlockReason(summary: SiasnImportSummary | null): string {
   }
 
   if (status === 'COMMITTED') {
-    return 'Batch sudah pernah dicommit ke database.';
+    return 'Batch sudah pernah dimasukkan ke Master ASN.';
   }
 
   if (status === 'FAILED') {
-    return 'Batch berstatus gagal dan tidak dapat dicommit.';
+    return 'Batch berstatus gagal dan tidak dapat dimasukkan ke Master ASN.';
   }
 
   if (status === 'CANCELLED') {
-    return 'Batch sudah dibatalkan dan tidak dapat dicommit.';
+    return 'Batch sudah dibatalkan dan tidak dapat dimasukkan ke Master ASN.';
   }
 
   if (summary.mappedRows <= 0) {
-    return 'Belum ada baris yang berhasil termapping. Jalankan Map Referensi terlebih dahulu.';
+    return 'Belum ada baris yang berhasil dipetakan. Jalankan Petakan Referensi terlebih dahulu.';
   }
 
   if (summary.invalidRows > 0) {
-    return `Masih ada ${summary.invalidRows} baris invalid yang harus diperbaiki.`;
+    return `Masih ada ${summary.invalidRows} baris tidak valid yang harus diperbaiki.`;
   }
 
   if (summary.needsReviewRows > 0) {
-    return `Masih ada ${summary.needsReviewRows} baris yang perlu review manual.`;
+    return `Masih ada ${summary.needsReviewRows} baris yang perlu diperiksa manual.`;
   }
 
   if (summary.unmappedRows > 0) {
-    return `Masih ada ${summary.unmappedRows} baris yang belum termapping.`;
+    return `Masih ada ${summary.unmappedRows} baris yang belum terpetakan.`;
   }
 
-  return 'Batch belum memenuhi syarat quality gate untuk commit.';
+  return 'Batch belum siap dimasukkan ke Master ASN.';
+}
+
+function ImportFlowStep({
+  description,
+  state,
+  title,
+}: {
+  description: string;
+  state: 'done' | 'active' | 'pending' | 'blocked';
+  title: string;
+}) {
+  const stateClass = {
+    done: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    active: 'border-sky-200 bg-sky-50 text-sky-800',
+    pending: 'border-[#cfe1da] bg-white text-[#4c625c]',
+    blocked: 'border-amber-200 bg-amber-50 text-amber-900',
+  };
+  const dotClass = {
+    done: 'bg-emerald-600',
+    active: 'bg-sky-600',
+    pending: 'bg-zinc-300',
+    blocked: 'bg-amber-500',
+  };
+
+  return (
+    <div className={`rounded-lg border p-3 ${stateClass[state]}`}>
+      <div className="flex items-center gap-2">
+        <span className={`size-2 rounded-full ${dotClass[state]}`} />
+        <span className="text-sm font-semibold">{title}</span>
+      </div>
+      <div className="mt-1 text-xs leading-5 text-current/75">{description}</div>
+    </div>
+  );
+}
+
+function getFlowState(
+  step: 'upload' | 'mapping' | 'validasi' | 'preview' | 'commit',
+  summary: SiasnImportSummary | null,
+  previewChecked: boolean,
+) {
+  const committed = isCommittedStatus(summary);
+  const safe = isAsnCommitSafe(summary);
+  const status = normalizeStatus(summary?.status);
+  const processing = status === 'PROCESSING';
+
+  if (committed) return 'done';
+
+  if (step === 'upload') return summary ? 'done' : 'active';
+  if (!summary) return 'pending';
+
+  if (step === 'mapping') {
+    if (summary.mappedRows > 0) return 'done';
+    return processing ? 'active' : 'blocked';
+  }
+
+  if (step === 'validasi') {
+    if (safe) return 'done';
+    if (summary.mappedRows > 0) return 'blocked';
+    return 'pending';
+  }
+
+  if (step === 'preview') {
+    if (previewChecked) return 'done';
+    return safe ? 'active' : 'pending';
+  }
+
+  if (safe && previewChecked) return 'active';
+  return 'pending';
 }
 
 export function SidataImportSiasnPage() {
@@ -276,6 +290,7 @@ export function SidataImportSiasnPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [summary, setSummary] = useState<SiasnImportSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [previewChecked, setPreviewChecked] = useState(false);
 
   const [activeTab, setActiveTab] = useState<IssueTab>('issues');
   const [issues, setIssues] = useState<PaginatedIssues | null>(null);
@@ -311,6 +326,7 @@ export function SidataImportSiasnPage() {
     void loadIssues(selectedId, activeTab, 1, '');
     setIssuesPage(1);
     setIssuesSearch('');
+    setPreviewChecked(false);
   }, [selectedId]);
 
   useEffect(() => {
@@ -440,7 +456,7 @@ export function SidataImportSiasnPage() {
       const result = await sidataImportApi.uploadAsnFile(selectedFile, tipePegawai);
 
       toast.success(
-        `Upload berhasil — ${result.totalRows} baris, ${result.validRows} valid, ${result.invalidRows} invalid`,
+        `Upload berhasil - ${result.totalRows} baris, ${result.validRows} valid, ${result.invalidRows} tidak valid`,
       );
 
       setSelectedFile(null);
@@ -463,7 +479,7 @@ export function SidataImportSiasnPage() {
     try {
       const result = await sidataImportApi.mapAsnBatch(selectedId);
 
-      toast.success(result.message ?? 'Mapping ASN diproses di background.');
+      toast.success(result.message ?? 'Pemetaan ASN diproses di background.');
 
       await Promise.all([loadSummary(selectedId), loadBatches()]);
       void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
@@ -482,7 +498,7 @@ export function SidataImportSiasnPage() {
     try {
       const result = await sidataImportApi.remapAsnBatch(selectedId);
 
-      toast.success(result.message ?? 'Remap ASN diproses di background.');
+      toast.success(result.message ?? 'Pemetaan ulang ASN diproses di background.');
 
       await Promise.all([loadSummary(selectedId), loadBatches()]);
       void loadIssues(selectedId, activeTab, issuesPage, issuesSearch);
@@ -503,7 +519,7 @@ export function SidataImportSiasnPage() {
       const { extracted, totalExtracted } = result;
 
       toast.success(
-        `Ekstrak referensi selesai — ${totalExtracted} data baru: Agama ${extracted.agama}, Golongan ${extracted.golongan}, Jenis Jabatan ${extracted.jenisJabatan}, Jenis ASN ${extracted.jenisAsn}, dan lainnya.`,
+        `Ekstrak referensi selesai - ${totalExtracted} data baru: Agama ${extracted.agama}, Golongan ${extracted.golongan}, Jenis Jabatan ${extracted.jenisJabatan}, Jenis ASN ${extracted.jenisAsn}, dan lainnya.`,
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal ekstrak referensi dari Data ASN');
@@ -516,7 +532,7 @@ export function SidataImportSiasnPage() {
     if (!selectedId || !summary) return;
 
     const confirmed = window.confirm(
-      `Commit final ${summary.totalRows} baris ASN ke database utama? Pastikan mapping dan hasil review sudah benar.`,
+      `Masukkan ${summary.totalRows} baris ASN ke Master ASN? Pastikan mapping dan hasil review sudah benar.`,
     );
 
     if (!confirmed) return;
@@ -526,7 +542,7 @@ export function SidataImportSiasnPage() {
     try {
       const result = await sidataImportApi.commitAsnBatch(selectedId);
 
-      toast.success(result.message ?? 'Commit final ASN diproses di background.');
+      toast.success(result.message ?? 'Penyimpanan final ASN diproses di background.');
 
       await Promise.all([
         loadSummary(selectedId),
@@ -534,7 +550,7 @@ export function SidataImportSiasnPage() {
         loadIssues(selectedId, activeTab, issuesPage, issuesSearch),
       ]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal commit final batch ASN');
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan final ASN');
     } finally {
       setCommitting(false);
     }
@@ -653,68 +669,47 @@ export function SidataImportSiasnPage() {
   const isBusy = mapping || committing || cancelling || uploading || extracting;
   const commitSafe = isAsnCommitSafe(summary);
   const committed = isCommittedStatus(summary);
-  const canCommit = Boolean(summary && commitSafe && !committed);
   const showQualityGateWarning = Boolean(summary && !commitSafe && !committed);
+  const showPreviewGateWarning = Boolean(summary && commitSafe && !previewChecked && !committed);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Import SIASN"
-        description="Upload data ASN dari BKN SIASN, petakan ke referensi lokal, lalu lanjutkan review dan commit melalui Mapping Referensi."
+        description="Upload file ASN, cek hasil validasi, lalu commit jika datanya sudah aman."
       />
 
-      <SectionCard
-        title="Panduan Import Data SIASN"
-        description="Ikuti alur ini agar data SIASN tidak langsung menimpa master ASN tanpa validasi, mapping, dan review."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge value="1. Import SIASN" tone="dark" />
-            <StatusBadge value="2. Mapping Referensi" tone="info" />
-            <StatusBadge value="3. Commit Master" tone="success" />
-          </div>
-        }
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {IMPORT_GUIDE_STEPS.map((step, index) => {
-            const Icon = step.icon;
-
-            return (
-              <div
-                key={step.title}
-                className="rounded-lg border border-[#cfe1da] bg-[#f7fbf8] p-4"
-              >
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#0e7c86] text-xs font-semibold text-white">
-                    {index + 1}
-                  </span>
-                  <Icon className="size-5 text-[#0e7c86]" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#18343a]">{step.title}</h3>
-                <p className="mt-2 text-sm leading-5 text-[#62766f]">{step.description}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 rounded-lg border border-[#f2cf5a] bg-[#fff8dd] p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#745300]">
-            <AlertTriangle className="size-4" />
-            Catatan sebelum commit
-          </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            {IMPORT_GUIDE_CHECKLIST.map((item) => (
-              <div key={item} className="flex gap-2 text-sm leading-5 text-[#745300]">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </SectionCard>
+      <div className="grid gap-3 md:grid-cols-5">
+        <ImportFlowStep
+          title="1. Upload"
+          description="Pilih jenis ASN dan unggah file SIASN."
+          state={getFlowState('upload', summary, previewChecked)}
+        />
+        <ImportFlowStep
+          title="2. Mapping"
+          description="Petakan ASN ke referensi dan unit kerja."
+          state={getFlowState('mapping', summary, previewChecked)}
+        />
+        <ImportFlowStep
+          title="3. Validasi"
+          description="Pastikan tidak ada invalid, review, atau unmapped."
+          state={getFlowState('validasi', summary, previewChecked)}
+        />
+        <ImportFlowStep
+          title="4. Preview"
+          description="Cek rekonsiliasi sebelum data masuk master."
+          state={getFlowState('preview', summary, previewChecked)}
+        />
+        <ImportFlowStep
+          title="5. Simpan"
+          description="Commit final ke Master ASN."
+          state={getFlowState('commit', summary, previewChecked)}
+        />
+      </div>
 
       <SectionCard
-        title="Upload Data ASN SIASN"
-        description="Format: .xlsx (maks. 25 MB). Pilih jenis ASN sesuai file yang didownload dari SIASN."
+        title="Upload File ASN"
+        description="Pilih jenis ASN sesuai file SIASN. Format file: .xlsx."
       >
         <div className="flex flex-col gap-4">
           <div>
@@ -733,12 +728,12 @@ export function SidataImportSiasnPage() {
                   )}
                 >
                   {opt.label}
-                  <span className="ml-1.5 text-xs font-normal opacity-75">
-                    — {opt.description}
-                  </span>
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Kolom minimal: NIP dan Nama. Jika TMT pensiun kosong, sistem menghitung dari tanggal lahir dan BUP jabatan.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -767,7 +762,7 @@ export function SidataImportSiasnPage() {
                   onClick={() => void handleUpload()}
                   disabled={isBusy || !tipePegawai}
                 >
-                  {uploading ? 'Mengupload…' : 'Upload'}
+                  {uploading ? 'Mengupload...' : 'Upload'}
                 </ActionButton>
                 <ActionButton
                   variant="ghost"
@@ -791,7 +786,7 @@ export function SidataImportSiasnPage() {
 
           {selectedFile && tipePegawai && (
             <p className="text-xs text-muted-foreground">
-              {selectedFile.name} — {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · Jenis:{' '}
+              {selectedFile.name} - {(selectedFile.size / 1024 / 1024).toFixed(2)} MB - Jenis:{' '}
               <strong>{getTipePegawaiLabel(`SIASN_ASN_${tipePegawai}`)}</strong>
             </p>
           )}
@@ -799,7 +794,7 @@ export function SidataImportSiasnPage() {
       </SectionCard>
 
       <SectionCard
-        title="Riwayat Batch Import"
+        title="Riwayat Import"
         actions={
           <ActionButton
             variant="ghost"
@@ -812,7 +807,7 @@ export function SidataImportSiasnPage() {
         }
       >
         {batchesLoading ? (
-          <LoadingState label="Memuat riwayat batch…" />
+          <LoadingState label="Memuat riwayat batch..." />
         ) : batchesError ? (
           <ErrorAlert message={batchesError} />
         ) : (
@@ -823,7 +818,7 @@ export function SidataImportSiasnPage() {
             columns={[
               {
                 key: 'id',
-                header: 'Batch ID',
+                header: 'ID Import',
                 render: (item) => (
                   <button
                     className={cn(
@@ -834,7 +829,7 @@ export function SidataImportSiasnPage() {
                     )}
                     onClick={() => setSelectedId(selectedId === item.id ? null : item.id)}
                   >
-                    {item.id.slice(0, 8)}…
+                    {item.id.slice(0, 8)}...
                   </button>
                 ),
                 className: 'w-28',
@@ -858,7 +853,7 @@ export function SidataImportSiasnPage() {
                 key: 'fileName',
                 header: 'File',
                 render: (item) => (
-                  <span className="text-xs text-zinc-700">{item.fileName ?? '—'}</span>
+                  <span className="text-xs text-zinc-700">{item.fileName ?? '-'}</span>
                 ),
               },
               {
@@ -869,7 +864,7 @@ export function SidataImportSiasnPage() {
               },
               {
                 key: 'rows',
-                header: 'Total / Valid / Invalid',
+                header: 'Total / Valid / Tidak Valid',
                 render: (item) => (
                   <span className="font-mono text-xs">
                     {item.totalRows} / {item.validRows} / {item.invalidRows}
@@ -893,18 +888,18 @@ export function SidataImportSiasnPage() {
       {selectedId && (
         <>
           {summaryLoading ? (
-            <LoadingState label="Memuat ringkasan batch…" />
+            <LoadingState label="Memuat ringkasan batch..." />
           ) : summary ? (
             <>
               <SectionCard
-                title={`Ringkasan Batch — ${selectedId.slice(0, 8)}…`}
-                description={`${summary.importType} · ${summary.fileName ?? 'tanpa nama file'}`}
+                title={`Ringkasan Batch - ${selectedId.slice(0, 8)}...`}
+                description={`${summary.importType} - ${summary.fileName ?? 'tanpa nama file'}`}
                 actions={
                   <div className="flex flex-wrap items-center gap-2">
                     {summaryStatus === 'PROCESSING' && (
                       <span className="flex animate-pulse items-center gap-1.5 text-xs font-medium text-amber-600">
                         <Loader2 className="size-3 animate-spin" />
-                        Memproses…
+                        Memproses...
                       </span>
                     )}
 
@@ -913,7 +908,7 @@ export function SidataImportSiasnPage() {
                       icon={ArrowRight}
                       onClick={openMappingReferensi}
                     >
-                      Buka Mapping Referensi
+                      Buka Pemetaan
                     </ActionButton>
 
                     <ActionButton
@@ -931,7 +926,7 @@ export function SidataImportSiasnPage() {
                         onClick={() => void handleExtractReferences()}
                         disabled={isBusy}
                       >
-                        {extracting ? 'Mengekstrak…' : 'Ekstrak Referensi'}
+                        {extracting ? 'Mengekstrak...' : 'Ekstrak Referensi'}
                       </ActionButton>
                     )}
 
@@ -941,7 +936,7 @@ export function SidataImportSiasnPage() {
                         onClick={() => void handleMap()}
                         disabled={isBusy}
                       >
-                        {mapping ? 'Mapping…' : 'Map Referensi'}
+                        {mapping ? 'Memetakan...' : 'Petakan Referensi'}
                       </ActionButton>
                     )}
 
@@ -952,21 +947,25 @@ export function SidataImportSiasnPage() {
                         onClick={() => void handleRemap()}
                         disabled={isBusy}
                       >
-                        {mapping ? 'Remapping…' : 'Remap Ulang'}
+                        {mapping ? 'Memetakan...' : 'Petakan Ulang'}
                       </ActionButton>
                     )}
 
                     {summary.mappedRows > 0 && !commitSafe && !committed && (
-                      <StatusBadge value="Commit Belum Aman" tone="warning" />
+                      <StatusBadge value="Belum Siap Commit" tone="warning" />
                     )}
 
-                    {canCommit && (
+                    {summary && commitSafe && !committed && (
                       <ActionButton
                         icon={committing ? Loader2 : ShieldCheck}
                         onClick={() => void handleCommit()}
-                        disabled={isBusy}
+                        disabled={isBusy || !previewChecked}
                       >
-                        {committing ? 'Committing...' : 'Commit Final'}
+                        {committing
+                          ? 'Menyimpan...'
+                          : previewChecked
+                            ? 'Simpan ke Master'
+                            : 'Cek Preview Dulu'}
                       </ActionButton>
                     )}
 
@@ -977,41 +976,27 @@ export function SidataImportSiasnPage() {
                         onClick={() => void handleCancel()}
                         disabled={isBusy}
                       >
-                        {cancelling ? 'Membatalkan…' : 'Batalkan'}
+                        {cancelling ? 'Membatalkan...' : 'Batalkan'}
                       </ActionButton>
                     )}
 
                     {summary.status === 'COMMITTED' && (
                       <span className="inline-flex items-center gap-1.5 text-sm text-emerald-700">
                         <CheckCircle2 className="size-4" />
-                        Sudah dikomit
+                        Sudah masuk Master
                       </span>
                     )}
                   </div>
                 }
               >
-                <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-                  <div className="flex items-start gap-3">
-                    <ArrowRight className="mt-0.5 size-4 shrink-0" />
-                    <div>
-                      <div className="font-semibold">Lanjutkan proses final di Mapping Referensi</div>
-                      <div className="mt-1">
-                        Review issue, resolve mapping unit kerja, export daftar masalah, dan commit
-                        final dilakukan melalui halaman Mapping Referensi agar quality gate tetap
-                        konsisten.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {committed ? (
                   <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
                       <div>
-                        <div className="font-semibold">Batch sudah dicommit</div>
+                        <div className="font-semibold">Sudah masuk Master ASN</div>
                         <div className="mt-1">
-                          Data dari batch ini sudah masuk ke database utama ASN.
+                          Data dari batch ini sudah masuk ke Master ASN.
                         </div>
                       </div>
                     </div>
@@ -1021,11 +1006,24 @@ export function SidataImportSiasnPage() {
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                       <div>
-                        <div className="font-semibold">Quality gate belum terpenuhi</div>
+                        <div className="font-semibold">Belum siap commit</div>
                         <div className="mt-1">{getAsnCommitBlockReason(summary)}</div>
                         <div className="mt-2 text-xs text-amber-800">
-                          Gunakan halaman Mapping Referensi untuk menyelesaikan invalid, needs
-                          review, dan unmapped sebelum commit final.
+                          Selesaikan data tidak valid, perlu review, atau belum terpetakan sebelum
+                          memasukkan data ke Master ASN.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : showPreviewGateWarning ? (
+                  <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                    <div className="flex items-start gap-3">
+                      <GitCompareArrows className="mt-0.5 size-4 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold">Perlu cek preview rekonsiliasi</div>
+                        <div className="mt-1">
+                          Data sudah valid dan terpetakan. Sebelum simpan ke Master ASN, buka preview
+                          rekonsiliasi dan pastikan perubahan data sudah sesuai.
                         </div>
                       </div>
                     </div>
@@ -1035,29 +1033,58 @@ export function SidataImportSiasnPage() {
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
                       <div>
-                        <div className="font-semibold">Quality gate aman</div>
+                        <div className="font-semibold">Siap commit</div>
                         <div className="mt-1">
-                          Batch sudah termapping dan tidak memiliki invalid, needs review, atau
-                          unmapped. Commit final tetap dilakukan melalui Mapping Referensi.
+                          Semua baris sudah valid dan terpetakan. Klik Simpan ke Master jika hasilnya
+                          sudah dicek.
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
 
+                {summary && commitSafe && !committed ? (
+                  <div className="mb-4 rounded-lg border border-[#cfe1da] bg-white p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <label className="flex cursor-pointer items-start gap-3 text-sm text-[#18343a]">
+                        <input
+                          checked={previewChecked}
+                          className="mt-1"
+                          onChange={(event) => setPreviewChecked(event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span>
+                          <span className="font-semibold">Saya sudah cek preview rekonsiliasi.</span>
+                          <span className="mt-1 block text-xs leading-5 text-[#62766f]">
+                            Wajib dicentang sebelum Simpan ke Master agar commit final tidak dilakukan
+                            tanpa pemeriksaan perubahan data.
+                          </span>
+                        </span>
+                      </label>
+                      <ActionButton
+                        icon={GitCompareArrows}
+                        onClick={openRekonsiliasi}
+                        variant="secondary"
+                      >
+                        Buka Preview
+                      </ActionButton>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <StatCard label="Total Baris" value={summary.totalRows} />
                   <StatCard label="Valid" value={summary.validRows} tone="success" />
-                  <StatCard label="Invalid" value={summary.invalidRows} tone="danger" />
+                  <StatCard label="Tidak Valid" value={summary.invalidRows} tone="danger" />
                   <StatCard label="Duplikat" value={summary.duplicateRows} tone="warning" />
-                  <StatCard label="Mapped" value={summary.mappedRows} tone="success" />
+                  <StatCard label="Terpetakan" value={summary.mappedRows} tone="success" />
                   <StatCard label="Perlu Review" value={summary.needsReviewRows} tone="warning" />
-                  <StatCard label="Unmapped" value={summary.unmappedRows} tone="danger" />
+                  <StatCard label="Belum Terpetakan" value={summary.unmappedRows} tone="danger" />
                   <StatCard label="Committed" value={summary.committedRows} tone="info" />
                 </div>
               </SectionCard>
 
-              <SectionCard title="Tinjauan Data">
+              <SectionCard title="Daftar Masalah Data">
                 <div className="mb-4 flex gap-1 rounded-lg border border-border bg-zinc-50 p-1">
                   {ISSUE_TABS.map((tab) => (
                     <button
@@ -1078,7 +1105,7 @@ export function SidataImportSiasnPage() {
                 <form onSubmit={handleSearchSubmit} className="mb-4 flex gap-2">
                   <input
                     className={cn(inputClass, 'max-w-sm flex-1')}
-                    placeholder="Cari NIP atau nama…"
+                    placeholder="Cari NIP atau nama..."
                     value={issuesSearch}
                     onChange={(e) => setIssuesSearch(e.target.value)}
                   />
@@ -1088,7 +1115,7 @@ export function SidataImportSiasnPage() {
                 </form>
 
                 {issuesLoading ? (
-                  <LoadingState label="Memuat data…" />
+                  <LoadingState label="Memuat data..." />
                 ) : issues ? (
                   <>
                     <DataTable
@@ -1193,7 +1220,7 @@ export function SidataImportSiasnPage() {
                     {issues.total > issues.limit && (
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                         <span>
-                          Halaman {issues.page} dari {Math.ceil(issues.total / issues.limit)} —{' '}
+                          Halaman {issues.page} dari {Math.ceil(issues.total / issues.limit)} -{' '}
                           {issues.total} total
                         </span>
                         <div className="flex gap-2">

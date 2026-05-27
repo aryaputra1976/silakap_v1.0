@@ -24,6 +24,8 @@
     "db:import-jf-profile": "tsx scripts/import-jf-profile-bkn.ts",
     "db:diagnose-asn-needs-review": "tsx scripts/diagnose-asn-needs-review.ts",
     "db:diagnose-unmapped-unit-kerja": "tsx scripts/diagnose-unmapped-unit-kerja.ts",
+    "db:audit-sidata-asn-import": "tsx scripts/audit-sidata-asn-import.ts",
+    "db:backfill-sidata-retirement": "tsx scripts/backfill-sidata-retirement.ts",
     "db:cleanup-smoke": "tsx scripts/cleanup-smoke-data.ts",
     "db:cleanup-pilot": "tsx scripts/cleanup-pilot-data.ts",
     "smoke:phase11": "tsx scripts/smoke-phase11-siap.ts",

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type GroupCount = {
@@ -37,6 +38,14 @@ export type RecentTimelineItem = {
     currentState: string;
     status: string;
   };
+};
+
+export type AnalyticsDashboardFilters = {
+  year?: number;
+  quarter?: number;
+  month?: number;
+  from?: Date;
+  to?: Date;
 };
 
 type CurrentStateRow = {
@@ -96,26 +105,29 @@ export class AnalyticsRepository {
     });
   }
 
-  async countSipensiunCases(): Promise<number> {
+  async countSipensiunCases(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.sipensiunCase.count({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
     });
   }
 
-  async countSiapCases(): Promise<number> {
+  async countSiapCases(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.siapCase.count({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
     });
   }
 
-  async countPendingTasks(): Promise<number> {
+  async countPendingTasks(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.siapTask.count({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
         status: {
           in: [
             'CREATED',
@@ -130,35 +142,39 @@ export class AnalyticsRepository {
     });
   }
 
-  async countCompletedTasks(): Promise<number> {
+  async countCompletedTasks(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.siapTask.count({
       where: {
         deletedAt: null,
         status: 'COMPLETED',
+        ...this.dateFieldWhere('completedAt', filters),
       },
     });
   }
 
-  async countDocuments(): Promise<number> {
+  async countDocuments(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.document.count({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
     });
   }
 
-  async countSlaOverdue(): Promise<number> {
+  async countSlaOverdue(filters: AnalyticsDashboardFilters = {}): Promise<number> {
     return this.prisma.slaTracking.count({
       where: {
         status: 'OVERDUE',
+        ...this.dateFieldWhere('dueAt', filters),
       },
     });
   }
 
-  async groupCasesByState(): Promise<GroupCount[]> {
+  async groupCasesByState(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: CurrentStateRow[] = await this.prisma.siapCase.findMany({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
       select: {
         currentState: true,
@@ -168,10 +184,11 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => row.currentState);
   }
 
-  async groupCasesByServiceType(): Promise<GroupCount[]> {
+  async groupCasesByServiceType(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: ServiceTypeRow[] = await this.prisma.siapCase.findMany({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
       select: {
         serviceType: true,
@@ -181,10 +198,11 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => row.serviceType);
   }
 
-  async groupTasksByStatus(): Promise<GroupCount[]> {
+  async groupTasksByStatus(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: TaskStatusRow[] = await this.prisma.siapTask.findMany({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
       select: {
         status: true,
@@ -194,10 +212,11 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => String(row.status));
   }
 
-  async groupDocumentsByType(): Promise<GroupCount[]> {
+  async groupDocumentsByType(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: DocumentTypeRow[] = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
       select: {
         documentType: true,
@@ -207,8 +226,9 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => row.documentType);
   }
 
-  async groupSlaByStatus(): Promise<GroupCount[]> {
+  async groupSlaByStatus(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: SlaStatusRow[] = await this.prisma.slaTracking.findMany({
+      where: this.dateFieldWhere('dueAt', filters),
       select: {
         status: true,
       },
@@ -217,10 +237,11 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => String(row.status));
   }
 
-  async groupSipensiunByJenis(): Promise<GroupCount[]> {
+  async groupSipensiunByJenis(filters: AnalyticsDashboardFilters = {}): Promise<GroupCount[]> {
     const rows: JenisPensiunRow[] = await this.prisma.sipensiunCase.findMany({
       where: {
         deletedAt: null,
+        ...this.createdAtWhere(filters),
       },
       select: {
         jenisPensiun: true,
@@ -230,23 +251,26 @@ export class AnalyticsRepository {
     return this.countByKey(rows, (row) => String(row.jenisPensiun));
   }
 
-  async countActiveCases(): Promise<ActiveCasesSummary> {
+  async countActiveCases(filters: AnalyticsDashboardFilters = {}): Promise<ActiveCasesSummary> {
     const [totalActive, draft, submitted] = await Promise.all([
       this.prisma.siapCase.count({
         where: {
           deletedAt: null,
+          ...this.createdAtWhere(filters),
           status: 'ACTIVE',
         },
       }),
       this.prisma.siapCase.count({
         where: {
           deletedAt: null,
+          ...this.createdAtWhere(filters),
           status: 'DRAFT',
         },
       }),
       this.prisma.siapCase.count({
         where: {
           deletedAt: null,
+          ...this.createdAtWhere(filters),
           currentState: 'SUBMITTED',
         },
       }),
@@ -259,18 +283,22 @@ export class AnalyticsRepository {
     };
   }
 
-  async getDocumentCompleteness(): Promise<DocumentCompletenessSummary> {
+  async getDocumentCompleteness(
+    filters: AnalyticsDashboardFilters = {},
+  ): Promise<DocumentCompletenessSummary> {
     const [totalDocuments, totalCases, casesWithDocumentsRows] =
       await Promise.all([
-        this.countDocuments(),
+        this.countDocuments(filters),
         this.prisma.siapCase.count({
           where: {
             deletedAt: null,
+            ...this.createdAtWhere(filters),
           },
         }),
         this.prisma.document.findMany({
           where: {
             deletedAt: null,
+            ...this.createdAtWhere(filters),
             caseId: {
               not: null,
             },
@@ -291,10 +319,14 @@ export class AnalyticsRepository {
     };
   }
 
-  async getRecentTimeline(limit = 10): Promise<RecentTimelineItem[]> {
+  async getRecentTimeline(
+    limit = 10,
+    filters: AnalyticsDashboardFilters = {},
+  ): Promise<RecentTimelineItem[]> {
     const rows: RecentTimelineDbRow[] =
       await this.prisma.timelineEntry.findMany({
         where: {
+          ...this.createdAtWhere(filters),
           case: {
             deletedAt: null,
           },
@@ -344,7 +376,27 @@ export class AnalyticsRepository {
         currentState: row.case.currentState,
         status: String(row.case.status),
       },
-    }));
+      }));
+  }
+
+  private createdAtWhere(filters: AnalyticsDashboardFilters) {
+    return this.dateFieldWhere('createdAt', filters);
+  }
+
+  private dateFieldWhere(
+    field: string,
+    filters: AnalyticsDashboardFilters,
+  ): Record<string, Prisma.DateTimeFilter> {
+    if (!filters.from && !filters.to) {
+      return {};
+    }
+
+    return {
+      [field]: {
+        ...(filters.from ? { gte: filters.from } : {}),
+        ...(filters.to ? { lt: filters.to } : {}),
+      },
+    };
   }
 
   private countByKey<T>(

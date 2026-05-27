@@ -69,7 +69,9 @@ export function SidebarMenu() {
         <AccordionMenuSub key={index} value={item.path || `root-${index}`}>
           <AccordionMenuSubTrigger className="text-sm font-medium">
             {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-            <span data-slot="accordion-menu-title">{item.title}</span>
+            <span data-slot="accordion-menu-title" className="min-w-0 truncate">
+              {item.title}
+            </span>
           </AccordionMenuSubTrigger>
           <AccordionMenuSubContent
             type="single"
@@ -92,10 +94,12 @@ export function SidebarMenu() {
         >
           <Link
             to={item.path || '#'}
-            className="flex items-center justify-between grow gap-2"
+            className="flex min-w-0 grow items-center justify-start gap-2"
           >
             {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-            <span data-slot="accordion-menu-title">{item.title}</span>
+            <span data-slot="accordion-menu-title" className="min-w-0 truncate">
+              {item.title}
+            </span>
           </Link>
         </AccordionMenuItem>
       );
@@ -113,7 +117,9 @@ export function SidebarMenu() {
         className="text-sm font-medium"
       >
         {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-        <span data-slot="accordion-menu-title">{item.title}</span>
+        <span data-slot="accordion-menu-title" className="min-w-0 truncate">
+          {item.title}
+        </span>
         {item.disabled && (
           <Badge variant="secondary" size="sm" className="ms-auto me-[-10px]">
             Soon
@@ -158,7 +164,7 @@ export function SidebarMenu() {
                 </span>
               </span>
             ) : (
-              item.title
+              <span className="min-w-0 truncate">{item.title}</span>
             )}
           </AccordionMenuSubTrigger>
           <AccordionMenuSubContent
@@ -187,7 +193,9 @@ export function SidebarMenu() {
           value={item.path || ''}
           className="text-[13px]"
         >
-          <Link to={item.path || '#'}>{item.title}</Link>
+          <Link to={item.path || '#'} className="min-w-0 truncate">
+            {item.title}
+          </Link>
         </AccordionMenuItem>
       );
     }
@@ -204,7 +212,9 @@ export function SidebarMenu() {
         value={`disabled-child-${level}-${index}`}
         className="text-[13px]"
       >
-        <span data-slot="accordion-menu-title">{item.title}</span>
+        <span data-slot="accordion-menu-title" className="min-w-0 truncate">
+          {item.title}
+        </span>
         {item.disabled && (
           <Badge variant="secondary" size="sm" className="ms-auto me-[-10px]">
             Soon

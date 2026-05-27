@@ -17,20 +17,23 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ok } from '../shared/respond';
 import { CreateAbkDto, UpdateAbkDto } from './dto/abk.dto';
-import { CreateBezettingDto, UpdateBezettingDto } from './dto/bezetting.dto';
+import { BulkUpsertBupDto, GenerateBupFromAsnDto, UpsertBupDto } from './dto/bup.dto';
+import { CreateBezettingDto, GenerateBezettingDto, UpdateBezettingDto } from './dto/bezetting.dto';
 import { CreateFormasiDto, ReviewFormasiDto, UpdateFormasiDto } from './dto/formasi.dto';
 import {
   BulkImportJabatanFungsionalRefDto,
   CreateJabatanFungsionalRefDto,
   UpdateJabatanFungsionalRefDto,
 } from './dto/jabatan-fungsional-ref.dto';
-import { BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
+import { AddJabatanFromRefDto, BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
 import {
   AbkQueryDto,
   BezettingQueryDto,
+  BupQueryDto,
   FormasiQueryDto,
   JabatanFungsionalRefQueryDto,
   JabatanQueryDto,
+  ProyeksiQueryDto,
 } from './dto/query.dto';
 import { SiformenService } from './siformen.service';
 
@@ -108,12 +111,60 @@ export class SiformenController {
     return ok(null, 'Data referensi jabatan fungsional berhasil dihapus');
   }
 
-  // ── Dashboard ─────────────────────────────────────────────────────────
+  // ── Dashboard / Proyeksi ─────────────────────────────────────────────────
 
   @Get('dashboard')
   async dashboard(@Query('tahun') tahun?: string) {
     const year = tahun ? parseInt(tahun, 10) : new Date().getFullYear();
     const result = await this.service.getDashboard(year);
+    return ok(result);
+  }
+
+  @Get('proyeksi/summary')
+  async proyeksiSummary() {
+    const result = await this.service.getProyeksiSummary();
+    return ok(result);
+  }
+
+  @Get('proyeksi')
+  async proyeksi(@Query() query: ProyeksiQueryDto) {
+    const result = await this.service.getProyeksiPerUnitKerja(query);
+    return ok(result);
+  }
+
+  @Get('bup')
+  async bupList(@Query() query: BupQueryDto) {
+    const result = await this.service.getBupList(query);
+    return ok(result);
+  }
+
+  @Get('bup/jabatan/:jabatanId')
+  async bupPerJabatan(@Param('jabatanId') jabatanId: string) {
+    const result = await this.service.getBupPerJabatan(jabatanId);
+    return ok(result);
+  }
+
+  @Post('bup/upsert')
+  async upsertBup(@Body() dto: UpsertBupDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.upsertBup(dto, user);
+    return ok(result, 'Data BUP berhasil disimpan');
+  }
+
+  @Post('bup/bulk-upsert')
+  async bulkUpsertBup(@Body() dto: BulkUpsertBupDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.bulkUpsertBup(dto, user);
+    return ok(result, `${result.upserted} data BUP berhasil disimpan`);
+  }
+
+  @Post('bup/generate-from-asn')
+  async generateBupFromAsn(@Body() dto: GenerateBupFromAsnDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.generateBupFromAsn(dto, user);
+    return ok(result, `${result.created} entri BUP di-generate dari data ASN`);
+  }
+
+  @Get('rekap-pegawai')
+  async rekapPegawai() {
+    const result = await this.service.getRekapPegawai();
     return ok(result);
   }
 
@@ -146,6 +197,21 @@ export class SiformenController {
     return ok(result, `Import selesai: ${result.created} ditambahkan, ${result.updated} diperbarui`);
   }
 
+  @Post('jabatan/from-ref')
+  async addJabatanFromRef(@Body() dto: AddJabatanFromRefDto, @CurrentUser() user: AuthUser) {
+    const result = await this.service.addJabatanFromRef(dto, user);
+    return ok(result, 'Jabatan berhasil ditambahkan ke Peta Jabatan');
+  }
+
+  @Post('jabatan/sync-from-asn')
+  async syncJabatanFromAsn(@CurrentUser() user: AuthUser) {
+    const result = await this.service.syncJabatanFromAsn(user);
+    return ok(
+      result,
+      `Sinkronisasi selesai: ${result.created} jabatan dibuat, ${result.matched} ter-link ke referensi`,
+    );
+  }
+
   @Post('jabatan')
   async createJabatan(@Body() dto: CreateJabatanDto, @CurrentUser() user: AuthUser) {
     const result = await this.service.createJabatan(dto, user);
@@ -169,6 +235,18 @@ export class SiformenController {
   }
 
   // ── Bezetting ─────────────────────────────────────────────────────────
+
+  @Post('bezetting/generate-from-jabatan')
+  async generateBezettingFromJabatan(
+    @Body() dto: GenerateBezettingDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.service.generateBezettingFromJabatan(dto, user);
+    return ok(
+      result,
+      `Generate selesai: ${result.created} posisi dibuat, ${result.skipped} dilewati`,
+    );
+  }
 
   @Get('bezetting')
   async listBezetting(@Query() query: BezettingQueryDto) {

@@ -1,11 +1,13 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   ActiveCasesSummary,
   AnalyticsRepository,
+  AnalyticsDashboardFilters,
   DocumentCompletenessSummary,
   GroupCount,
   RecentTimelineItem,
 } from './analytics.repository';
+import type { AnalyticsDashboardQueryDto } from './dto/analytics-dashboard-query.dto';
 
 type AnalyticsGroupResponse = {
   key: string;
@@ -34,7 +36,8 @@ export class AnalyticsService {
     private readonly analyticsRepository: AnalyticsRepository,
   ) {}
 
-  async getDashboard() {
+  async getDashboard(query: AnalyticsDashboardQueryDto = {}) {
+    const filters = this.normalizeFilters(query);
     const [
       totalAsn,
       totalSipensiun,
@@ -54,21 +57,21 @@ export class AnalyticsService {
       recentTimeline,
     ] = await Promise.all([
       this.analyticsRepository.countAsn(),
-      this.analyticsRepository.countSipensiunCases(),
-      this.analyticsRepository.countSiapCases(),
-      this.analyticsRepository.countPendingTasks(),
-      this.analyticsRepository.countCompletedTasks(),
-      this.analyticsRepository.countDocuments(),
-      this.analyticsRepository.countSlaOverdue(),
-      this.analyticsRepository.groupCasesByState(),
-      this.analyticsRepository.groupCasesByServiceType(),
-      this.analyticsRepository.groupTasksByStatus(),
-      this.analyticsRepository.groupDocumentsByType(),
-      this.analyticsRepository.groupSlaByStatus(),
-      this.analyticsRepository.groupSipensiunByJenis(),
-      this.analyticsRepository.countActiveCases(),
-      this.analyticsRepository.getDocumentCompleteness(),
-      this.analyticsRepository.getRecentTimeline(10),
+      this.analyticsRepository.countSipensiunCases(filters),
+      this.analyticsRepository.countSiapCases(filters),
+      this.analyticsRepository.countPendingTasks(filters),
+      this.analyticsRepository.countCompletedTasks(filters),
+      this.analyticsRepository.countDocuments(filters),
+      this.analyticsRepository.countSlaOverdue(filters),
+      this.analyticsRepository.groupCasesByState(filters),
+      this.analyticsRepository.groupCasesByServiceType(filters),
+      this.analyticsRepository.groupTasksByStatus(filters),
+      this.analyticsRepository.groupDocumentsByType(filters),
+      this.analyticsRepository.groupSlaByStatus(filters),
+      this.analyticsRepository.groupSipensiunByJenis(filters),
+      this.analyticsRepository.countActiveCases(filters),
+      this.analyticsRepository.getDocumentCompleteness(filters),
+      this.analyticsRepository.getRecentTimeline(10, filters),
     ]);
 
     return {
@@ -92,6 +95,68 @@ export class AnalyticsService {
       sipensiunByJenis: this.toGroupResponse(sipensiunByJenis),
       recentTimeline: this.toRecentTimelineResponse(recentTimeline),
     };
+  }
+
+  private normalizeFilters(
+    query: AnalyticsDashboardQueryDto,
+  ): AnalyticsDashboardFilters {
+    const year = this.normalizeNumber(query.year, 'Tahun tidak valid', 2000, 2100);
+    const quarter = this.normalizeNumber(query.quarter, 'Triwulan tidak valid', 1, 4);
+    const month = this.normalizeNumber(query.month, 'Bulan tidak valid', 1, 12);
+
+    if (quarter && month) {
+      throw new BadRequestException('Pilih bulan atau triwulan, bukan keduanya.');
+    }
+
+    if (!year) {
+      return {};
+    }
+
+    if (month) {
+      const from = new Date(Date.UTC(year, month - 1, 1));
+      const to = new Date(Date.UTC(year, month, 1));
+      return { year, month, from, to };
+    }
+
+    if (quarter) {
+      const startMonth = (quarter - 1) * 3;
+      const from = new Date(Date.UTC(year, startMonth, 1));
+      const to = new Date(Date.UTC(year, startMonth + 3, 1));
+      return { year, quarter, from, to };
+    }
+
+    return {
+      year,
+      from: new Date(Date.UTC(year, 0, 1)),
+      to: new Date(Date.UTC(year + 1, 0, 1)),
+    };
+  }
+
+  private normalizeNumber(
+    value: string | undefined,
+    message: string,
+    min: number,
+    max: number,
+  ) {
+    const normalized = value?.trim();
+
+    if (!normalized) {
+      return undefined;
+    }
+
+    const parsed = Number(normalized);
+
+    if (!Number.isFinite(parsed)) {
+      throw new BadRequestException(message);
+    }
+
+    const number = Math.trunc(parsed);
+
+    if (number < min || number > max) {
+      throw new BadRequestException(message);
+    }
+
+    return number;
   }
 
   private toActiveCasesResponse(activeCases: ActiveCasesSummary) {

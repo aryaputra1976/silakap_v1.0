@@ -9,20 +9,23 @@ import {
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import type { CreateAbkDto, UpdateAbkDto } from './dto/abk.dto';
-import type { CreateBezettingDto, UpdateBezettingDto } from './dto/bezetting.dto';
+import type { BulkUpsertBupDto, GenerateBupFromAsnDto, UpsertBupDto } from './dto/bup.dto';
+import type { CreateBezettingDto, GenerateBezettingDto, UpdateBezettingDto } from './dto/bezetting.dto';
 import type { CreateFormasiDto, ReviewFormasiDto, UpdateFormasiDto } from './dto/formasi.dto';
 import type {
   BulkImportJabatanFungsionalRefDto,
   CreateJabatanFungsionalRefDto,
   UpdateJabatanFungsionalRefDto,
 } from './dto/jabatan-fungsional-ref.dto';
-import type { BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
+import type { AddJabatanFromRefDto, BulkImportJabatanDto, CreateJabatanDto, UpdateJabatanDto } from './dto/jabatan.dto';
 import type {
   AbkQueryDto,
   BezettingQueryDto,
+  BupQueryDto,
   FormasiQueryDto,
   JabatanFungsionalRefQueryDto,
   JabatanQueryDto,
+  ProyeksiQueryDto,
 } from './dto/query.dto';
 import { SiformenRepository } from './siformen.repository';
 
@@ -137,10 +140,52 @@ export class SiformenService {
     ]).then(([rumpunJabatan, instansiPembina]) => ({ rumpunJabatan, instansiPembina }));
   }
 
-  // ── Dashboard ────────────────────────────────────────────────────────────
+  // ── Dashboard / Proyeksi ─────────────────────────────────────────────────
 
   getDashboard(tahun: number) {
     return this.repo.getDashboardSummary(tahun);
+  }
+
+  getProyeksiSummary() {
+    return this.repo.getProyeksiSummary();
+  }
+
+  getProyeksiPerUnitKerja(query: ProyeksiQueryDto) {
+    const tahun = parseInt(query.tahunBezetting ?? String(new Date().getFullYear()), 10) || new Date().getFullYear();
+    return this.repo.getProyeksiPerUnitKerja(tahun, {
+      q: query.q,
+      unitKerjaId: query.unitKerjaId,
+      jenisJabatan: query.jenisJabatan,
+    });
+  }
+
+  getBupList(query: BupQueryDto) {
+    return this.repo.getBupList(query);
+  }
+
+  getBupPerJabatan(jabatanId: string) {
+    return this.repo.getBupPerJabatan(jabatanId);
+  }
+
+  upsertBup(dto: UpsertBupDto, user: AuthUser) {
+    requireRole(user, WRITE_ROLES);
+    return this.repo.upsertBup(dto.jabatanId, dto.tahun, dto.jumlahPensiun, user.id);
+  }
+
+  bulkUpsertBup(dto: BulkUpsertBupDto, user: AuthUser) {
+    requireRole(user, WRITE_ROLES);
+    return this.repo.bulkUpsertBup(dto.items, user.id);
+  }
+
+  generateBupFromAsn(dto: GenerateBupFromAsnDto, user: AuthUser) {
+    requireRole(user, ADMIN_ROLES);
+    const tahunMulai = dto.tahunMulai ?? 2024;
+    const tahunAkhir = dto.tahunAkhir ?? 2028;
+    return this.repo.generateBupFromAsn(tahunMulai, tahunAkhir, user.id);
+  }
+
+  getRekapPegawai() {
+    return this.repo.getRekapPegawai();
   }
 
   // ── Jabatan ──────────────────────────────────────────────────────────────
@@ -211,6 +256,16 @@ export class SiformenService {
     return this.repo.bulkImportJabatan(dto.items, user.id);
   }
 
+  async addJabatanFromRef(dto: AddJabatanFromRefDto, user: AuthUser) {
+    requireRole(user, WRITE_ROLES);
+    return this.repo.addJabatanFromRef(dto.refId, dto.unitKerja, dto.kodeJabatan, user.id);
+  }
+
+  async syncJabatanFromAsn(user: AuthUser) {
+    requireRole(user, ADMIN_ROLES);
+    return this.repo.syncJabatanFromAsn(user.id);
+  }
+
   async deleteJabatan(id: string, user: AuthUser) {
     requireRole(user, ADMIN_ROLES);
     await this.getJabatan(id);
@@ -227,6 +282,11 @@ export class SiformenService {
 
   listBezetting(query: BezettingQueryDto) {
     return this.repo.findManyBezetting(query);
+  }
+
+  async generateBezettingFromJabatan(dto: GenerateBezettingDto, user: AuthUser) {
+    requireRole(user, ADMIN_ROLES);
+    return this.repo.generateBezettingFromJabatan(dto.tahun, user.id);
   }
 
   async getBezetting(id: string) {

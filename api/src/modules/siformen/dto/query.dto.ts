@@ -100,6 +100,67 @@ export class AbkQueryDto {
   limit?: string;
 }
 
+export class BupQueryDto {
+  @IsOptional()
+  @IsString()
+  tahun?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  unitKerjaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  page?: string;
+
+  @IsOptional()
+  @IsString()
+  limit?: string;
+}
+
+export class BupPerJabatanQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  jabatanId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  unitKerjaId?: string;
+
+  @IsOptional()
+  @IsString()
+  tahun?: string;
+}
+
+export class ProyeksiQueryDto {
+  @IsOptional()
+  @IsString()
+  tahunBezetting?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  unitKerjaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  jenisJabatan?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+}
+
 export class JabatanFungsionalRefQueryDto {
   @IsOptional()
   @IsString()

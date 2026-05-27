@@ -300,13 +300,15 @@ model RefreshToken {
 }
 
 model UnitKerja {
-  id        String  @id @default(uuid()) @db.VarChar(36)
-  kode      String  @unique @db.VarChar(50)
-  nama      String  @db.VarChar(200)
-  parentId  String? @map("parent_id") @db.VarChar(36)
-  level     Int     @default(0)
-  sortOrder Int     @default(0) @map("sort_order")
-  isActive  Boolean @default(true) @map("is_active")
+  id             String  @id @default(uuid()) @db.VarChar(36)
+  kode           String  @unique @db.VarChar(50)
+  nama           String  @db.VarChar(200)
+  tipe           String? @db.VarChar(50)
+  parentId       String? @map("parent_id") @db.VarChar(36)
+  level          Int     @default(0)
+  sortOrder      Int     @default(0) @map("sort_order")
+  isActive       Boolean @default(true) @map("is_active")
+  flagDelayering Boolean @default(false) @map("flag_delayering")
 
   createdAt DateTime  @default(now()) @map("created_at")
   createdBy String?   @map("created_by") @db.VarChar(36)
@@ -2809,10 +2811,13 @@ model SiformenJabatan {
   jenisJabatan            String                       @map("jenis_jabatan") @db.VarChar(40)
   eselonLevel             String?                      @map("eselon_level") @db.VarChar(10)
   kelasJabatan            Int?                         @map("kelas_jabatan")
+  levelKesetaraan         Int?                         @map("level_kesetaraan")
   unitKerja               String                       @map("unit_kerja") @db.VarChar(200)
   satuanKerja             String?                      @map("satuan_kerja") @db.VarChar(200)
   kualifikasiPendidikan   String?                      @map("kualifikasi_pendidikan") @db.Text
   isActive                Boolean                      @default(true) @map("is_active")
+  flagDelayering          Boolean                      @default(false) @map("flag_delayering")
+  statusPosisi            String                       @default("aktif") @map("status_posisi") @db.VarChar(20)
   sortOrder               Int?                         @map("sort_order")
 
   unitKerjaId             String?                      @map("unit_kerja_id") @db.VarChar(36)
@@ -2830,13 +2835,32 @@ model SiformenJabatan {
   bezetting               SiformenBezetting[]
   formasi                 SiformenFormasi[]
   abk                     SiformenAbk[]
+  bup                     SiformenBup[]
 
   @@index([jenisJabatan])
   @@index([unitKerja])
   @@index([unitKerjaId])
   @@index([sortOrder])
+  @@index([statusPosisi])
   @@index([jabatanFungsionalRefId])
   @@map("siformen_jabatan")
+}
+
+model SiformenBup {
+  id            String           @id @default(uuid()) @db.VarChar(36)
+  jabatanId     String           @map("jabatan_id") @db.VarChar(36)
+  jabatan       SiformenJabatan  @relation(fields: [jabatanId], references: [id], onDelete: Cascade)
+  tahun         Int
+  jumlahPensiun Int              @default(0) @map("jumlah_pensiun")
+
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  createdBy     String?          @map("created_by") @db.VarChar(36)
+  updatedBy     String?          @map("updated_by") @db.VarChar(36)
+
+  @@unique([jabatanId, tahun])
+  @@index([tahun])
+  @@map("siformen_bup")
 }
 
 model SiformenBezetting {

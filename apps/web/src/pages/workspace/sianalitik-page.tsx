@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, Calendar } from 'lucide-react';
+import { AlertCircle, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { ErrorAlert, LoadingState, PageHeader, SectionCard } from '@/components/workspace/ui';
 import type { AnalyticsDashboard } from '@/lib/api/types';
@@ -30,6 +30,31 @@ const PERIOD_SHORTCUTS = [
 ];
 
 type PeriodQuery = { year: string; quarter?: string };
+type SecondaryErrors = { sidata?: string; dms?: string };
+type SecondaryLoading = { sidata: boolean; dms: boolean };
+
+function SecondaryDataState({
+  title,
+  message,
+  loading = false,
+}: {
+  title: string;
+  message: string;
+  loading?: boolean;
+}) {
+  return (
+    <SectionCard title={title} className="flex min-h-full flex-col justify-center">
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        {loading ? (
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+        ) : (
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        )}
+        <p>{message}</p>
+      </div>
+    </SectionCard>
+  );
+}
 
 export default function SianalitikPage() {
   const [period, setPeriod] = useState<PeriodQuery>({ year: YEAR });
@@ -38,6 +63,11 @@ export default function SianalitikPage() {
   const [rhkRows, setRhkRows] = useState<KinerjaBidangRhkReportRow[]>([]);
   const [quality, setQuality] = useState<SidataAsnQualityDashboard | null>(null);
   const [dms, setDms] = useState<DmsDashboardSummary | null>(null);
+  const [secondaryErrors, setSecondaryErrors] = useState<SecondaryErrors>({});
+  const [secondaryLoading, setSecondaryLoading] = useState<SecondaryLoading>({
+    sidata: true,
+    dms: true,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -46,13 +76,17 @@ export default function SianalitikPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setQuality(null);
+    setDms(null);
+    setSecondaryErrors({});
+    setSecondaryLoading({ sidata: true, dms: true });
 
     const reportQuery = period.quarter
       ? { year: period.year, quarter: period.quarter }
       : { year: period.year };
 
     Promise.all([
-      apiClient.get<AnalyticsDashboard>('/analytics/dashboard'),
+      apiClient.get<AnalyticsDashboard>('/analytics/dashboard', reportQuery),
       kinerjaBidangApi.getDashboard(reportQuery),
       kinerjaBidangApi.getReport(reportQuery),
     ])
@@ -72,8 +106,33 @@ export default function SianalitikPage() {
         if (!cancelled) setLoading(false);
       });
 
-    sidataApi.getAsnQualityDashboard().then(setQuality).catch(() => null);
-    dmsApi.getDashboardSummary().then(setDms).catch(() => null);
+    sidataApi
+      .getAsnQualityDashboard()
+      .then((data) => {
+        if (!cancelled) setQuality(data);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Data SIDATA tidak tersedia';
+        setSecondaryErrors((prev) => ({ ...prev, sidata: msg }));
+      })
+      .finally(() => {
+        if (!cancelled) setSecondaryLoading((prev) => ({ ...prev, sidata: false }));
+      });
+
+    dmsApi
+      .getDashboardSummary(reportQuery)
+      .then((data) => {
+        if (!cancelled) setDms(data);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Data DMS tidak tersedia';
+        setSecondaryErrors((prev) => ({ ...prev, dms: msg }));
+      })
+      .finally(() => {
+        if (!cancelled) setSecondaryLoading((prev) => ({ ...prev, dms: false }));
+      });
 
     return () => {
       cancelled = true;
@@ -152,8 +211,32 @@ export default function SianalitikPage() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <SianalitikSipensiunStatus analytics={analytics} />
-            {dms && <SianalitikDmsEvidence dms={dms} />}
-            {quality && <SianalitikSidataQuality quality={quality} />}
+            {dms ? (
+              <SianalitikDmsEvidence dms={dms} />
+            ) : (
+              <SecondaryDataState
+                title="Bukti Dukung DMS"
+                message={
+                  secondaryLoading.dms
+                    ? 'Memuat ringkasan dokumen DMS...'
+                    : (secondaryErrors.dms ?? 'Ringkasan DMS belum tersedia untuk periode ini.')
+                }
+                loading={secondaryLoading.dms}
+              />
+            )}
+            {quality ? (
+              <SianalitikSidataQuality quality={quality} />
+            ) : (
+              <SecondaryDataState
+                title="Kualitas Data SIDATA"
+                message={
+                  secondaryLoading.sidata
+                    ? 'Memuat kualitas data ASN...'
+                    : (secondaryErrors.sidata ?? 'Ringkasan SIDATA belum tersedia.')
+                }
+                loading={secondaryLoading.sidata}
+              />
+            )}
           </div>
 
           <SianalitikRiskMatrix
@@ -170,7 +253,7 @@ export default function SianalitikPage() {
             rhkRows={rhkRows}
             quality={quality}
             dms={dms}
-            generatedAt={new Date().toISOString()}
+            generatedAt={lastRefresh.toISOString()}
           />
         </>
       )}

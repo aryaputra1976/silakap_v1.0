@@ -1,28 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  BarChart3,
   CalendarClock,
   CheckCircle2,
   Database,
   FileSpreadsheet,
   FolderSync,
-  IdCard,
-  Layers3,
   RefreshCcw,
-  ShieldAlert,
   ShieldCheck,
-  SquarePen,
-  UserCheck,
-  UserRoundX,
-  Users,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import {
-  sidataApi,
-  type SidataAsnQualityBreakdownItem,
-  type SidataAsnQualityDashboard,
-} from '@/lib/api/sidata';
+import { sidataApi, type SidataAsnQualityDashboard } from '@/lib/api/sidata';
 import { sidataImportApi } from '@/lib/api/sidata-import';
 import {
   buildImportAggregate,
@@ -42,10 +30,22 @@ import {
   LoadingState,
   PageHeader,
   SectionCard,
-  StatCard,
   StatusBadge,
   formatDateTime,
 } from '@/components/workspace/ui';
+
+type DashboardIssue = {
+  key: string;
+  label: string;
+  count: number;
+  path: string;
+};
+
+const numberFormatter = new Intl.NumberFormat('id-ID');
+
+function formatCount(value: number) {
+  return numberFormatter.format(value);
+}
 
 function formatPercent(value: number): string {
   return `${value.toFixed(value % 1 === 0 ? 0 : 2)}%`;
@@ -58,26 +58,80 @@ function getQualityTone(score: number): 'success' | 'warning' | 'danger' {
 }
 
 function getIssueTone(value: number): 'success' | 'warning' | 'danger' {
-  if (value === 0) return 'success';
-  return 'warning';
+  return value === 0 ? 'success' : 'warning';
 }
 
-function formatDateOnly(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
-
-function mapBreakdownRow(item: SidataAsnQualityBreakdownItem) {
-  return {
-    ...item,
-    displayPercentage: formatPercent(item.percentage),
+function DashboardTile({
+  icon: Icon,
+  label,
+  tone = 'neutral',
+  value,
+}: {
+  icon: typeof Database;
+  label: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+  value: string | number;
+}) {
+  const toneClass = {
+    neutral: 'border-[#cfe1da] bg-white text-[#18343a]',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    warning: 'border-amber-200 bg-amber-50 text-amber-900',
+    danger: 'border-rose-200 bg-rose-50 text-rose-800',
+    info: 'border-sky-200 bg-sky-50 text-sky-800',
   };
+
+  return (
+    <div className={`rounded-lg border p-4 ${toneClass[tone]}`}>
+      <div className="flex items-center gap-2 text-xs font-medium text-current/70">
+        <Icon className="size-4" />
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function buildIssues(quality: SidataAsnQualityDashboard | null): DashboardIssue[] {
+  if (!quality) return [];
+
+  return [
+    {
+      key: 'withoutUnitKerja',
+      label: 'Unit kerja kosong',
+      count: quality.completeness.withoutUnitKerja,
+      path: '/sidata/asn',
+    },
+    {
+      key: 'withoutJabatan',
+      label: 'Jabatan kosong',
+      count: quality.completeness.withoutJabatan,
+      path: '/sidata/asn',
+    },
+    {
+      key: 'withoutGolongan',
+      label: 'Golongan kosong',
+      count: quality.completeness.withoutGolongan,
+      path: '/sidata/asn',
+    },
+    {
+      key: 'withoutNik',
+      label: 'NIK kosong',
+      count: quality.completeness.withoutNik,
+      path: '/sidata/asn',
+    },
+    {
+      key: 'withoutTmtPensiun',
+      label: 'TMT pensiun kosong',
+      count: quality.completeness.withoutTmtPensiun,
+      path: '/sidata/import/siasn',
+    },
+    {
+      key: 'withoutSiasnProfile',
+      label: 'Profil SIASN belum ada',
+      count: quality.completeness.withoutSiasnProfile,
+      path: '/sidata/import/siasn',
+    },
+  ].sort((left, right) => right.count - left.count);
 }
 
 export function SidataDashboardPage() {
@@ -93,22 +147,9 @@ export function SidataDashboardPage() {
   }, []);
 
   const stats = useMemo(() => buildImportAggregate(batches), [batches]);
-  const recentBatches = useMemo(() => batches.slice(0, 8), [batches]);
-
-  const statusBreakdown = useMemo(
-    () => (qualityDashboard?.breakdown.byStatusAsn ?? []).map(mapBreakdownRow),
-    [qualityDashboard],
-  );
-
-  const jenisAsnBreakdown = useMemo(
-    () => (qualityDashboard?.breakdown.byJenisAsn ?? []).map(mapBreakdownRow),
-    [qualityDashboard],
-  );
-
-  const syncStatusBreakdown = useMemo(
-    () => (qualityDashboard?.breakdown.bySyncStatus ?? []).map(mapBreakdownRow),
-    [qualityDashboard],
-  );
+  const recentBatches = useMemo(() => batches.slice(0, 6), [batches]);
+  const issues = useMemo(() => buildIssues(qualityDashboard), [qualityDashboard]);
+  const openIssues = issues.filter((item) => item.count > 0);
 
   async function loadDashboard() {
     setLoading(true);
@@ -132,7 +173,7 @@ export function SidataDashboardPage() {
 
   function openBatchWorkspace(batch: SidataImportBatchWithKind) {
     navigate(
-      batch.kind === 'ASN' ? '/sidata/import/mapping-referensi' : '/sidata/import/referensi',
+      batch.kind === 'ASN' ? '/sidata/import/siasn' : '/sidata/import/referensi',
     );
   }
 
@@ -141,28 +182,19 @@ export function SidataDashboardPage() {
   }
 
   const totalAsn = qualityDashboard?.totals.totalAsn ?? 0;
-  const activeAsn = qualityDashboard?.totals.activeAsn ?? 0;
-  const inactiveAsn = qualityDashboard?.totals.inactiveAsn ?? 0;
   const qualityScore = qualityDashboard?.quality.qualityScore ?? 0;
   const issueRows = qualityDashboard?.quality.issueRows ?? 0;
-  const completeCoreRows = qualityDashboard?.quality.completeCoreRows ?? 0;
+  const bupNext12Months = qualityDashboard?.retirement.bupNext12Months ?? 0;
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Dashboard SIDATA"
-        description="Ringkasan kualitas master ASN, status import SIASN, dan kesiapan data referensi SIDATA."
+        description="Ringkasan cepat kualitas Master ASN dan status import SIASN."
         meta={
           <>
-            <StatusBadge value="Data ASN" tone="info" />
-            <StatusBadge value="Import Monitor" tone="dark" />
-            <StatusBadge value="Quality Control" tone={getQualityTone(qualityScore)} />
-            {qualityDashboard ? (
-              <StatusBadge
-                value={qualityDashboard.scope.type === 'ALL' ? 'Scope Semua Data' : 'Scope Unit Kerja'}
-                tone="neutral"
-              />
-            ) : null}
+            <StatusBadge value="SIDATA" tone="dark" />
+            <StatusBadge value={`${formatPercent(qualityScore)} Kualitas`} tone={getQualityTone(qualityScore)} />
           </>
         }
         actions={
@@ -179,435 +211,90 @@ export function SidataDashboardPage() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          icon={Users}
-          label="Total ASN"
-          value={totalAsn}
-          tone="info"
-          description="Jumlah data ASN pada master SIDATA."
-        />
-        <StatCard
-          icon={UserCheck}
-          label="ASN Aktif"
-          value={activeAsn}
-          tone="success"
-          description="Data ASN dengan status aktif."
-        />
-        <StatCard
-          icon={UserRoundX}
-          label="ASN Nonaktif"
-          value={inactiveAsn}
-          tone={inactiveAsn > 0 ? 'warning' : 'success'}
-          description="Data ASN nonaktif/berhenti/pensiun/meninggal."
-        />
-        <StatCard
-          icon={BarChart3}
-          label="Quality Score"
-          value={formatPercent(qualityScore)}
-          tone={getQualityTone(qualityScore)}
-          description="Persentase ASN yang lengkap pada field inti."
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Data Inti Lengkap"
-          value={completeCoreRows}
-          tone="success"
-          description="ASN dengan unit, jabatan, golongan, NIK, tanggal lahir, TMT pensiun, dan profil SIASN."
-        />
-        <StatCard
-          icon={ShieldAlert}
-          label="Issue Rows"
-          value={issueRows}
-          tone={getIssueTone(issueRows)}
-          description="ASN yang masih memiliki kekurangan field inti."
-        />
-        <StatCard
-          icon={CalendarClock}
-          label={`BUP ${qualityDashboard?.period.bupWindowMonths ?? 12} Bulan`}
-          value={qualityDashboard?.retirement.bupNext12Months ?? 0}
-          tone="warning"
-          description="ASN aktif yang mencapai BUP dalam periode pemantauan."
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="BUP Overdue Aktif"
-          value={qualityDashboard?.retirement.bupOverdueActive ?? 0}
-          tone={(qualityDashboard?.retirement.bupOverdueActive ?? 0) > 0 ? 'danger' : 'success'}
-          description="ASN aktif yang melewati TMT pensiun."
-        />
+      <div className="grid gap-3 md:grid-cols-4">
+        <DashboardTile icon={Database} label="Total ASN" value={formatCount(totalAsn)} tone="info" />
+        <DashboardTile icon={CheckCircle2} label="Skor Kualitas" value={formatPercent(qualityScore)} tone={getQualityTone(qualityScore)} />
+        <DashboardTile icon={AlertTriangle} label="Data Bermasalah" value={formatCount(issueRows)} tone={getIssueTone(issueRows)} />
+        <DashboardTile icon={CalendarClock} label="BUP 12 Bulan" value={formatCount(bupNext12Months)} tone={bupNext12Months > 0 ? 'warning' : 'success'} />
       </div>
 
-      {qualityDashboard ? (
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <SectionCard
-          title="Kualitas Master ASN"
-          description={`Data dihitung dari backend pada ${formatDateTime(qualityDashboard.generatedAt)}. Periode BUP: ${formatDateOnly(
-            qualityDashboard.period.today,
-          )} sampai ${formatDateOnly(qualityDashboard.period.bupUntil)}.`}
+          title="Prioritas Data"
+          description="Field inti yang masih perlu dibersihkan."
           actions={
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge value={`${formatPercent(qualityScore)} Quality`} tone={getQualityTone(qualityScore)} />
-              <StatusBadge value={`${issueRows} Issue`} tone={getIssueTone(issueRows)} />
-            </div>
+            <ActionButton
+              icon={ShieldCheck}
+              onClick={() => navigate('/sidata/validasi')}
+              variant="secondary"
+            >
+              Buka Validasi
+            </ActionButton>
           }
         >
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              icon={Database}
-              label="PNS"
-              value={qualityDashboard.totals.pns}
-              tone="info"
-              description="ASN dengan jenis PNS."
-            />
-            <StatCard
-              icon={Database}
-              label="PPPK"
-              value={qualityDashboard.totals.pppk}
-              tone="info"
-              description="ASN dengan jenis PPPK."
-            />
-            <StatCard
-              icon={Database}
-              label="PPPK Paruh Waktu"
-              value={qualityDashboard.totals.pppkParuhWaktu}
-              tone="info"
-              description="ASN dengan jenis PPPK Paruh Waktu."
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Core Complete"
-              value={completeCoreRows}
-              tone="success"
-              description="Baris ASN yang memenuhi kelengkapan inti."
-            />
-
-            <StatCard
-              icon={AlertTriangle}
-              label="Tanpa Unit Kerja"
-              value={qualityDashboard.completeness.withoutUnitKerja}
-              tone={getIssueTone(qualityDashboard.completeness.withoutUnitKerja)}
-              description="ASN yang belum memiliki unit kerja."
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Tanpa Jabatan"
-              value={qualityDashboard.completeness.withoutJabatan}
-              tone={getIssueTone(qualityDashboard.completeness.withoutJabatan)}
-              description="ASN yang belum memiliki jabatan."
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Tanpa Golongan"
-              value={qualityDashboard.completeness.withoutGolongan}
-              tone={getIssueTone(qualityDashboard.completeness.withoutGolongan)}
-              description="ASN yang belum memiliki golongan."
-            />
-            <StatCard
-              icon={IdCard}
-              label="Tanpa NIK"
-              value={qualityDashboard.completeness.withoutNik}
-              tone={getIssueTone(qualityDashboard.completeness.withoutNik)}
-              description="ASN yang belum memiliki NIK."
-            />
-            <StatCard
-              icon={CalendarClock}
-              label="Tanpa Tanggal Lahir"
-              value={qualityDashboard.completeness.withoutTanggalLahir}
-              tone={getIssueTone(qualityDashboard.completeness.withoutTanggalLahir)}
-              description="ASN tanpa tanggal lahir pada profil SIASN."
-            />
-            <StatCard
-              icon={CalendarClock}
-              label="Tanpa TMT Pensiun"
-              value={qualityDashboard.completeness.withoutTmtPensiun}
-              tone={getIssueTone(qualityDashboard.completeness.withoutTmtPensiun)}
-              description="ASN yang belum memiliki TMT pensiun."
-            />
-            <StatCard
-              icon={Database}
-              label="Tanpa Profil SIASN"
-              value={qualityDashboard.completeness.withoutSiasnProfile}
-              tone={getIssueTone(qualityDashboard.completeness.withoutSiasnProfile)}
-              description="ASN yang belum memiliki profil SIASN."
-            />
-            <StatCard
-              icon={ShieldAlert}
-              label="Total Issue"
-              value={issueRows}
-              tone={getIssueTone(issueRows)}
-              description="Jumlah ASN yang belum lengkap pada field inti."
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Sinkron SIASN"
-              value={qualityDashboard.sync.synced}
-              tone="success"
-              description="Data sesuai batch SIASN terakhir."
-            />
-            <StatCard
-              icon={SquarePen}
-              label="Koreksi Lokal"
-              value={qualityDashboard.sync.localCorrection}
-              tone={qualityDashboard.sync.localCorrection > 0 ? 'warning' : 'success'}
-              description="Data sudah dikoreksi di SIDATA dan perlu jejak audit."
-            />
-            <StatCard
-              icon={ShieldAlert}
-              label="Konflik SIASN"
-              value={qualityDashboard.sync.conflict}
-              tone={qualityDashboard.sync.conflict > 0 ? 'danger' : 'success'}
-              description="Export SIASN berbeda dengan koreksi lokal SIDATA."
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Perlu Review"
-              value={qualityDashboard.sync.needReview}
-              tone={qualityDashboard.sync.needReview > 0 ? 'warning' : 'success'}
-              description="Data ASN perlu pemeriksaan operator/analis."
-            />
-          </div>
-        </SectionCard>
-      ) : null}
-
-      {qualityDashboard ? (
-        <div className="grid gap-5 xl:grid-cols-2">
-          <SectionCard
-            title="Breakdown Status ASN"
-            description="Komposisi data ASN berdasarkan status kepegawaian."
-          >
-            {statusBreakdown.length === 0 ? (
-              <EmptyState
-                icon={BarChart3}
-                title="Belum ada breakdown status"
-                description="Data breakdown status ASN belum tersedia."
-              />
-            ) : (
-              <DataTable
-                empty="Belum ada data status ASN"
-                items={statusBreakdown}
-                rowKey={(item) => item.key}
-                columns={[
-                  {
-                    key: 'label',
-                    header: 'Status',
-                    render: (item) => <StatusBadge value={item.label} tone="info" />,
-                  },
-                  {
-                    key: 'total',
-                    header: 'Total',
-                    render: (item) => (
-                      <span className="font-mono text-sm font-semibold">{item.total}</span>
-                    ),
-                  },
-                  {
-                    key: 'percentage',
-                    header: 'Persentase',
-                    render: (item) => (
-                      <span className="text-sm text-muted-foreground">
-                        {item.displayPercentage}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            )}
-          </SectionCard>
-
-          <SectionCard
-            title="Breakdown Jenis ASN"
-            description="Komposisi data ASN berdasarkan jenis pegawai."
-          >
-            {jenisAsnBreakdown.length === 0 ? (
-              <EmptyState
-                icon={BarChart3}
-                title="Belum ada breakdown jenis ASN"
-                description="Data breakdown jenis ASN belum tersedia."
-              />
-            ) : (
-              <DataTable
-                empty="Belum ada data jenis ASN"
-                items={jenisAsnBreakdown}
-                rowKey={(item) => item.key}
-                columns={[
-                  {
-                    key: 'label',
-                    header: 'Jenis ASN',
-                    render: (item) => <StatusBadge value={item.label} tone="dark" />,
-                  },
-                  {
-                    key: 'total',
-                    header: 'Total',
-                    render: (item) => (
-                      <span className="font-mono text-sm font-semibold">{item.total}</span>
-                    ),
-                  },
-                  {
-                    key: 'percentage',
-                    header: 'Persentase',
-                    render: (item) => (
-                      <span className="text-sm text-muted-foreground">
-                        {item.displayPercentage}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            )}
-          </SectionCard>
-
-          <SectionCard
-            title="Breakdown Status Sinkronisasi"
-            description="Status kendali data ASN terhadap export SIASN dan koreksi lokal."
-          >
-            {syncStatusBreakdown.length === 0 ? (
-              <EmptyState
-                icon={BarChart3}
-                title="Belum ada status sinkronisasi"
-                description="Status sinkronisasi akan tampil setelah migrasi dan import berjalan."
-              />
-            ) : (
-              <DataTable
-                empty="Belum ada data sinkronisasi"
-                items={syncStatusBreakdown}
-                rowKey={(item) => item.key}
-                columns={[
-                  {
-                    key: 'label',
-                    header: 'Status',
-                    render: (item) => <StatusBadge value={item.label} />,
-                  },
-                  {
-                    key: 'total',
-                    header: 'Total',
-                    render: (item) => (
-                      <span className="font-mono text-sm font-semibold">{item.total}</span>
-                    ),
-                  },
-                  {
-                    key: 'percentage',
-                    header: 'Persentase',
-                    render: (item) => (
-                      <span className="text-sm text-muted-foreground">
-                        {item.displayPercentage}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            )}
-          </SectionCard>
-        </div>
-      ) : null}
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
-        <SectionCard
-          title="Kualitas Import SIDATA"
-          description="Akumulasi kualitas seluruh batch import ASN dan referensi."
-        >
-          {batches.length === 0 ? (
+          {openIssues.length === 0 ? (
             <EmptyState
-              icon={FileSpreadsheet}
-              title="Belum ada batch import"
-              description="Upload referensi atau data SIASN untuk mulai membangun kualitas data SIDATA."
+              icon={CheckCircle2}
+              title="Data inti sudah lengkap"
+              description="Tidak ada field inti kosong pada dashboard kualitas saat ini."
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                icon={FileSpreadsheet}
-                label="Total Rows"
-                value={stats.totalRows}
-                description="Akumulasi seluruh baris import."
-              />
-              <StatCard
-                icon={CheckCircle2}
-                label="Valid Rows"
-                value={stats.validRows}
-                tone="success"
-                description="Baris yang lolos validasi."
-              />
-              <StatCard
-                icon={AlertTriangle}
-                label="Invalid Rows"
-                value={stats.invalidRows}
-                tone="danger"
-                description="Baris yang tidak dapat diproses."
-              />
-              <StatCard
-                icon={ShieldCheck}
-                label="Warning Rows"
-                value={stats.warningRows}
-                tone="warning"
-                description="Baris dengan catatan validasi."
-              />
-              <StatCard
-                icon={Layers3}
-                label="Mapped Rows"
-                value={stats.mappedRows}
-                tone="info"
-                description="Baris yang sudah termapping."
-              />
-              <StatCard
-                icon={ShieldAlert}
-                label="Needs Review"
-                value={stats.needsReviewRows}
-                tone="warning"
-                description="Baris yang perlu review manual."
-              />
-              <StatCard
-                icon={RefreshCcw}
-                label="Unmapped"
-                value={stats.unmappedRows}
-                description="Baris yang belum punya referensi."
-              />
-              <StatCard
-                icon={CheckCircle2}
-                label="Committed Rows"
-                value={stats.committedRows}
-                tone="success"
-                description="Baris yang sudah masuk data utama."
-              />
-            </div>
+            <DataTable
+              empty="Tidak ada prioritas perbaikan"
+              items={openIssues}
+              rowKey={(item) => item.key}
+              columns={[
+                {
+                  key: 'issue',
+                  header: 'Masalah',
+                  render: (item) => (
+                    <div className="font-semibold text-zinc-900">{item.label}</div>
+                  ),
+                },
+                {
+                  key: 'count',
+                  header: 'Jumlah',
+                  className: 'w-[120px]',
+                  render: (item) => (
+                    <span className="font-semibold text-amber-700">
+                      {formatCount(item.count)}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'action',
+                  header: '',
+                  className: 'w-[150px]',
+                  render: (item) => (
+                    <ActionButton
+                      icon={item.path.includes('import') ? FileSpreadsheet : Database}
+                      onClick={() => navigate(item.path)}
+                      variant="secondary"
+                    >
+                      Perbaiki
+                    </ActionButton>
+                  ),
+                },
+              ]}
+            />
           )}
         </SectionCard>
 
         <SectionCard
-          title="Aksi Cepat SIDATA"
-          description="Shortcut operasional untuk admin data BKPSDM."
+          title="Aksi Cepat"
+          description="Menu kerja SIDATA yang paling sering dipakai."
         >
           <div className="grid gap-3">
-            <ActionButton
-              icon={Database}
-              onClick={() => navigate('/sidata/asn')}
-              variant="secondary"
-            >
-              Buka Profil ASN
+            <ActionButton icon={Database} onClick={() => navigate('/sidata/asn')} variant="secondary">
+              Master ASN
             </ActionButton>
-            <ActionButton
-              icon={FileSpreadsheet}
-              onClick={() => navigate('/sidata/import/siasn')}
-              variant="secondary"
-            >
-              Import Data SIASN
+            <ActionButton icon={FileSpreadsheet} onClick={() => navigate('/sidata/import/siasn')} variant="secondary">
+              Import SIASN
             </ActionButton>
-            <ActionButton
-              icon={Layers3}
-              onClick={() => navigate('/sidata/import/referensi')}
-              variant="secondary"
-            >
-              Import Referensi
+            <ActionButton icon={ShieldCheck} onClick={() => navigate('/sidata/rekonsiliasi')} variant="secondary">
+              Rekonsiliasi
             </ActionButton>
-            <ActionButton
-              icon={ShieldCheck}
-              onClick={() => navigate('/sidata/import/mapping-referensi')}
-              variant="secondary"
-            >
-              Review Mapping
-            </ActionButton>
-            <ActionButton
-              icon={FolderSync}
-              onClick={() => navigate('/sidata/import/riwayat')}
-              variant="secondary"
-            >
+            <ActionButton icon={FolderSync} onClick={() => navigate('/sidata/import/riwayat')} variant="secondary">
               Riwayat Import
             </ActionButton>
           </div>
@@ -615,12 +302,13 @@ export function SidataDashboardPage() {
       </div>
 
       <SectionCard
-        title="Batch Import Terbaru"
-        description="Daftar batch import terakhir untuk pemantauan cepat."
+        title="Status Import"
+        description="Ringkasan batch import ASN dan referensi."
         actions={
           <div className="flex flex-wrap gap-2">
-            <StatusBadge value={`${recentBatches.length} Ditampilkan`} tone="info" />
-            <StatusBadge value={`${batches.length} Total`} tone="neutral" />
+            <StatusBadge value={`${formatCount(stats.totalBatch)} Batch`} tone="info" />
+            <StatusBadge value={`${formatCount(stats.invalidRows)} Tidak Valid`} tone={stats.invalidRows > 0 ? 'warning' : 'success'} />
+            <StatusBadge value={`${formatCount(stats.unmappedRows)} Belum Terpetakan`} tone={stats.unmappedRows > 0 ? 'warning' : 'success'} />
           </div>
         }
       >
@@ -628,7 +316,7 @@ export function SidataDashboardPage() {
           <EmptyState
             icon={FileSpreadsheet}
             title="Belum ada batch import"
-            description="Belum ada riwayat import ASN atau referensi."
+            description="Upload data SIASN atau referensi untuk mulai mengisi riwayat import."
           />
         ) : (
           <DataTable
@@ -639,6 +327,7 @@ export function SidataDashboardPage() {
               {
                 key: 'batch',
                 header: 'Batch',
+                className: 'w-[110px]',
                 render: (item) => (
                   <span className="font-mono text-xs font-semibold text-zinc-900">
                     {shortId(item.id)}
@@ -646,25 +335,19 @@ export function SidataDashboardPage() {
                 ),
               },
               {
-                key: 'kind',
-                header: 'Jenis',
-                render: (item) => (
-                  <StatusBadge
-                    value={item.kind === 'ASN' ? 'ASN' : 'Referensi'}
-                    tone={item.kind === 'ASN' ? 'info' : 'dark'}
-                  />
-                ),
-              },
-              {
                 key: 'file',
                 header: 'File',
                 render: (item) => (
-                  <div className="max-w-[300px]">
+                  <div className="min-w-0">
                     <div className="truncate font-semibold text-zinc-900">
                       {getBatchFileName(item)}
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {getBatchTypeLabel(item)}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <StatusBadge
+                        value={item.kind === 'ASN' ? 'ASN' : 'Referensi'}
+                        tone={item.kind === 'ASN' ? 'info' : 'dark'}
+                      />
+                      <span>{getBatchTypeLabel(item)}</span>
                     </div>
                   </div>
                 ),
@@ -672,30 +355,34 @@ export function SidataDashboardPage() {
               {
                 key: 'status',
                 header: 'Status',
+                className: 'w-[130px]',
                 render: (item) => <StatusBadge value={item.status} />,
               },
               {
                 key: 'rows',
-                header: 'Rows',
+                header: 'Ringkasan',
+                className: 'w-[190px]',
                 render: (item) => (
-                  <div className="grid gap-1 text-xs">
-                    <span>Total: {toNumber(item.totalRows)}</span>
-                    <span className="text-emerald-700">Valid: {toNumber(item.validRows)}</span>
-                    <span className="text-rose-700">Invalid: {toNumber(item.invalidRows)}</span>
-                    <span className="text-amber-700">Warning: {toNumber(item.warningRows)}</span>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <span>Total: <b>{toNumber(item.totalRows)}</b></span>
+                    <span>Valid: <b className="text-emerald-700">{toNumber(item.validRows)}</b></span>
+                    <span>Tidak valid: <b className="text-rose-700">{toNumber(item.invalidRows)}</b></span>
+                    <span>Warning: <b className="text-amber-700">{toNumber(item.warningRows)}</b></span>
                   </div>
                 ),
               },
               {
                 key: 'createdAt',
                 header: 'Tanggal',
+                className: 'w-[150px]',
                 render: (item) => (
                   <span className="text-xs">{formatDateTime(item.createdAt)}</span>
                 ),
               },
               {
                 key: 'action',
-                header: 'Aksi',
+                header: '',
+                className: 'w-[100px]',
                 render: (item) => (
                   <ActionButton onClick={() => openBatchWorkspace(item)} variant="secondary">
                     Buka

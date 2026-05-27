@@ -74,7 +74,7 @@ export function SianalitikRhkProgress({ summary, rows }: Props) {
 
       <div className="border-t border-slate-100 pt-2">
         <Link
-          to="/kinerja-bidang/laporan"
+          to="/kinerja-bidang/report"
           className="text-xs font-medium text-[#12815f] hover:underline"
         >
           Lihat laporan lengkap →

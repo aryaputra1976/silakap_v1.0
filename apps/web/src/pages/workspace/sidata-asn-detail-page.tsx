@@ -56,10 +56,52 @@ function InfoRow({
   const displayValue = typeof value === 'string' ? (value || '-') : (value ?? '-');
 
   return (
-    <div className="flex gap-3 border-b border-[#e4eeea] py-2.5 last:border-0">
-      <span className="w-40 shrink-0 text-sm text-[#62766f]">{label}</span>
-      <span className="min-w-0 text-sm font-medium text-[#18343a]">{displayValue}</span>
+    <div className="grid gap-1 border-b border-[#e4eeea] py-2.5 last:border-0 md:grid-cols-[150px_1fr] md:gap-3">
+      <span className="text-sm text-[#62766f]">{label}</span>
+      <span className="min-w-0 break-words text-sm font-medium text-[#18343a]">{displayValue}</span>
     </div>
+  );
+}
+
+function SummaryItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode | null | undefined;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs text-[#62766f]">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-[#18343a]">{value ?? '-'}</div>
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  children,
+  icon: Icon,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  icon: typeof BriefcaseBusiness;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={
+        active
+          ? 'inline-flex h-9 items-center gap-2 rounded-md bg-[#0e7c86] px-3 text-sm font-semibold text-white'
+          : 'inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
+      }
+      type="button"
+      onClick={onClick}
+    >
+      <Icon className="size-4" />
+      {children}
+    </button>
   );
 }
 
@@ -71,8 +113,8 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[#cfe1da] bg-white shadow-[0_12px_28px_rgba(14,124,134,0.08)]">
-      <div className="border-b border-[#cfe1da] bg-[linear-gradient(90deg,#eef8f6_0%,#ffffff_100%)] px-5 py-4">
+    <div className="overflow-hidden rounded-lg border border-[#cfe1da] bg-white">
+      <div className="border-b border-[#cfe1da] bg-[#f7fbf8] px-5 py-3">
         <h3 className="text-sm font-semibold uppercase tracking-normal text-[#075e66]">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
@@ -283,7 +325,7 @@ export function SidataAsnDetailPage() {
           onClick={() => navigate('/sidata/asn')}
         >
           <ArrowLeft className="size-4" />
-          Kembali ke Direktori
+          Kembali ke Master ASN
         </button>
       </div>
     );
@@ -295,7 +337,7 @@ export function SidataAsnDetailPage() {
     <div className="space-y-5">
       <PageHeader
         title={asn.nama}
-        description={`NIP ${asn.nip}${asn.unitKerja ? ` / ${asn.unitKerja.nama}` : ''}`}
+        description={`NIP ${asn.nip}`}
         meta={
           <div className="flex items-center gap-2">
             {asn.jenisAsn ? (
@@ -313,47 +355,60 @@ export function SidataAsnDetailPage() {
             <StatusBadge value={asn.syncStatus ?? 'NEED_REVIEW'} />
           </div>
         }
+        actions={
+          <>
+            <ActionButton
+              icon={ArrowLeft}
+              onClick={() => navigate('/sidata/asn')}
+              variant="ghost"
+            >
+              Kembali
+            </ActionButton>
+            {asn.statusAsn === 'AKTIF' ? (
+              <ActionButton
+                icon={FilePlus2}
+                onClick={() => void handleCreateSipensiun()}
+                disabled={!!creatingId}
+                variant="secondary"
+              >
+                {creatingId ? 'Membuat usulan...' : 'Buat Usulan'}
+              </ActionButton>
+            ) : null}
+          </>
+        }
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
+      <div className="grid gap-3 rounded-lg border border-[#cfe1da] bg-white p-4 md:grid-cols-4">
+        <SummaryItem label="Unit Kerja" value={asn.unitKerja?.nama} />
+        <SummaryItem label="Jabatan" value={asn.jabatanNama} />
+        <SummaryItem label="Golongan" value={asn.golonganNama} />
+        <SummaryItem label="TMT Pensiun" value={formatDate(asn.tmtPensiun)} />
+      </div>
+
       <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-white p-2">
-        <button
-          className={
-            activeTab === 'profil'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
-          }
-          type="button"
+        <TabButton
+          active={activeTab === 'profil'}
+          icon={BriefcaseBusiness}
           onClick={() => setActiveTab('profil')}
         >
-          <BriefcaseBusiness className="size-4" />
           Profil
-        </button>
-        <button
-          className={
-            activeTab === 'riwayat'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
-          }
-          type="button"
+        </TabButton>
+        <TabButton
+          active={activeTab === 'riwayat'}
+          icon={History}
           onClick={() => setActiveTab('riwayat')}
         >
-          <History className="size-4" />
           Riwayat
-        </button>
-        <button
-          className={
-            activeTab === 'edit'
-              ? 'inline-flex h-10 items-center gap-2 rounded-md bg-[#0e7c86] px-4 text-sm font-semibold text-white'
-              : 'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-[#4c625c] hover:bg-[#eef8f6]'
-          }
-          type="button"
+        </TabButton>
+        <TabButton
+          active={activeTab === 'edit'}
+          icon={SquarePen}
           onClick={() => setActiveTab('edit')}
         >
-          <SquarePen className="size-4" />
           Edit
-        </button>
+        </TabButton>
       </div>
 
       {activeTab === 'profil' ? (
@@ -596,27 +651,14 @@ export function SidataAsnDetailPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700"
-          onClick={() => navigate('/sidata/asn')}
-        >
-          <ArrowLeft className="size-4" />
-          Kembali ke Direktori
-        </button>
-
-        {asn.statusAsn === 'AKTIF' && (
-          <ActionButton
-            icon={FilePlus2}
-            onClick={() => void handleCreateSipensiun()}
-            disabled={!!creatingId}
-            variant="secondary"
-          >
-            {creatingId ? 'Membuat usulan...' : 'Buat Usulan Pensiun'}
-          </ActionButton>
-        )}
-      </div>
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700"
+        onClick={() => navigate('/sidata/asn')}
+      >
+        <ArrowLeft className="size-4" />
+        Kembali ke Master ASN
+      </button>
     </div>
   );
 }

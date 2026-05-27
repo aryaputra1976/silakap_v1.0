@@ -52,7 +52,6 @@ const asnInclude = {
       statusKawinNama: true,
       tmtPns: true,
       tmtPensiun: true,
-      rawData: true,
     },
   },
   golonganHistory: {
@@ -89,6 +88,99 @@ const asnInclude = {
     },
   },
 } satisfies Prisma.AsnInclude;
+
+const asnListSelect = {
+  id: true,
+  nip: true,
+  nik: true,
+  nama: true,
+  unitKerjaId: true,
+  jabatanNama: true,
+  golonganNama: true,
+  jenisJabatanNama: true,
+  tmtJabatan: true,
+  tmtGolongan: true,
+  tmtPensiun: true,
+  masaKerjaTahun: true,
+  masaKerjaBulan: true,
+  masaKerjaTotalBulan: true,
+  kelasJabatan: true,
+  siasnEselonId: true,
+  siasnGolonganId: true,
+  eselonNama: true,
+  jenisPegawaiNama: true,
+  jenisAsnNama: true,
+  tipePegawai: true,
+  detailStatusNama: true,
+  pendidikanNama: true,
+  pendidikanRefId: true,
+  tingkatPendidikanRefId: true,
+  tingkatPendidikanNama: true,
+  tahunLulus: true,
+  namaSekolah: true,
+  statusAsn: true,
+  syncStatus: true,
+  lastSiasnBatchId: true,
+  lastSiasnSyncedAt: true,
+  localCorrectionAt: true,
+  localCorrectionBy: true,
+  localCorrectionReason: true,
+  needsReview: true,
+  reviewNote: true,
+  sourceBatchId: true,
+  syncedAt: true,
+  unitKerja: {
+    select: {
+      id: true,
+      kode: true,
+      nama: true,
+    },
+  },
+  jabatanRef: {
+    select: {
+      bup: true,
+    },
+  },
+  siasnProfile: {
+    select: {
+      email: true,
+      phone: true,
+      tanggalLahir: true,
+      tmtPns: true,
+      tmtPensiun: true,
+    },
+  },
+  golonganHistory: {
+    where: { deletedAt: null },
+    orderBy: [
+      { effectiveDate: 'desc' },
+      { syncedAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    take: 1,
+    select: {
+      golonganNama: true,
+      golonganAkhirNama: true,
+      siasnGolonganAkhirId: true,
+      mkTahun: true,
+      mkBulan: true,
+    },
+  },
+  pendidikanHistory: {
+    where: { deletedAt: null },
+    orderBy: [
+      { effectiveDate: 'desc' },
+      { syncedAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    take: 1,
+    select: {
+      pendidikanNama: true,
+      tingkatPendidikanNama: true,
+      tahunLulus: true,
+    },
+  },
+} satisfies Prisma.AsnSelect;
 
 const asnAssignmentHistorySelect = {
   id: true,
@@ -188,6 +280,10 @@ export type AsnRecord = Prisma.AsnGetPayload<{
   include: typeof asnInclude;
 }>;
 
+export type AsnListRecord = Prisma.AsnGetPayload<{
+  select: typeof asnListSelect;
+}>;
+
 export type AsnAssignmentHistoryRecord =
   Prisma.AsnAssignmentHistoryGetPayload<{
     select: typeof asnAssignmentHistorySelect;
@@ -204,10 +300,6 @@ export type AsnDocumentRecord = Prisma.DocumentGetPayload<{
 export type AsnChangeLogRecord = Prisma.AsnChangeLogGetPayload<{
   select: typeof asnChangeLogSelect;
 }>;
-
-type OrderedAsnIdRow = {
-  id: string;
-};
 
 export type SidataAsnDocumentAuditAction =
   | 'SIDATA_ASN_DOCUMENT_UPLOAD'
@@ -335,26 +427,26 @@ export class SidataRepository {
   }
 
   async findAsnList(filters: NormalizedAsnFilters): Promise<{
-    items: AsnRecord[];
+    items: AsnListRecord[];
     total: number;
   }> {
     const where = await this.buildAsnWhere(filters);
     const skip = (filters.page - 1) * filters.limit;
-    const orderedIds = await this.findOrderedAsnIds(filters, skip, filters.limit);
+    const orderedIds = await this.findOrderedAsnIds(filters, skip, filters.limit, where);
 
     const [unorderedItems, total] = await Promise.all([
       orderedIds.length > 0
         ? this.prisma.asn.findMany({
             where: { id: { in: orderedIds } },
-            include: asnInclude,
+            select: asnListSelect,
           })
-        : Promise.resolve([] as AsnRecord[]),
+        : Promise.resolve([] as AsnListRecord[]),
       this.prisma.asn.count({ where }),
     ]);
     const itemById = new Map(unorderedItems.map((item) => [item.id, item]));
     const items = orderedIds
       .map((id) => itemById.get(id))
-      .filter((item): item is AsnRecord => Boolean(item));
+      .filter((item): item is AsnListRecord => Boolean(item));
 
     return { items, total };
   }
@@ -514,6 +606,32 @@ export class SidataRepository {
     bupUntil: Date;
   }): Promise<SidataAsnQualityDashboardRecord> {
     const whereSql = await this.buildAsnQualityWhereSql(params.unitKerjaId);
+    const inferredBupSql = Prisma.sql`
+      COALESCE(
+        rj.bup,
+        CASE
+          WHEN UPPER(COALESCE(a.jabatan_nama, rj.nama, '')) LIKE '%GURU%' THEN 60
+          WHEN UPPER(COALESCE(a.jabatan_nama, rj.nama, '')) LIKE '%AHLI UTAMA%' THEN 65
+          WHEN UPPER(COALESCE(a.jabatan_nama, rj.nama, '')) LIKE '%AHLI MADYA%' THEN 60
+          WHEN COALESCE(a.jabatan_nama, rj.nama, '') <> '' THEN 58
+          ELSE NULL
+        END
+      )
+    `;
+    const effectiveTmtPensiunSql = Prisma.sql`
+      COALESCE(
+        a.tmt_pensiun,
+        sp.tmt_pensiun,
+        CASE
+          WHEN sp.tanggal_lahir IS NOT NULL AND ${inferredBupSql} IS NOT NULL
+            THEN DATE_ADD(
+              MAKEDATE(YEAR(sp.tanggal_lahir) + ${inferredBupSql}, 1),
+              INTERVAL MONTH(sp.tanggal_lahir) MONTH
+            )
+          ELSE NULL
+        END
+      )
+    `;
 
     const aggregateRows = await this.prisma.$queryRaw<AsnQualityAggregateSqlRow[]>(Prisma.sql`
       SELECT
@@ -538,7 +656,8 @@ export class SidataRepository {
         END) AS withoutJabatanRows,
 
         SUM(CASE
-          WHEN (a.golongan_ref_id IS NULL OR a.golongan_ref_id = '')
+          WHEN COALESCE(a.tipe_pegawai, '') <> 'PPPK_PARUH_WAKTU'
+           AND (a.golongan_ref_id IS NULL OR a.golongan_ref_id = '')
            AND (a.golongan_nama IS NULL OR a.golongan_nama = '') THEN 1
           ELSE 0
         END) AS withoutGolonganRows,
@@ -554,7 +673,7 @@ export class SidataRepository {
         END) AS withoutTanggalLahirRows,
 
         SUM(CASE
-          WHEN a.tmt_pensiun IS NULL THEN 1
+          WHEN ${effectiveTmtPensiunSql} IS NULL THEN 1
           ELSE 0
         END) AS withoutTmtPensiunRows,
 
@@ -565,16 +684,14 @@ export class SidataRepository {
 
         SUM(CASE
           WHEN a.is_active = 1
-           AND a.tmt_pensiun IS NOT NULL
-           AND a.tmt_pensiun >= ${params.today}
-           AND a.tmt_pensiun <= ${params.bupUntil} THEN 1
+           AND ${effectiveTmtPensiunSql} >= ${params.today}
+           AND ${effectiveTmtPensiunSql} <= ${params.bupUntil} THEN 1
           ELSE 0
         END) AS bupNext12MonthsRows,
 
         SUM(CASE
           WHEN a.is_active = 1
-           AND a.tmt_pensiun IS NOT NULL
-           AND a.tmt_pensiun < ${params.today} THEN 1
+           AND ${effectiveTmtPensiunSql} < ${params.today} THEN 1
           ELSE 0
         END) AS bupOverdueActiveRows,
 
@@ -585,11 +702,13 @@ export class SidataRepository {
              OR (a.jabatan_nama IS NOT NULL AND a.jabatan_nama <> '')
            )
            AND (
+             COALESCE(a.tipe_pegawai, '') = 'PPPK_PARUH_WAKTU'
+             OR
              (a.golongan_ref_id IS NOT NULL AND a.golongan_ref_id <> '')
              OR (a.golongan_nama IS NOT NULL AND a.golongan_nama <> '')
            )
            AND a.nik IS NOT NULL AND a.nik <> ''
-           AND a.tmt_pensiun IS NOT NULL
+           AND ${effectiveTmtPensiunSql} IS NOT NULL
            AND sp.id IS NOT NULL
            AND sp.tanggal_lahir IS NOT NULL THEN 1
           ELSE 0
@@ -605,6 +724,9 @@ export class SidataRepository {
       LEFT JOIN asn_siasn_profile sp
         ON sp.asn_id = a.id
        AND sp.deleted_at IS NULL
+      LEFT JOIN ref_jabatan rj
+        ON rj.id = a.jabatan_ref_id
+       AND rj.deleted_at IS NULL
       WHERE ${whereSql}
     `);
 
@@ -755,136 +877,20 @@ export class SidataRepository {
     filters: NormalizedAsnFilters,
     skip: number,
     take: number,
+    whereInput?: Prisma.AsnWhereInput,
   ): Promise<string[]> {
-    const whereSql = await this.buildAsnWhereSql(filters);
-    const rows = await this.prisma.$queryRaw<OrderedAsnIdRow[]>(Prisma.sql`
-      SELECT sorted.id
-      FROM (
-        SELECT
-          a.id,
-          a.nama,
-          a.nip,
-          COALESCE(NULLIF(rg.kode, ''), '0') AS golongan_akhir_code_sort,
-          COALESCE(NULLIF(a.golongan_nama, ''), '') AS golongan_akhir_sort,
-          COALESCE(NULLIF(a.siasn_eselon_id, ''), NULLIF(a.eselon_nama, ''), '') AS eselon_sort,
-          COALESCE(a.kelas_jabatan, rj.kelas_jabatan, 0) AS kelas_jabatan_sort,
-          a.jenis_jabatan_nama,
-          COALESCE(a.jabatan_nama, rj.nama, '') AS jabatan_sort,
-          COALESCE(a.masa_kerja_tahun, 0) AS mk_tahun_sort,
-          COALESCE(a.masa_kerja_bulan, 0) AS mk_bulan_sort,
-          COALESCE(a.tmt_jabatan, a.tmt_golongan, a.created_at) AS tmt_masa_kerja_sort,
-          CASE
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?3|DOKTOR' THEN 9
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?2|MAGISTER' THEN 8
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'S[ -]?1|D[ -]?IV|DIPLOMA IV|SARJANA' THEN 7
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?III|DIPLOMA III' THEN 6
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?II|DIPLOMA II' THEN 5
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'D[ -]?I|DIPLOMA I' THEN 4
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMA|SMK|SLTA|MA' THEN 3
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SMP|SLTP|MTS' THEN 2
-            WHEN UPPER(COALESCE(a.tingkat_pendidikan_nama, a.pendidikan_nama, '')) REGEXP 'SD|MI' THEN 1
-            ELSE 0
-          END AS pendidikan_rank,
-          COALESCE(sp.tanggal_lahir, '9999-12-31') AS tanggal_lahir_sort,
-          COALESCE(NULLIF(rg.kode, ''), '0') AS golongan_kode_sort,
-          COALESCE(NULLIF(a.tipe_pegawai, ''), 'LAINNYA') AS tipe_pegawai_sort
-        FROM asn a
-        LEFT JOIN ref_golongan rg ON rg.id = a.golongan_ref_id
-        LEFT JOIN ref_jabatan rj ON rj.id = a.jabatan_ref_id
-        LEFT JOIN asn_siasn_profile sp ON sp.asn_id = a.id AND sp.deleted_at IS NULL
-        WHERE ${whereSql}
-      ) sorted
-      ORDER BY
-        CASE
-          WHEN sorted.tipe_pegawai_sort = 'PNS' THEN 1
-          WHEN sorted.tipe_pegawai_sort = 'PPPK' THEN 2
-          WHEN sorted.tipe_pegawai_sort = 'PPPK_PARUH_WAKTU' THEN 3
-          ELSE 4
-        END ASC,
-        CASE
-          WHEN UPPER(COALESCE(sorted.jenis_jabatan_nama, '')) LIKE '%STRUKTURAL%' THEN 1
-          WHEN UPPER(COALESCE(sorted.jenis_jabatan_nama, '')) LIKE '%FUNGSIONAL%' THEN 2
-          WHEN UPPER(COALESCE(sorted.jenis_jabatan_nama, '')) LIKE '%PELAKSANA%' THEN 3
-          ELSE 4
-        END ASC,
-        CASE
-          WHEN sorted.golongan_akhir_code_sort = '45' THEN 17
-          WHEN sorted.golongan_akhir_code_sort = '44' THEN 16
-          WHEN sorted.golongan_akhir_code_sort = '43' THEN 15
-          WHEN sorted.golongan_akhir_code_sort = '42' THEN 14
-          WHEN sorted.golongan_akhir_code_sort = '41' THEN 13
-          WHEN sorted.golongan_akhir_code_sort = '34' THEN 12
-          WHEN sorted.golongan_akhir_code_sort = '33' THEN 11
-          WHEN sorted.golongan_akhir_code_sort = '32' THEN 10
-          WHEN sorted.golongan_akhir_code_sort = '31' THEN 9
-          WHEN sorted.golongan_akhir_code_sort = '24' THEN 8
-          WHEN sorted.golongan_akhir_code_sort = '23' THEN 7
-          WHEN sorted.golongan_akhir_code_sort = '22' THEN 6
-          WHEN sorted.golongan_akhir_code_sort = '21' THEN 5
-          WHEN sorted.golongan_akhir_code_sort = '14' THEN 4
-          WHEN sorted.golongan_akhir_code_sort = '13' THEN 3
-          WHEN sorted.golongan_akhir_code_sort = '12' THEN 2
-          WHEN sorted.golongan_akhir_code_sort = '11' THEN 1
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%IV/E%' THEN 17
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%IV/D%' THEN 16
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%IV/C%' THEN 15
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%IV/B%' THEN 14
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%IV/A%' THEN 13
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%III/D%' THEN 12
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%III/C%' THEN 11
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%III/B%' THEN 10
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%III/A%' THEN 9
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%II/D%' THEN 8
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%II/C%' THEN 7
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%II/B%' THEN 6
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%II/A%' THEN 5
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%I/D%' THEN 4
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%I/C%' THEN 3
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%I/B%' THEN 2
-          WHEN UPPER(sorted.golongan_akhir_sort) LIKE '%I/A%' THEN 1
-          ELSE CAST(sorted.golongan_kode_sort AS UNSIGNED)
-        END DESC,
-        CASE
-          WHEN sorted.eselon_sort = '21' THEN 1
-          WHEN sorted.eselon_sort = '22' THEN 2
-          WHEN sorted.eselon_sort = '31' THEN 3
-          WHEN sorted.eselon_sort = '32' THEN 4
-          WHEN sorted.eselon_sort = '33' THEN 5
-          WHEN sorted.eselon_sort = '41' THEN 6
-          WHEN sorted.eselon_sort = '42' THEN 7
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'SEKRETARIS DAERAH%' THEN 1
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA BADAN%' THEN 2
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'INSPEKTUR%' THEN 2
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'SEKRETARIS DPRD%' THEN 2
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'ASISTEN %' THEN 3
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'STAF AHLI%' THEN 3
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'SEKRETARIS BADAN%' THEN 3
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'SEKRETARIS DINAS%' THEN 3
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA BAGIAN%' THEN 4
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA BIDANG%' THEN 4
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'CAMAT%' THEN 4
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'INSPEKTUR PEMBANTU%' THEN 4
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA SUB BAGIAN%' THEN 6
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA SUBBAGIAN%' THEN 6
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA SUB BIDANG%' THEN 6
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA SUBBIDANG%' THEN 6
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'KEPALA SEKSI%' THEN 6
-          WHEN UPPER(sorted.jabatan_sort) LIKE 'LURAH%' THEN 6
-          ELSE 99
-        END ASC,
-        sorted.kelas_jabatan_sort DESC,
-        sorted.jabatan_sort ASC,
-        sorted.mk_tahun_sort DESC,
-        sorted.mk_bulan_sort DESC,
-        sorted.tmt_masa_kerja_sort ASC,
-        sorted.pendidikan_rank DESC,
-        sorted.tanggal_lahir_sort ASC,
-        sorted.nama ASC,
-        sorted.nip ASC,
-        sorted.id ASC
-      LIMIT ${take}
-      OFFSET ${skip}
-    `);
+    const rows = await this.prisma.asn.findMany({
+      where: whereInput ?? await this.buildAsnWhere(filters),
+      select: { id: true },
+      orderBy: [
+        { tipePegawai: 'asc' },
+        { nama: 'asc' },
+        { nip: 'asc' },
+        { id: 'asc' },
+      ],
+      skip,
+      take,
+    });
 
     return rows.map((row) => row.id);
   }

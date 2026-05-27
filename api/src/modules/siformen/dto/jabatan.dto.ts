@@ -81,6 +81,21 @@ export class BulkImportJabatanDto {
   items!: BulkImportJabatanItemDto[];
 }
 
+export class AddJabatanFromRefDto {
+  @IsString()
+  @MaxLength(36)
+  refId!: string;
+
+  @IsString()
+  @MaxLength(200)
+  unitKerja!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  kodeJabatan?: string;
+}
+
 export class UpdateJabatanDto {
   @IsOptional()
   @IsString()

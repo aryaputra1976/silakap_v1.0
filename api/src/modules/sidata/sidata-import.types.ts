@@ -379,6 +379,7 @@ export const SIDATA_ASN_MAP_STATUS = {
 export type SidataAsnMappedData = {
   unitKerjaId: string | null;
   jabatanId: string | null;
+  jabatanBup?: number | null;
   golonganId: string | null;
   pangkatId: string | null;
   jenisAsnId: string | null;
@@ -453,6 +454,7 @@ export type CommitSiasnAsnRowResult = {
 export type SiasnAsnMappedDataForCommit = {
   unitKerjaId?: string | null;
   jabatanId?: string | null;
+  jabatanBup?: number | null;
   golonganId?: string | null;
   pangkatId?: string | null;
   jenisAsnId?: string | null;

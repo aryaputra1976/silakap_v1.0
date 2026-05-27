@@ -164,6 +164,8 @@ export type RefJabatanRecord = Prisma.RefJabatanGetPayload<{
   select: typeof jabatanSelect;
 }>;
 
+type AsnJabatanMapEntry = { id: string; jenisJabatanId: string; bup: number | null };
+
 // In-memory lookup maps pre-loaded once per mapping batch — eliminates N+1 queries
 type AsnReferenceMaps = {
   unitKerjaByKode: Map<string, string>;
@@ -171,9 +173,9 @@ type AsnReferenceMaps = {
   unitKerjaCandidatesByNama: Map<string, Array<{ id: string; parentId: string | null }>>;
   unitKerjaParentNameById: Map<string, string>;
   jenisJabatanByKode: Map<string, string>;
-  jabatanBySiasnKode: Map<string, { id: string; jenisJabatanId: string }>;
-  jabatanByKode: Map<string, { id: string; jenisJabatanId: string }>;
-  jabatanByNormalized: Array<{ id: string; namaNormalized: string; jenisJabatanId: string }>;
+  jabatanBySiasnKode: Map<string, AsnJabatanMapEntry>;
+  jabatanByKode: Map<string, AsnJabatanMapEntry>;
+  jabatanByNormalized: Array<AsnJabatanMapEntry & { namaNormalized: string }>;
   golonganByKode: Map<string, string>;
   golonganByNama: Map<string, string>;
   pangkatByNama: Map<string, string>;
@@ -621,7 +623,11 @@ export class SidataImportRepository {
           const bupRaw = this.pickRaw(normalizedRaw, ['bup', 'batas_usia_pensiun', 'batas_usia_pensiun_tahun']);
           const bup = bupRaw !== null
             ? parseInt(bupRaw, 10) || null
-            : this.inferBupFromJabatanJenjang(jenjang);
+            : this.inferBupFromJabatan({
+                nama: sourceName,
+                jenjang,
+                jenisJabatan: row.referenceType,
+              });
 
           const existing = await this.findExistingJabatanInTx(tx, {
             jenisJabatanId: params.jenisJabatanId,
@@ -2430,7 +2436,7 @@ export class SidataImportRepository {
           take: 20_000,
         }),
         this.prisma.refJenisJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true } }),
-        this.prisma.refJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, siasnKode: true, namaNormalized: true, jenisJabatanId: true }, take: 20_000 }),
+        this.prisma.refJabatan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, siasnKode: true, namaNormalized: true, jenisJabatanId: true, bup: true }, take: 20_000 }),
         this.prisma.refGolongan.findMany({ where: { deletedAt: null }, select: { id: true, kode: true, nama: true }, take: 5_000 }),
         this.prisma.refPangkat.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 5_000 }),
         this.prisma.refJenisAsn.findMany({ where: { deletedAt: null }, select: { id: true, nama: true }, take: 100 }),
@@ -2445,8 +2451,8 @@ export class SidataImportRepository {
     const simpleMap = (items: { id: string; nama: string }[]) =>
       new Map(items.map((i) => [norm(i.nama), i.id]));
 
-    const jabatanEntry = (j: { id: string; jenisJabatanId: string }) =>
-      ({ id: j.id, jenisJabatanId: j.jenisJabatanId });
+    const jabatanEntry = (j: { id: string; jenisJabatanId: string; bup: number | null }) =>
+      ({ id: j.id, jenisJabatanId: j.jenisJabatanId, bup: j.bup });
 
     const unitKerjaCandidatesByNama = new Map<string, Array<{ id: string; parentId: string | null }>>();
     for (const unit of unitKerjas) {
@@ -2477,7 +2483,7 @@ export class SidataImportRepository {
       ),
       jabatanByNormalized: jabatans
         .filter((j) => j.namaNormalized)
-        .map((j) => ({ id: j.id, namaNormalized: j.namaNormalized!, jenisJabatanId: j.jenisJabatanId })),
+        .map((j) => ({ id: j.id, namaNormalized: j.namaNormalized!, jenisJabatanId: j.jenisJabatanId, bup: j.bup })),
       golonganByKode: new Map(golongans.filter((g) => g.kode).map((g) => [g.kode!, g.id])),
       golonganByNama: simpleMap(golongans),
       pangkatByNama: simpleMap(pangkats),
@@ -2527,7 +2533,7 @@ export class SidataImportRepository {
       names: this.getUnitKerjaNameCandidates(row, raw),
     });
 
-    const jabatanId = this.findJabatanIdFromMaps(maps, {
+    const jabatan = this.findJabatanFromMaps(maps, {
       code: row.kdJabatan ?? row.kdJabatanSiasn ?? rawJabatanCode,
       name: row.namaJabatan,
       jenisJabatanKode: null,
@@ -2543,7 +2549,11 @@ export class SidataImportRepository {
 
     return {
       unitKerjaId,
-      jabatanId,
+      jabatanId: jabatan?.id ?? null,
+      jabatanBup: jabatan?.bup ?? this.rawBup(raw) ?? this.inferBupFromJabatan({
+        nama: row.namaJabatan,
+        jenisJabatan: row.jenisJabatan,
+      }),
       golonganId: fromMap(maps.golonganByKode, row.kdGolongan ?? row.kdGolonganSiasn, null)
         ?? fromMap(maps.golonganByNama, null, row.namaGolongan),
       pangkatId: fromMap(maps.pangkatByNama, null, row.namaRuang),
@@ -2621,10 +2631,10 @@ export class SidataImportRepository {
     return [...new Set(names)];
   }
 
-  private findJabatanIdFromMaps(
+  private findJabatanFromMaps(
     maps: AsnReferenceMaps,
     params: { code: string | null; name: string | null; jenisJabatanKode: string | null; jenisJabatanNama: string | null },
-  ): string | null {
+  ): AsnJabatanMapEntry | null {
     const code = params.code?.trim() || null;
     const name = params.name?.trim() || null;
     const jenisKode = this.normalizeJenisJabatanKode(params.jenisJabatanKode, params.jenisJabatanNama);
@@ -2635,13 +2645,13 @@ export class SidataImportRepository {
 
     if (code) {
       const bySiasnKode = maps.jabatanBySiasnKode.get(code);
-      if (bySiasnKode && matchesJenis(bySiasnKode)) return bySiasnKode.id;
+      if (bySiasnKode && matchesJenis(bySiasnKode)) return bySiasnKode;
       const byKode = maps.jabatanByKode.get(code);
-      if (byKode && matchesJenis(byKode)) return byKode.id;
+      if (byKode && matchesJenis(byKode)) return byKode;
       // Fallback without jenis filter
       if (jenisJabatanId) {
-        if (bySiasnKode) return bySiasnKode.id;
-        if (byKode) return byKode.id;
+        if (bySiasnKode) return bySiasnKode;
+        if (byKode) return byKode;
       }
     }
 
@@ -2650,20 +2660,20 @@ export class SidataImportRepository {
       const byNorm = maps.jabatanByNormalized.find(
         (j) => j.namaNormalized === normalized && matchesJenis(j),
       ) ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normalized);
-      if (byNorm) return byNorm.id;
+      if (byNorm) return byNorm;
 
       const stripped = this.stripPunctuation(name);
       const byStripped = maps.jabatanByNormalized.find(
         (j) => this.stripPunctuation(j.namaNormalized) === stripped && matchesJenis(j),
       ) ?? maps.jabatanByNormalized.find((j) => this.stripPunctuation(j.namaNormalized) === stripped);
-      if (byStripped) return byStripped.id;
+      if (byStripped) return byStripped;
 
       const guruLamaTarget = this.GURU_LAMA_MAP[name.trim().toUpperCase()];
       if (guruLamaTarget) {
         const normTarget = this.normalizeText(guruLamaTarget);
         const byGuru = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
           ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
-        if (byGuru) return byGuru.id;
+        if (byGuru) return byGuru;
       }
 
       const namaJenjangTarget = this.toNamaJenjangJabatan(name);
@@ -2671,7 +2681,7 @@ export class SidataImportRepository {
         const normTarget = this.normalizeText(namaJenjangTarget);
         const byNJ = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
           ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
-        if (byNJ) return byNJ.id;
+        if (byNJ) return byNJ;
       }
 
       const abbrevTarget = this.toAsnAbbreviationJabatan(name);
@@ -2679,7 +2689,7 @@ export class SidataImportRepository {
         const normTarget = this.normalizeText(abbrevTarget);
         const byAbbrev = maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget && matchesJenis(j))
           ?? maps.jabatanByNormalized.find((j) => j.namaNormalized === normTarget);
-        if (byAbbrev) return byAbbrev.id;
+        if (byAbbrev) return byAbbrev;
       }
     }
 
@@ -3407,12 +3417,18 @@ export class SidataImportRepository {
       'status pegawai',
       'status_cpns_pns',
     ]) ?? row.statusKepegawaian ?? kedudukanHukumNama;
+    const effectiveBup = mappedData.jabatanBup ?? this.rawBup(raw) ?? this.inferBupFromJabatan({
+      nama: row.namaJabatan,
+      jenisJabatan: row.jenisJabatan,
+    });
+    const effectiveTmtPensiun = row.tmtPensiun
+      ?? this.estimateTmtPensiunFromBirthDate(row.tanggalLahir, effectiveBup);
 
     const currentData = {
       siasnPnsId: this.rawString(raw, ['pns_id']),
       nip: row.nip ?? '',
       nipLama: row.nipLama,
-      nik: this.rawString(raw, ['nik']),
+      nik: row.nik ?? this.rawString(raw, ['nik', 'nomor_ktp', 'no_ktp', 'ktp']),
       nama: row.nama ?? '',
       namaSearch: this.normalizeText(row.nama ?? ''),
       gelarDepan: this.rawString(raw, ['gelar_depan']),
@@ -3421,10 +3437,10 @@ export class SidataImportRepository {
       jenisAsnRefId: mappedData.jenisAsnId ?? null,
       jenisAsnNama,
       statusAsn: row.statusKepegawaian ?? kedudukanHukumNama,
-      isActive: !row.tmtPensiun || new Date(row.tmtPensiun) > new Date(),
+      isActive: !effectiveTmtPensiun || new Date(effectiveTmtPensiun) > new Date(),
       kedudukanHukumRefId: mappedData.kedudukanHukumId ?? null,
       kedudukanHukumNama,
-      tmtPensiun: row.tmtPensiun,
+      tmtPensiun: effectiveTmtPensiun,
       unitKerjaId: mappedData.unitKerjaId ?? null,
       siasnUnorId,
       unorNama: row.unorNama ?? this.rawString(raw, ['unor_nama']),
@@ -3603,7 +3619,6 @@ export class SidataImportRepository {
     const mappedJson = row.mappedData
       ? (row.mappedData as Prisma.InputJsonValue)
       : Prisma.JsonNull;
-    const profileData = this.buildSiasnProfileData(row, mappedData, tipePegawai, raw);
     const rawChecksum = this.checksumJson({ rawData: row.rawData, mappedData: row.mappedData });
     const now = new Date();
     const siasnPnsId = this.rawString(raw, ['pns_id']);
@@ -3627,6 +3642,16 @@ export class SidataImportRepository {
       'pendidikan',
     ]);
     const tahunLulus = row.tahunLulus ?? this.rawInt(raw, ['tahun_lulus', 'tahun lulus']);
+    const effectiveBup = mappedData.jabatanBup ?? this.rawBup(raw) ?? this.inferBupFromJabatan({
+      nama: row.namaJabatan,
+      jenisJabatan: row.jenisJabatan,
+    });
+    const effectiveTmtPensiun = row.tmtPensiun
+      ?? this.estimateTmtPensiunFromBirthDate(row.tanggalLahir, effectiveBup);
+    const profileData = this.buildSiasnProfileData(row, mappedData, tipePegawai, raw, {
+      bup: effectiveBup,
+      tmtPensiun: effectiveTmtPensiun,
+    });
 
     await tx.asnSiasnProfile.upsert({
       where: { asnId },
@@ -3666,7 +3691,7 @@ export class SidataImportRepository {
         nomorSkPns: this.rawString(raw, ['nomor_sk_pns']) ?? row.noSk,
         tanggalSkPns: this.rawDate(raw, ['tanggal_sk_pns']) ?? row.tanggalSk,
         tmtPns: row.tmtPns,
-        tmtPensiun: row.tmtPensiun,
+        tmtPensiun: effectiveTmtPensiun,
         kpknId: this.rawString(raw, ['kpkn_id']),
         kpknNama: this.rawString(raw, ['kpkn_nama']),
         lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
@@ -3723,7 +3748,7 @@ export class SidataImportRepository {
         nomorSkPns: this.rawString(raw, ['nomor_sk_pns']) ?? row.noSk,
         tanggalSkPns: this.rawDate(raw, ['tanggal_sk_pns']) ?? row.tanggalSk,
         tmtPns: row.tmtPns,
-        tmtPensiun: row.tmtPensiun,
+        tmtPensiun: effectiveTmtPensiun,
         kpknId: this.rawString(raw, ['kpkn_id']),
         kpknNama: this.rawString(raw, ['kpkn_nama']),
         lokasiKerjaId: this.rawString(raw, ['lokasi_kerja_id']),
@@ -3922,6 +3947,7 @@ export class SidataImportRepository {
     mappedData: SiasnAsnMappedDataForCommit,
     tipePegawai: string | null,
     raw: Record<string, unknown>,
+    retirement: { bup: number | null; tmtPensiun: Date | null },
   ): Prisma.InputJsonValue {
     const golonganAkhirNama = this.rawString(raw, ['gol_akhir_nama', 'golongan_akhir_nama']) ?? row.namaGolongan;
 
@@ -3929,7 +3955,7 @@ export class SidataImportRepository {
       identity: {
         nip: row.nip,
         nipLama: row.nipLama,
-        nik: this.rawString(raw, ['nik']),
+        nik: row.nik ?? this.rawString(raw, ['nik', 'nomor_ktp', 'no_ktp', 'ktp']),
         nama: row.nama,
         gelarDepan: this.rawString(raw, ['gelar_depan']),
         gelarBelakang: this.rawString(raw, ['gelar_belakang']),
@@ -3947,6 +3973,8 @@ export class SidataImportRepository {
         kedudukanHukumId: this.rawString(raw, ['kedudukan_hukum_id']),
         kedudukanHukumNama: row.kedudukanHukum ?? this.rawString(raw, ['kedudukan_hukum_nama']),
         statusCpnsPns: this.rawString(raw, ['status_cpns_pns']),
+        bup: retirement.bup,
+        tmtPensiun: retirement.tmtPensiun?.toISOString() ?? null,
       },
       assignment: {
         unitKerjaId: mappedData.unitKerjaId ?? null,
@@ -3974,7 +4002,7 @@ export class SidataImportRepository {
         tahunLulus: row.tahunLulus ?? this.rawInt(raw, ['tahun_lulus']),
         namaSekolah: row.namaSekolah,
       },
-      mappedReference: mappedData as Record<string, string | null | undefined>,
+      mappedReference: mappedData as Record<string, unknown>,
     } as Prisma.InputJsonValue;
   }
 
@@ -4049,6 +4077,7 @@ export class SidataImportRepository {
     return {
       unitKerjaId: this.toNullableStringFromJson(record['unitKerjaId']),
       jabatanId: this.toNullableStringFromJson(record['jabatanId']),
+      jabatanBup: this.toNullableNumberFromJson(record['jabatanBup']),
       golonganId: this.toNullableStringFromJson(record['golonganId']),
       pangkatId: this.toNullableStringFromJson(record['pangkatId']),
       jenisAsnId: this.toNullableStringFromJson(record['jenisAsnId']),
@@ -4065,6 +4094,13 @@ export class SidataImportRepository {
     if (typeof value !== 'string') return null;
     const normalized = value.trim();
     return normalized || null;
+  }
+
+  private toNullableNumberFromJson(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value !== 'string') return null;
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private checksumJson(value: unknown): string {
@@ -4116,6 +4152,20 @@ export class SidataImportRepository {
     if (!value) return null;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private rawBup(raw: Record<string, unknown>): number | null {
+    const value = this.rawInt(raw, [
+      'bup',
+      'batas_usia_pensiun',
+      'batas usia pensiun',
+      'batas_usia_pensiun_tahun',
+      'usia_pensiun',
+      'usia pensiun',
+    ]);
+
+    if (value === null) return null;
+    return value >= 45 && value <= 70 ? value : null;
   }
 
   private rawDate(raw: Record<string, unknown>, candidates: string[]): Date | null {
@@ -4273,6 +4323,36 @@ export class SidataImportRepository {
     if (normalizedJenjang === '99') return 60;
     if (['31', '32', '41', '42'].includes(normalizedJenjang)) return 58;
     return null;
+  }
+
+  private inferBupFromJabatan(params: {
+    nama?: string | null;
+    jenjang?: string | null;
+    jenisJabatan?: string | null;
+  }): number | null {
+    const fromJenjang = this.inferBupFromJabatanJenjang(params.jenjang);
+    if (fromJenjang !== null) return fromJenjang;
+
+    const nama = (params.nama ?? '').trim().toUpperCase();
+    const jenisJabatan = (params.jenisJabatan ?? '').trim().toUpperCase();
+    if (!nama && !jenisJabatan) return null;
+
+    if (nama.includes('GURU')) return 60;
+    if (nama.includes('AHLI UTAMA')) return 65;
+    if (nama.includes('AHLI MADYA')) return 60;
+    if (nama.includes('AHLI MUDA') || nama.includes('AHLI PERTAMA')) return 58;
+    if (jenisJabatan.includes('FUNGSIONAL') && nama) return 58;
+    if (nama) return 58;
+
+    return null;
+  }
+
+  private estimateTmtPensiunFromBirthDate(tanggalLahir: Date | null | undefined, bup: number | null | undefined): Date | null {
+    if (!tanggalLahir || !bup) return null;
+    const year = tanggalLahir.getUTCFullYear() + bup;
+    const month = tanggalLahir.getUTCMonth() + 1;
+    const day = tanggalLahir.getUTCDate();
+    return this.dateOnlyUtc(year, month, day);
   }
 
   private isMissingReferenceMessage(message: string): boolean {
@@ -4543,27 +4623,37 @@ export class SidataImportRepository {
     const existingJabatans = await this.prisma.refJabatan.findMany({
       where: { deletedAt: null },
       select: {
+        id: true,
         jenisJabatanId: true,
         kode: true,
         siasnKode: true,
         namaNormalized: true,
+        bup: true,
       },
       take: 20_000,
     });
     const existingKeys = new Set<string>();
+    const existingByKey = new Map<string, { id: string; bup: number | null }>();
     for (const jabatan of existingJabatans) {
       if (jabatan.namaNormalized) {
-        existingKeys.add(`${jabatan.jenisJabatanId}|name|${jabatan.namaNormalized}`);
+        const key = `${jabatan.jenisJabatanId}|name|${jabatan.namaNormalized}`;
+        existingKeys.add(key);
+        existingByKey.set(key, { id: jabatan.id, bup: jabatan.bup });
       }
       if (jabatan.kode) {
-        existingKeys.add(`${jabatan.jenisJabatanId}|code|${jabatan.kode}`);
+        const key = `${jabatan.jenisJabatanId}|code|${jabatan.kode}`;
+        existingKeys.add(key);
+        existingByKey.set(key, { id: jabatan.id, bup: jabatan.bup });
       }
       if (jabatan.siasnKode) {
-        existingKeys.add(`${jabatan.jenisJabatanId}|code|${jabatan.siasnKode}`);
+        const key = `${jabatan.jenisJabatanId}|code|${jabatan.siasnKode}`;
+        existingKeys.add(key);
+        existingByKey.set(key, { id: jabatan.id, bup: jabatan.bup });
       }
     }
 
     const data: Prisma.RefJabatanCreateManyInput[] = [];
+    const bupBackfills = new Map<string, number>();
     for (const pair of pairs.values()) {
       const jenisJabatanId = jenisIdByKode.get(pair.jenisKode);
       if (!jenisJabatanId) continue;
@@ -4571,6 +4661,15 @@ export class SidataImportRepository {
       const namaNormalized = this.normalizeText(pair.nama);
       const codeKey = pair.kode ? `${jenisJabatanId}|code|${pair.kode}` : null;
       const nameKey = `${jenisJabatanId}|name|${namaNormalized}`;
+      const inferredBup = this.inferBupFromJabatan({
+        nama: pair.nama,
+        jenisJabatan: pair.jenisNama,
+      });
+      const existing = existingByKey.get(nameKey) ?? (codeKey ? existingByKey.get(codeKey) : undefined);
+      if (existing) {
+        if (existing.bup === null && inferredBup !== null) bupBackfills.set(existing.id, inferredBup);
+        continue;
+      }
       if (existingKeys.has(nameKey) || (codeKey && existingKeys.has(codeKey))) continue;
 
       data.push({
@@ -4582,6 +4681,7 @@ export class SidataImportRepository {
         siasnId: pair.kode,
         siasnKode: pair.kode,
         siasnNama: pair.nama,
+        bup: inferredBup,
         source: 'SIASN_ASN_EXTRACT',
         isActive: true,
       });
@@ -4589,10 +4689,18 @@ export class SidataImportRepository {
       if (codeKey) existingKeys.add(codeKey);
     }
 
-    if (data.length === 0) return 0;
+    for (const [id, bup] of bupBackfills) {
+      await this.prisma.refJabatan.update({
+        where: { id },
+        data: { bup },
+        select: simpleIdSelect,
+      });
+    }
+
+    if (data.length === 0) return bupBackfills.size;
 
     const result = await this.prisma.refJabatan.createMany({ data });
-    return result.count;
+    return result.count + bupBackfills.size;
   }
 
   private async upsertUnitKerjaBulk(

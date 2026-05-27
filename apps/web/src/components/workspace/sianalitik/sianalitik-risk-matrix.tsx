@@ -63,7 +63,7 @@ function buildRisks(
       module: 'Kinerja',
       title: `${belumBukti.length} target RHK belum ada bukti`,
       detail: 'Realisasi tanpa bukti tidak dapat disetujui',
-      link: '/kinerja-bidang/laporan',
+      link: '/kinerja-bidang/report',
     });
   } else if (belumBukti.length > 0) {
     risks.push({
@@ -72,7 +72,7 @@ function buildRisks(
       module: 'Kinerja',
       title: `${belumBukti.length} target RHK belum ada bukti`,
       detail: 'Segera lengkapi bukti dukung',
-      link: '/kinerja-bidang/laporan',
+      link: '/kinerja-bidang/report',
     });
   }
 

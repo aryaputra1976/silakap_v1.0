@@ -1,4 +1,5 @@
 import { AppRouting } from '@/routing/app-routing';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter } from 'react-router-dom';
@@ -8,8 +9,13 @@ import { AuthProvider } from '@/lib/auth/session';
 
 const { BASE_URL } = import.meta.env;
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+});
+
 export function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <ThemeProvider
       attribute="class"
       defaultTheme="light"
@@ -29,5 +35,6 @@ export function App() {
         </LoadingBarContainer>
       </HelmetProvider>
     </ThemeProvider>
+    </QueryClientProvider>
   );
 }

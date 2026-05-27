@@ -1,6 +1,13 @@
 import { IsDateString, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class GenerateBezettingDto {
+  @IsInt()
+  @Min(2000)
+  @Type(() => Number)
+  tahun!: number;
+}
+
 export enum BezettingStatusIsi {
   VACANT = 'VACANT',
   FILLED = 'FILLED',

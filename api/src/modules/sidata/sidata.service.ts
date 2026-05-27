@@ -12,6 +12,7 @@ import {
   AsnChangeLogRecord,
   AsnDocumentRecord,
   AsnGolonganHistoryRecord,
+  AsnListRecord,
   AsnRecord,
   SidataRepository,
   UnitKerjaRecord,
@@ -111,6 +112,8 @@ type PaginatedAsnResponse = {
   limit: number;
   total: number;
 };
+
+type AsnResponseRecord = AsnRecord | AsnListRecord;
 
 type AsnHistoryBatch = {
   id: string;
@@ -1077,20 +1080,13 @@ export class SidataService {
     };
   }
 
-  private getGolonganAkhirNama(asn: AsnRecord): string | null {
+  private getGolonganAkhirNama(asn: AsnResponseRecord): string | null {
     const latestGolongan = asn.golonganHistory[0];
-    const rawData = asn.siasnProfile?.rawData;
-    const raw =
-      rawData && typeof rawData === 'object' && !Array.isArray(rawData)
-        ? rawData as Record<string, unknown>
-        : {};
     const golonganCode =
       latestGolongan?.siasnGolonganAkhirId
-      || this.pickJsonText(raw, ['gol_akhir_id', 'golongan_akhir_id', 'Gol Akhir ID', 'Golongan Akhir ID'])
       || asn.siasnGolonganId;
     const golonganName =
       latestGolongan?.golonganAkhirNama?.trim()
-      || this.pickJsonText(raw, ['gol_akhir_nama', 'golongan_akhir_nama', 'Gol Akhir Nama', 'Golongan Akhir Nama'])
       || latestGolongan?.golonganNama?.trim()
       || asn.golonganNama;
 
@@ -1104,7 +1100,7 @@ export class SidataService {
     );
   }
 
-  private isPppkAsn(asn: AsnRecord): boolean {
+  private isPppkAsn(asn: AsnResponseRecord): boolean {
     const type = `${asn.tipePegawai ?? asn.jenisAsnNama ?? ''}`.toUpperCase();
     return type.includes('PPPK');
   }
@@ -1136,7 +1132,7 @@ export class SidataService {
     return map[code] ?? null;
   }
 
-  private formatMasaKerja(asn: AsnRecord): string | null {
+  private formatMasaKerja(asn: AsnResponseRecord): string | null {
     if (asn.masaKerjaTahun !== null && asn.masaKerjaTahun !== undefined) {
       const bulan = asn.masaKerjaBulan ?? 0;
       return `${asn.masaKerjaTahun} tahun ${bulan} bulan`;
@@ -1176,13 +1172,13 @@ export class SidataService {
     return age >= 0 ? age : null;
   }
 
-  private getEffectiveTmtPensiun(asn: AsnRecord): Date | null {
+  private getEffectiveTmtPensiun(asn: AsnResponseRecord): Date | null {
     return asn.tmtPensiun
       ?? asn.siasnProfile?.tmtPensiun
       ?? this.calculateEstimatedTmtPensiun(asn);
   }
 
-  private calculateEstimatedTmtPensiun(asn: AsnRecord): Date | null {
+  private calculateEstimatedTmtPensiun(asn: AsnResponseRecord): Date | null {
     const birthDate = asn.siasnProfile?.tanggalLahir;
     const bupYears = this.resolveBupYears(asn);
 
@@ -1195,41 +1191,11 @@ export class SidataService {
     ));
   }
 
-  private resolveBupYears(asn: AsnRecord): number | null {
+  private resolveBupYears(asn: AsnResponseRecord): number | null {
     return asn.jabatanRef?.bup ?? null;
   }
 
-  private pickJsonText(value: Record<string, unknown>, keys: string[]): string | null {
-    const normalizedValueByKey = new Map(
-      Object.entries(value).map(([key, item]) => [this.normalizeJsonKey(key), item]),
-    );
-
-    for (const key of keys) {
-      const direct = value[key];
-      if (direct !== null && direct !== undefined) {
-        const text = String(direct).trim();
-        if (text) return text;
-      }
-
-      const normalized = normalizedValueByKey.get(this.normalizeJsonKey(key));
-      if (normalized !== null && normalized !== undefined) {
-        const text = String(normalized).trim();
-        if (text) return text;
-      }
-    }
-
-    return null;
-  }
-
-  private normalizeJsonKey(value: string): string {
-    return value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-  }
-
-  private toAsnResponse(asn: AsnRecord): AsnResponse {
+  private toAsnResponse(asn: AsnResponseRecord): AsnResponse {
     return {
       id: asn.id,
       nip: asn.nip,
