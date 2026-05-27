@@ -6,7 +6,6 @@ import {
   ActionButton,
   ErrorAlert,
   PageHeader,
-  SectionCard,
   inputClass,
 } from '@/components/workspace/ui';
 
@@ -61,93 +60,94 @@ export function SiapCaseNewPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Buat Kasus SIAP"
-        description="Buat kasus layanan kepegawaian baru. Kasus akan dibuat dalam status DRAFT."
+        title="Buat Kasus"
+        description="Isi jenis layanan dan judul kasus. Detail lain bisa dilengkapi setelah kasus dibuat."
       />
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-        <SectionCard title="Informasi Kasus">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2 flex flex-col gap-1.5">
-              <label className="text-sm font-medium">
-                Jenis Layanan <span className="text-destructive">*</span>
-              </label>
-              <select
-                className={inputClass}
-                value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                required
-              >
-                <option value="">Pilih jenis layanan...</option>
-                {SERVICE_TYPES.map((st) => (
-                  <option key={st.value} value={st.value}>
-                    {st.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="sm:col-span-2 flex flex-col gap-1.5">
-              <label className="text-sm font-medium">
-                Judul Kasus <span className="text-destructive">*</span>
-              </label>
-              <input
-                className={inputClass}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Kenaikan Pangkat Periode April 2026 - Ahmad Fauzi"
-                maxLength={200}
-                required
-              />
-              <p className="text-xs text-muted-foreground">{title.length}/200 karakter</p>
-            </div>
-
-            <div className="sm:col-span-2 flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Deskripsi</label>
-              <textarea
-                className={`${inputClass} min-h-[90px] resize-y`}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Keterangan tambahan (opsional)..."
-                maxLength={2000}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">ID ASN Terkait</label>
-              <input
-                className={inputClass}
-                value={asnId}
-                onChange={(e) => setAsnId(e.target.value)}
-                placeholder="ID ASN (opsional)"
-                maxLength={36}
-              />
-              <p className="text-xs text-muted-foreground">
-                Kosongkan jika kasus tidak terkait ASN tertentu.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Prioritas</label>
-              <select
-                className={inputClass}
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <form onSubmit={(e) => void handleSubmit(e)} className="max-w-3xl space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">
+              Jenis Layanan <span className="text-destructive">*</span>
+            </label>
+            <select
+              className={inputClass}
+              value={serviceType}
+              onChange={(e) => setServiceType(e.target.value)}
+              required
+            >
+              <option value="">Pilih layanan</option>
+              {SERVICE_TYPES.map((st) => (
+                <option key={st.value} value={st.value}>
+                  {st.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </SectionCard>
 
-        <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">
+              Judul Kasus <span className="text-destructive">*</span>
+            </label>
+            <input
+              className={inputClass}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Contoh: Kenaikan pangkat Ahmad Fauzi"
+              maxLength={200}
+              required
+            />
+          </div>
+
+          <details className="rounded-lg border border-slate-200 bg-slate-50/70">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">
+              Tambahan opsional
+            </summary>
+            <div className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
+              <div className="sm:col-span-2 flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Catatan</label>
+                <textarea
+                  className={`${inputClass} min-h-[90px] resize-y bg-white`}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Tambahkan informasi singkat bila perlu"
+                  maxLength={2000}
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">ASN terkait</label>
+                <input
+                  className={`${inputClass} bg-white`}
+                  value={asnId}
+                  onChange={(e) => setAsnId(e.target.value)}
+                  placeholder="Tempel ID ASN bila ada"
+                  maxLength={36}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Prioritas</label>
+                <select
+                  className={`${inputClass} bg-white`}
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
           <ActionButton type="submit" disabled={submitting || !serviceType || !title.trim()}>
             {submitting ? 'Menyimpan...' : 'Buat Kasus'}
           </ActionButton>

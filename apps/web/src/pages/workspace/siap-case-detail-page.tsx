@@ -192,7 +192,7 @@ export function SiapCaseDetailPage() {
       {actionError ? <ErrorAlert message={actionError} /> : null}
 
       {/* Case info */}
-      <SectionCard title="Informasi Kasus">
+      <SectionCard title="Ringkasan Kasus">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <InfoField label="Jenis Layanan">
             {caseData.serviceType.replace(/_/g, ' ')}
@@ -222,14 +222,14 @@ export function SiapCaseDetailPage() {
         {caseData.status === 'DRAFT' && canCreate && (
           <div className="mt-5 border-t border-border pt-4">
             <p className="mb-3 text-sm text-muted-foreground">
-              Kasus masih berstatus <strong>DRAFT</strong>. Submit untuk memulai proses verifikasi.
+              Kasus belum dikirim. Kirim untuk memulai proses.
             </p>
             <ActionButton
               icon={Send}
               disabled={working === 'submit'}
               onClick={() => void handleSubmitCase()}
             >
-              {working === 'submit' ? 'Memproses...' : 'Submit Kasus'}
+              {working === 'submit' ? 'Memproses...' : 'Kirim Kasus'}
             </ActionButton>
           </div>
         )}
@@ -237,12 +237,12 @@ export function SiapCaseDetailPage() {
 
       {/* Tasks */}
       <SectionCard
-        title={`Task (${caseData.tasks.length})`}
-        description={activeTasks.length > 0 ? `${activeTasks.length} task aktif` : 'Semua task selesai'}
+        title={`Tugas (${caseData.tasks.length})`}
+        description={activeTasks.length > 0 ? `${activeTasks.length} tugas aktif` : 'Semua tugas selesai'}
       >
         {caseData.tasks.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            Belum ada task. Submit kasus terlebih dahulu.
+            Belum ada tugas. Kirim kasus terlebih dahulu.
           </p>
         ) : (
           <div className="divide-y divide-border">
@@ -271,12 +271,12 @@ export function SiapCaseDetailPage() {
 
       {/* SLA Tracking */}
       {caseData.slaTracking.length > 0 && (
-        <SectionCard title="SLA Tracking">
+        <SectionCard title="Batas Waktu">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-semibold text-muted-foreground">
-                  <th className="pb-2 pr-4">State</th>
+                  <th className="pb-2 pr-4">Tahap</th>
                   <th className="pb-2 pr-4">Mulai</th>
                   <th className="pb-2 pr-4">Batas</th>
                   <th className="pb-2 pr-4">Selesai</th>
@@ -307,13 +307,13 @@ export function SiapCaseDetailPage() {
       )}
 
       {/* Timeline */}
-      <SectionCard title="Timeline Kasus">
+      <SectionCard title="Riwayat Kasus">
         <Timeline items={timelineItems} empty="Belum ada riwayat" />
       </SectionCard>
 
       {/* Workflow log */}
       {caseData.workflowLogs.length > 0 && (
-        <SectionCard title="Log Workflow">
+        <SectionCard title="Catatan Proses">
           <div className="space-y-2">
             {(caseData.workflowLogs as WorkflowLog[]).map((log) => (
               <div key={log.id} className="rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-sm">
@@ -344,13 +344,13 @@ export function SiapCaseDetailPage() {
           <div className="w-full max-w-md rounded-xl border border-border bg-white p-6 shadow-xl">
             {modal.type === 'complete' && (
               <>
-                <h2 className="mb-4 text-base font-semibold">Selesaikan Task</h2>
+                <h2 className="mb-4 text-base font-semibold">Selesaikan Tugas</h2>
                 <label className="mb-1 block text-sm font-medium">Catatan (opsional)</label>
                 <textarea
                   className={`${inputClass} min-h-[80px] resize-y`}
                   value={modal.note}
                   onChange={(e) => setModal({ ...modal, note: e.target.value })}
-                  placeholder="Catatan penyelesaian..."
+                  placeholder="Contoh: Berkas sudah diverifikasi"
                   rows={3}
                 />
               </>
@@ -358,17 +358,17 @@ export function SiapCaseDetailPage() {
 
             {modal.type === 'assign' && (
               <>
-                <h2 className="mb-4 text-base font-semibold">Tugaskan Task</h2>
+                <h2 className="mb-4 text-base font-semibold">Tugaskan</h2>
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium">
-                      ID User <span className="text-destructive">*</span>
+                      ID Pengguna <span className="text-destructive">*</span>
                     </label>
                     <input
                       className={inputClass}
                       value={modal.assignedTo}
                       onChange={(e) => setModal({ ...modal, assignedTo: e.target.value })}
-                      placeholder="ID pengguna yang ditugaskan"
+                      placeholder="Tempel ID pengguna penerima tugas"
                     />
                   </div>
                   <div>
@@ -377,7 +377,7 @@ export function SiapCaseDetailPage() {
                       className={inputClass}
                       value={modal.note}
                       onChange={(e) => setModal({ ...modal, note: e.target.value })}
-                      placeholder="Catatan penugasan (opsional)"
+                      placeholder="Catatan singkat bila perlu"
                     />
                   </div>
                 </div>
@@ -386,7 +386,7 @@ export function SiapCaseDetailPage() {
 
             {modal.type === 'return' && (
               <>
-                <h2 className="mb-4 text-base font-semibold">Kembalikan Task</h2>
+                <h2 className="mb-4 text-base font-semibold">Kembalikan Tugas</h2>
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium">
@@ -396,17 +396,17 @@ export function SiapCaseDetailPage() {
                       className={`${inputClass} min-h-[80px] resize-y`}
                       value={modal.reason}
                       onChange={(e) => setModal({ ...modal, reason: e.target.value })}
-                      placeholder="Alasan pengembalian task..."
+                      placeholder="Jelaskan alasan pengembalian"
                       rows={3}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium">Target Role</label>
+                    <label className="mb-1 block text-sm font-medium">Role tujuan</label>
                     <input
                       className={inputClass}
                       value={modal.targetRole}
                       onChange={(e) => setModal({ ...modal, targetRole: e.target.value })}
-                      placeholder="Contoh: ADMIN_BKPSDM (opsional)"
+                      placeholder="Opsional"
                     />
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export function SiapCaseDetailPage() {
                 disabled={!!working}
                 onClick={() => void handleModalConfirm()}
               >
-                {working ? 'Memproses...' : 'Konfirmasi'}
+                {working ? 'Memproses...' : 'Simpan'}
               </ActionButton>
               <ActionButton
                 variant="secondary"

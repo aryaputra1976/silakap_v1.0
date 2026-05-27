@@ -12,13 +12,13 @@ import {
 } from '@/components/workspace/ui';
 
 const defaultCategories = [
-  'VERIFIKASI_BERKAS',
-  'VALIDASI_DATA',
-  'ARSIP_DIGITAL',
-  'LAYANAN_ASN',
-  'RAPAT_KOORDINASI',
-  'LAPORAN',
-  'LAINNYA',
+  { value: 'VERIFIKASI_BERKAS', label: 'Verifikasi Berkas' },
+  { value: 'VALIDASI_DATA', label: 'Validasi Data' },
+  { value: 'ARSIP_DIGITAL', label: 'Arsip Digital' },
+  { value: 'LAYANAN_ASN', label: 'Layanan ASN' },
+  { value: 'RAPAT_KOORDINASI', label: 'Rapat / Koordinasi' },
+  { value: 'LAPORAN', label: 'Laporan' },
+  { value: 'LAINNYA', label: 'Lainnya' },
 ];
 
 export type WorklogFormState = {
@@ -70,16 +70,15 @@ export function SiapWorklogForm({
   return (
     <SectionCard
       title={editing ? 'Edit Buku Kerja' : 'Tambah Buku Kerja'}
-      description="Isi data pekerjaan harian. Buku kerja masih dapat diedit selama DRAFT atau REVISION_REQUIRED."
       actions={
         <ActionButton icon={X} onClick={onClose} variant="secondary">
           Tutup
         </ActionButton>
       }
     >
-      <form className="grid gap-4" onSubmit={onSubmit}>
+      <form className="grid max-w-4xl gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Tanggal Kerja">
+          <Field label="Tanggal">
             <input
               className={inputClass}
               required
@@ -97,14 +96,14 @@ export function SiapWorklogForm({
               onChange={(event) => update('category', event.target.value)}
             >
               {defaultCategories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category.value} value={category.value}>
+                  {category.label}
                 </option>
               ))}
             </select>
           </Field>
 
-          <Field label="Volume / Jumlah">
+          <Field label="Jumlah">
             <input
               className={inputClass}
               min={0}
@@ -116,33 +115,33 @@ export function SiapWorklogForm({
           </Field>
         </div>
 
-        <Field label="Judul Kegiatan">
+        <Field label="Kegiatan">
           <input
             className={inputClass}
             required
             value={form.title}
             onChange={(event) => update('title', event.target.value)}
-            placeholder="Contoh: Verifikasi berkas pensiun BUP"
+            placeholder="Contoh: Verifikasi berkas pensiun"
           />
         </Field>
 
-        <Field label="Uraian Pekerjaan">
+        <Field label="Uraian singkat">
           <textarea
             className={textareaClass}
             required
             value={form.description}
             onChange={(event) => update('description', event.target.value)}
-            placeholder="Jelaskan pekerjaan yang dilakukan hari ini."
+            placeholder="Tuliskan pekerjaan yang dilakukan"
           />
         </Field>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Output / Hasil">
+          <Field label="Hasil">
             <textarea
               className={textareaClass}
               value={form.output}
               onChange={(event) => update('output', event.target.value)}
-              placeholder="Contoh: 12 berkas diperiksa."
+              placeholder="Contoh: 12 berkas diperiksa"
             />
           </Field>
 
@@ -151,34 +150,39 @@ export function SiapWorklogForm({
               className={textareaClass}
               value={form.obstacle}
               onChange={(event) => update('obstacle', event.target.value)}
-              placeholder="Isi jika ada kendala."
+              placeholder="Isi bila ada"
             />
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Case ID Opsional">
-            <input
-              className={inputClass}
-              value={form.caseId}
-              onChange={(event) => update('caseId', event.target.value)}
-              placeholder="Isi jika terkait case SIAP"
-            />
-          </Field>
+        <details className="rounded-lg border border-slate-200 bg-slate-50/70">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">
+            Hubungkan ke kasus/tugas
+          </summary>
+          <div className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2">
+            <Field label="ID Kasus">
+              <input
+                className={`${inputClass} bg-white`}
+                value={form.caseId}
+                onChange={(event) => update('caseId', event.target.value)}
+                placeholder="Tempel ID kasus bila perlu"
+              />
+            </Field>
 
-          <Field label="Task ID Opsional">
-            <input
-              className={inputClass}
-              value={form.taskId}
-              onChange={(event) => update('taskId', event.target.value)}
-              placeholder="Isi jika terkait task SIAP"
-            />
-          </Field>
-        </div>
+            <Field label="ID Tugas">
+              <input
+                className={`${inputClass} bg-white`}
+                value={form.taskId}
+                onChange={(event) => update('taskId', event.target.value)}
+                placeholder="Tempel ID tugas bila perlu"
+              />
+            </Field>
+          </div>
+        </details>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end border-t border-slate-100 pt-4">
           <ActionButton disabled={saving} icon={Save} type="submit">
-            {saving ? 'Menyimpan...' : 'Simpan Buku Kerja'}
+            {saving ? 'Menyimpan...' : 'Simpan'}
           </ActionButton>
         </div>
       </form>

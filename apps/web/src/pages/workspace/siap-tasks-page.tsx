@@ -32,13 +32,13 @@ import {
 import { useAuth } from '@/lib/auth/session';
 
 const taskStatuses = [
-  'ASSIGNED',
-  'IN_PROGRESS',
-  'WAITING',
-  'RETURNED',
-  'OVERDUE',
-  'COMPLETED',
-  'CANCELLED',
+  { value: 'ASSIGNED', label: 'Belum Dikerjakan' },
+  { value: 'IN_PROGRESS', label: 'Sedang Dikerjakan' },
+  { value: 'WAITING', label: 'Menunggu' },
+  { value: 'RETURNED', label: 'Dikembalikan' },
+  { value: 'OVERDUE', label: 'Terlambat' },
+  { value: 'COMPLETED', label: 'Selesai' },
+  { value: 'CANCELLED', label: 'Batal' },
 ];
 
 export function SiapTasksPage() {
@@ -163,9 +163,9 @@ export function SiapTasksPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={taskType === 'DISPOSISI' ? 'Disposisi & Arahan' : taskType === 'TINDAK_LANJUT' ? 'Tindak Lanjut' : 'SIAP Tasks'}
-        description={taskType === 'DISPOSISI' ? 'Task disposisi dan arahan dari pimpinan.' : taskType === 'TINDAK_LANJUT' ? 'Task tindak lanjut yang perlu diselesaikan.' : 'Task workflow aktif yang dapat diproses berdasarkan user, assignee, dan role.'}
-        meta={<StatusBadge value={`${data?.total ?? 0} TASK`} tone="info" />}
+        title={taskType === 'DISPOSISI' ? 'Disposisi & Arahan' : taskType === 'TINDAK_LANJUT' ? 'Tindak Lanjut' : 'Tugas SIAP'}
+        description="Daftar pekerjaan yang perlu diproses."
+        meta={<StatusBadge value={`${data?.total ?? 0} tugas`} tone="info" />}
         actions={
           <>
             {canProcessSla ? (
@@ -175,7 +175,7 @@ export function SiapTasksPage() {
                 onClick={() => void processSlaOverdue()}
                 variant={overdueTotal > 0 ? 'danger' : 'secondary'}
               >
-                Process SLA Overdue
+                Cek Keterlambatan
               </ActionButton>
             ) : null}
 
@@ -222,7 +222,7 @@ export function SiapTasksPage() {
             value={taskType}
             onChange={(event) => changeTaskType(event.target.value)}
           >
-            <option value="">Semua tipe task</option>
+            <option value="">Semua jenis tugas</option>
             <option value="DISPOSISI">Disposisi</option>
             <option value="TINDAK_LANJUT">Tindak Lanjut</option>
             <option value="VERIFIKASI">Verifikasi</option>
@@ -235,15 +235,15 @@ export function SiapTasksPage() {
           >
             <option value="">Semua status</option>
             {taskStatuses.map((item) => (
-              <option key={item} value={item}>
-                {item}
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
         </FilterBar>
       </Toolbar>
 
-      <SectionCard title="Task Queue" description="Gunakan aksi hanya pada status yang valid.">
+      <SectionCard title="Daftar Tugas">
         {loading ? (
           <LoadingState label="Memuat task SIAP" />
         ) : (
@@ -254,7 +254,7 @@ export function SiapTasksPage() {
             columns={[
               {
                 key: 'title',
-                header: 'Task',
+                header: 'Tugas',
                 render: (item) => (
                   <div>
                     <div className="font-semibold text-zinc-950">{item.title}</div>
@@ -264,7 +264,7 @@ export function SiapTasksPage() {
               },
               {
                 key: 'case',
-                header: 'Case',
+                header: 'Kasus',
                 render: (item) => (
                   <div>
                     <div className="font-medium text-zinc-900">{item.case?.caseNumber ?? item.caseId}</div>
@@ -274,24 +274,24 @@ export function SiapTasksPage() {
               },
               { key: 'status', header: 'Status', render: (item) => <WorkflowBadge value={item.status} /> },
               { key: 'sla', header: 'SLA', render: (item) => <SlaBadge dueDate={item.dueDate} status={item.status} /> },
-              { key: 'priority', header: 'Priority', render: (item) => <StatusBadge value={item.priority} /> },
-              { key: 'due', header: 'Due Date', render: (item) => formatDate(item.dueDate) },
+              { key: 'priority', header: 'Prioritas', render: (item) => <StatusBadge value={item.priority} /> },
+              { key: 'due', header: 'Batas Waktu', render: (item) => formatDate(item.dueDate) },
               {
                 key: 'actions',
-                header: 'Action',
+                header: 'Aksi',
                 render: (item) => (
                   <div className="flex flex-wrap gap-2">
                     {item.status === 'ASSIGNED' ? (
                       <ActionButton disabled={workingId === item.id} icon={Play} onClick={() => mutateTask(item.id, 'start')} variant="secondary">
-                        Start
+                        Mulai
                       </ActionButton>
                     ) : null}
                     {item.status === 'IN_PROGRESS' ? (
                       <ActionButton disabled={workingId === item.id} icon={CheckCircle2} onClick={() => mutateTask(item.id, 'complete')}>
-                        Complete
+                        Selesai
                       </ActionButton>
                     ) : null}
-                    {item.status !== 'ASSIGNED' && item.status !== 'IN_PROGRESS' ? <StatusBadge value="NO ACTION" /> : null}
+                    {item.status !== 'ASSIGNED' && item.status !== 'IN_PROGRESS' ? <StatusBadge value="-" /> : null}
                   </div>
                 ),
               },
