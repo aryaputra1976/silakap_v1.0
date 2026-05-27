@@ -94,7 +94,7 @@ export const MENU_SIDEBAR: MenuConfig = [
       },
       {
         title: 'Tindak Lanjut',
-        path: '/siap/tasks?status=FOLLOW_UP',
+        path: '/siap/tasks?type=TINDAK_LANJUT',
         moduleKey: 'SIAP',
         requiredPermission: 'input',
       },
