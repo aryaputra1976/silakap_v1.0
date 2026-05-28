@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Prisma, SlaStatus, TaskStatus } from '@prisma/client';
+import { AccountStatus, Prisma, SlaStatus, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
 
@@ -111,6 +111,21 @@ export type OverdueSlaRecord = Prisma.SlaTrackingGetPayload<{
   include: typeof overdueSlaInclude;
 }>;
 
+const workflowDefinitionInclude = {
+  transitions: {
+    where: {
+      isActive: true,
+    },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+  },
+} satisfies Prisma.WorkflowDefinitionInclude;
+
+export type WorkflowDefinitionRecord = Prisma.WorkflowDefinitionGetPayload<{
+  include: typeof workflowDefinitionInclude;
+}>;
+
+export type WorkflowTransitionRecord = WorkflowDefinitionRecord['transitions'][number];
+
 @Injectable()
 export class SiapRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -186,6 +201,44 @@ export class SiapRepository {
       },
       include: caseDetailInclude,
     });
+  }
+
+  async findActiveWorkflowByServiceType(
+    serviceType: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<WorkflowDefinitionRecord | null> {
+    return client.workflowDefinition.findFirst({
+      where: {
+        serviceType,
+        isActive: true,
+      },
+      include: workflowDefinitionInclude,
+      orderBy: [{ updatedAt: 'desc' }],
+    });
+  }
+
+  async findActiveUserIdByRole(
+    roleCode: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<string | null> {
+    const userRole = await client.userRole.findFirst({
+      where: {
+        role: {
+          code: roleCode,
+          isActive: true,
+        },
+        user: {
+          status: AccountStatus.ACTIVE,
+          deletedAt: null,
+        },
+      },
+      select: {
+        userId: true,
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    return userRole?.userId ?? null;
   }
 
   async updateCaseState(

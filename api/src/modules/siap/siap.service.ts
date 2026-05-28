@@ -28,13 +28,13 @@ import {
   SiapDbClient,
   SiapRepository,
   SiapTaskRecord,
+  WorkflowDefinitionRecord,
+  WorkflowTransitionRecord,
 } from './siap.repository';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
 
-const SUBMITTED_STATE = 'SUBMITTED';
 const DRAFT_STATE = 'DRAFT';
-const FIRST_TASK_TYPE = 'VERIFIKASI_ADMIN';
-const FIRST_TASK_SLA_DAYS = 3;
+const COMPLETED_STATE = 'COMPLETED';
 const STAFF_ROLES = [
   'ANALIS_PERTAMA',
   'ANALIS_MUDA',
@@ -126,14 +126,22 @@ export class SiapService {
       throw new BadRequestException('Hanya case DRAFT yang dapat disubmit');
     }
 
+    const workflow = await this.getActiveWorkflow(existing.serviceType);
+    const firstTransition = this.getNextTransition(workflow, DRAFT_STATE, 'SUBMIT');
+
+    if (!firstTransition) {
+      throw new BadRequestException(
+        `Workflow ${workflow.code} belum memiliki transition SUBMIT dari DRAFT`,
+      );
+    }
+
     const now = new Date();
-    const dueAt = this.addDays(now, FIRST_TASK_SLA_DAYS);
 
     await this.siapRepository.withTransaction(async (client) => {
       await this.siapRepository.updateCaseState(
         existing.id,
         {
-          currentState: SUBMITTED_STATE,
+          currentState: firstTransition.toState,
           status: CaseStatus.ACTIVE,
           submittedAt: now,
           updatedBy: user.id,
@@ -145,41 +153,21 @@ export class SiapService {
         {
           caseId: existing.id,
           fromState: DRAFT_STATE,
-          toState: SUBMITTED_STATE,
-          action: 'SUBMIT',
-          note: 'Case disubmit untuk verifikasi admin',
+          toState: firstTransition.toState,
+          action: firstTransition.actionCode,
+          note: `Case dikirim ke tahap ${this.humanizeState(firstTransition.toState)}`,
           performedBy: user.id,
           performedAt: now,
         },
         client,
       );
 
-      const task = await this.siapRepository.createTask(
-        {
-          caseId: existing.id,
-          taskType: FIRST_TASK_TYPE,
-          title: 'Verifikasi administrasi berkas',
-          description: 'Verifikasi awal kelengkapan data dan dokumen usulan',
-          status: TaskStatus.ASSIGNED,
-          priority: this.toTaskPriority(existing.priority),
-          assignedTo: user.id,
-          assignedBy: user.id,
-          dueDate: dueAt,
-          createdBy: user.id,
-          updatedBy: user.id,
-        },
-        client,
-      );
-
-      await this.siapRepository.createSlaTracking(
-        {
-          caseId: existing.id,
-          taskId: task.id,
-          workflowState: SUBMITTED_STATE,
-          startedAt: now,
-          dueAt,
-          status: SlaStatus.ON_TRACK,
-        },
+      const task = await this.createTaskForTransition(
+        existing.id,
+        existing.priority,
+        firstTransition,
+        user,
+        now,
         client,
       );
 
@@ -187,8 +175,8 @@ export class SiapService {
         {
           caseId: existing.id,
           eventType: 'CASE_SUBMITTED',
-          title: 'Case disubmit',
-          description: `Case ${existing.caseNumber} disubmit dari DRAFT ke SUBMITTED`,
+          title: 'Case dikirim',
+          description: `Case ${existing.caseNumber} dikirim dari DRAFT ke ${firstTransition.toState}`,
           performedBy: user.id,
           createdAt: now,
         },
@@ -200,8 +188,8 @@ export class SiapService {
           caseId: existing.id,
           taskId: task.id,
           eventType: 'TASK_CREATED',
-          title: 'Task verifikasi admin dibuat',
-          description: `Task ${FIRST_TASK_TYPE} dibuat dan ditugaskan untuk verifikasi awal`,
+          title: 'Tugas tahap pertama dibuat',
+          description: `Tugas ${task.taskType} dibuat untuk role ${firstTransition.allowedRole}`,
           performedBy: user.id,
           createdAt: now,
         },
@@ -218,10 +206,14 @@ export class SiapService {
     await this.eventBusService.publishNotification({
       type: 'CASE_SUBMITTED',
       title: 'Case baru disubmit',
-      body: `${submitted.caseNumber} menunggu verifikasi administrasi`,
+      body: `${submitted.caseNumber} menunggu ${this.humanizeState(submitted.currentState)}`,
       caseId: submitted.id,
       actionUrl: '/siap/tasks',
-      recipientRoleCodes: ['SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID'],
+      recipientRoleCodes: [
+        'SUPER_ADMIN',
+        'ADMIN_BKPSDM',
+        firstTransition.allowedRole,
+      ],
       createdBy: user.id,
       metadata: {
         caseNumber: submitted.caseNumber,
@@ -396,6 +388,14 @@ export class SiapService {
     const now = new Date();
     const note =
       this.normalizeOptionalText(dto.note) ?? `${task.taskType} selesai`;
+    const workflow = await this.getActiveWorkflow(task.case.serviceType);
+    const nextTransition = this.getNextTransition(
+      workflow,
+      task.case.currentState,
+    );
+    const nextState = nextTransition?.toState ?? COMPLETED_STATE;
+    const shouldCompleteCase = !nextTransition || nextState === COMPLETED_STATE;
+
     const updated = await this.siapRepository.withTransaction(async (client) => {
       const updatedTask = await this.siapRepository.updateTask(
         task.id,
@@ -414,8 +414,8 @@ export class SiapService {
         {
           caseId: task.caseId,
           fromState: task.case.currentState,
-          toState: task.case.currentState,
-          action: 'COMPLETE_TASK',
+          toState: nextState,
+          action: nextTransition?.actionCode ?? 'COMPLETE_TASK',
           note,
           performedBy: user.id,
           performedAt: now,
@@ -436,6 +436,64 @@ export class SiapService {
         client,
       );
 
+      if (shouldCompleteCase) {
+        await this.siapRepository.updateCaseState(
+          task.caseId,
+          {
+            currentState: COMPLETED_STATE,
+            status: CaseStatus.COMPLETED,
+            completedAt: now,
+            updatedBy: user.id,
+          },
+          client,
+        );
+
+        await this.siapRepository.createTimelineEntry(
+          {
+            caseId: task.caseId,
+            taskId: task.id,
+            eventType: 'CASE_COMPLETED',
+            title: 'Case selesai',
+            description: `Case selesai setelah tahap ${this.humanizeState(task.case.currentState)}`,
+            performedBy: user.id,
+            createdAt: now,
+          },
+          client,
+        );
+      } else {
+        await this.siapRepository.updateCaseState(
+          task.caseId,
+          {
+            currentState: nextTransition.toState,
+            status: CaseStatus.ACTIVE,
+            updatedBy: user.id,
+          },
+          client,
+        );
+
+        const nextTask = await this.createTaskForTransition(
+          task.caseId,
+          task.case.priority,
+          nextTransition,
+          user,
+          now,
+          client,
+        );
+
+        await this.siapRepository.createTimelineEntry(
+          {
+            caseId: task.caseId,
+            taskId: nextTask.id,
+            eventType: 'TASK_CREATED',
+            title: 'Tugas tahap berikutnya dibuat',
+            description: `Tugas ${nextTask.taskType} dibuat untuk role ${nextTransition.allowedRole}`,
+            performedBy: user.id,
+            createdAt: now,
+          },
+          client,
+        );
+      }
+
       return updatedTask;
     });
 
@@ -452,6 +510,8 @@ export class SiapService {
         taskId: updated.id,
         taskType: updated.taskType,
         status: updated.status,
+        nextState,
+        caseCompleted: shouldCompleteCase,
       },
     });
 
@@ -679,6 +739,103 @@ export class SiapService {
     });
 
     return this.toTaskResponse(updated);
+  }
+
+  private async getActiveWorkflow(
+    serviceType: string,
+    client?: SiapDbClient,
+  ): Promise<WorkflowDefinitionRecord> {
+    const workflow = await this.siapRepository.findActiveWorkflowByServiceType(
+      serviceType,
+      client,
+    );
+
+    if (!workflow) {
+      throw new BadRequestException(
+        `Workflow aktif untuk layanan ${serviceType} belum dikonfigurasi`,
+      );
+    }
+
+    if (workflow.transitions.length === 0) {
+      throw new BadRequestException(
+        `Workflow ${workflow.code} belum memiliki transition aktif`,
+      );
+    }
+
+    return workflow;
+  }
+
+  private getNextTransition(
+    workflow: WorkflowDefinitionRecord,
+    fromState: string,
+    actionCode?: string,
+  ): WorkflowTransitionRecord | null {
+    const normalizedAction = actionCode?.trim().toUpperCase();
+    const matches = workflow.transitions.filter(
+      (transition) => transition.fromState === fromState,
+    );
+
+    if (normalizedAction) {
+      const actionMatch = matches.find(
+        (transition) => transition.actionCode.toUpperCase() === normalizedAction,
+      );
+
+      if (actionMatch) {
+        return actionMatch;
+      }
+    }
+
+    return matches[0] ?? null;
+  }
+
+  private async createTaskForTransition(
+    caseId: string,
+    casePriority: CasePriority,
+    transition: WorkflowTransitionRecord,
+    user: AuthUser,
+    startedAt: Date,
+    client: SiapDbClient,
+  ): Promise<SiapTaskRecord> {
+    const assignedTo =
+      (await this.siapRepository.findActiveUserIdByRole(
+        transition.allowedRole,
+        client,
+      )) ?? undefined;
+    const dueAt = transition.slaDays
+      ? this.addDays(startedAt, transition.slaDays)
+      : undefined;
+    const task = await this.siapRepository.createTask(
+      {
+        caseId,
+        taskType: transition.toState,
+        title: this.createTaskTitle(transition),
+        description: this.createTaskDescription(transition),
+        status: TaskStatus.ASSIGNED,
+        priority: this.toTaskPriority(casePriority),
+        assignedTo,
+        assignedBy: user.id,
+        dueDate: dueAt,
+        createdBy: user.id,
+        updatedBy: user.id,
+      },
+      client,
+    );
+
+    if (dueAt) {
+      await this.siapRepository.createSlaTracking(
+        {
+          caseId,
+          taskId: task.id,
+          workflowState: transition.toState,
+          startedAt,
+          dueAt,
+          status: SlaStatus.ON_TRACK,
+        },
+        client,
+      );
+    }
+
+    return task;
   }
 
   private async getTaskForUser(id: string, user: AuthUser) {
@@ -912,6 +1069,26 @@ export class SiapService {
 
   private addDays(date: Date, days: number) {
     return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+  }
+
+  private createTaskTitle(transition: WorkflowTransitionRecord) {
+    return `Proses ${this.humanizeState(transition.toState)}`;
+  }
+
+  private createTaskDescription(transition: WorkflowTransitionRecord) {
+    const roleLabel = this.humanizeState(transition.allowedRole);
+    const slaLabel = transition.slaDays
+      ? ` Target penyelesaian ${transition.slaDays} hari.`
+      : '';
+
+    return `Tahap ${this.humanizeState(transition.toState)} ditangani oleh ${roleLabel}.${slaLabel}`;
+  }
+
+  private humanizeState(value: string) {
+    return value
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   private toTaskPriority(priority: CasePriority): TaskPriority {

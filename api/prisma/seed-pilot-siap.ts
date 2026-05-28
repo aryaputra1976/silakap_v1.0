@@ -297,6 +297,8 @@ async function main() {
     status: SiapWorklogStatus.APPROVED,
   });
 
+  await seedSiapWorkflows();
+
   async function createPilotWorklog(input: {
     userKey: string;
     unitKerjaId: string;
@@ -375,6 +377,108 @@ async function main() {
     await prisma.siapWorklog.create({
       data,
     });
+  }
+
+  async function seedSiapWorkflows() {
+    const serviceTypes = [
+      'KENAIKAN_PANGKAT',
+      'MUTASI',
+      'PENSIUN',
+      'CUTI',
+      'IZIN_BELAJAR',
+      'SURAT_KETERANGAN',
+      'PEMBUATAN_KARPEG',
+      'LAIN_LAIN',
+    ];
+    const transitions = [
+      {
+        fromState: 'DRAFT',
+        toState: 'VERIFIKASI_ADMIN',
+        actionCode: 'SUBMIT',
+        allowedRole: 'ADMIN_BKPSDM',
+        slaDays: 2,
+        sortOrder: 10,
+      },
+      {
+        fromState: 'VERIFIKASI_ADMIN',
+        toState: 'ANALIS_PERTAMA',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'ANALIS_PERTAMA',
+        slaDays: 2,
+        sortOrder: 20,
+      },
+      {
+        fromState: 'ANALIS_PERTAMA',
+        toState: 'ANALIS_MUDA',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'ANALIS_MUDA',
+        slaDays: 2,
+        sortOrder: 30,
+      },
+      {
+        fromState: 'ANALIS_MUDA',
+        toState: 'ANALIS_MADYA',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'ANALIS_MADYA',
+        slaDays: 2,
+        sortOrder: 40,
+      },
+      {
+        fromState: 'ANALIS_MADYA',
+        toState: 'KABID',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'KABID',
+        slaDays: 2,
+        sortOrder: 50,
+      },
+      {
+        fromState: 'KABID',
+        toState: 'KEPALA_BADAN',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'KEPALA_BADAN',
+        slaDays: 2,
+        sortOrder: 60,
+      },
+      {
+        fromState: 'KEPALA_BADAN',
+        toState: 'COMPLETED',
+        actionCode: 'COMPLETE_TASK',
+        allowedRole: 'KEPALA_BADAN',
+        slaDays: null,
+        sortOrder: 70,
+      },
+    ];
+
+    for (const serviceType of serviceTypes) {
+      const workflow = await prisma.workflowDefinition.upsert({
+        where: { code: `SIAP_${serviceType}_DEFAULT` },
+        update: {
+          name: `Workflow ${serviceType.replace(/_/g, ' ')}`,
+          serviceType,
+          description: 'Workflow standar layanan SIAP',
+          isActive: true,
+        },
+        create: {
+          code: `SIAP_${serviceType}_DEFAULT`,
+          name: `Workflow ${serviceType.replace(/_/g, ' ')}`,
+          serviceType,
+          description: 'Workflow standar layanan SIAP',
+          isActive: true,
+        },
+      });
+
+      await prisma.workflowTransition.deleteMany({
+        where: { workflowId: workflow.id },
+      });
+
+      await prisma.workflowTransition.createMany({
+        data: transitions.map((transition) => ({
+          workflowId: workflow.id,
+          ...transition,
+          isActive: true,
+        })),
+      });
+    }
   }
 
   console.log('Pilot SIAP seed selesai.');
