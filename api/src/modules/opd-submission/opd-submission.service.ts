@@ -253,51 +253,73 @@ export class OpdSubmissionService {
     const targetHours = getSlaTargetHours(before.moduleKey, before.serviceType);
     const cal = await this.workingCalendarService.getEffectiveCalendar();
     const slaDueAt = calculateSlaDueAtBusiness(now, targetHours, cal);
-    const siapCase =
-      before.siapCaseId
-        ? null
-        : await this.siapService.createAndSubmitCase(
-            {
-              serviceType: before.serviceType,
-              title: this.buildSiapCaseTitle(before, submissionNumber),
-              description: this.buildSiapCaseDescription(before, submissionNumber),
-              asnId: before.subjectNip ?? undefined,
-              priority: CasePriority.NORMAL,
-            },
-            user,
-            context,
-          );
-    const updated = await this.repo.update(before.id, {
-      submissionNumber,
-      ...(siapCase ? { siapCaseId: siapCase.id } : {}),
-      status: 'SUBMITTED',
-      submittedAt: now,
-      slaStartedAt: now,
-      slaDueAt,
-      slaTargetHours: targetHours,
-      slaElapsedHours: 0,
-      slaPausedHours: 0,
-      slaPausedAt: null,
-      slaStoppedAt: null,
-      slaStatus: 'ON_TRACK',
-      lastStatusChangedAt: now,
-      lastStatusChangedById: user.id,
-      updatedById: user.id,
+    const updated = await this.repo.withTransaction(async (client) => {
+      const createdSiapCase =
+        before.siapCaseId
+          ? null
+          : await this.siapService.createAndSubmitCase(
+              {
+                serviceType: before.serviceType,
+                title: this.buildSiapCaseTitle(before, submissionNumber),
+                description: this.buildSiapCaseDescription(before, submissionNumber),
+                asnId: before.subjectNip ?? undefined,
+                priority: CasePriority.NORMAL,
+              },
+              user,
+              context,
+              client,
+            );
+
+      const submitted = await this.repo.updateAtomic(
+        before.id,
+        ['DRAFT'],
+        {
+          submissionNumber,
+          ...(createdSiapCase ? { siapCaseId: createdSiapCase.id } : {}),
+          status: 'SUBMITTED',
+          submittedAt: now,
+          slaStartedAt: now,
+          slaDueAt,
+          slaTargetHours: targetHours,
+          slaElapsedHours: 0,
+          slaPausedHours: 0,
+          slaPausedAt: null,
+          slaStoppedAt: null,
+          slaStatus: 'ON_TRACK',
+          lastStatusChangedAt: now,
+          lastStatusChangedById: user.id,
+          updatedById: user.id,
+        },
+        client,
+      );
+
+      if (!submitted) {
+        throw new BadRequestException(
+          'Pengajuan sedang diproses pengguna lain. Harap muat ulang halaman.',
+        );
+      }
+
+      if (createdSiapCase) {
+        await this.repo.createTimeline(
+          {
+            submissionId: submitted.id,
+            fromStatus: 'SUBMITTED',
+            toStatus: 'SUBMITTED',
+            action: 'SIAP_CASE_CREATED',
+            actorId: user.id,
+            actorRole: this.primaryRole(user),
+            note: `SIAP Case ${createdSiapCase.caseNumber} otomatis dibuat dari pengajuan OPD`,
+            publicNote: `SIAP Case ${createdSiapCase.caseNumber} dibuat untuk proses internal BKPSDM`,
+          },
+          client,
+        );
+      }
+
+      return submitted;
     });
 
     await this.writeAudit(updated, 'SUBMIT', before, updated, user, dto.note, context);
     await this.writeTimeline(updated, before.status, 'SUBMITTED', 'SUBMIT', user, dto.note, 'Pengajuan dikirim OPD dan SLA mulai dihitung');
-    if (siapCase) {
-      await this.writeTimeline(
-        updated,
-        'SUBMITTED',
-        'SUBMITTED',
-        'SIAP_CASE_CREATED',
-        user,
-        `SIAP Case ${siapCase.caseNumber} otomatis dibuat dari pengajuan OPD`,
-        `SIAP Case ${siapCase.caseNumber} dibuat untuk proses internal BKPSDM`,
-      );
-    }
     return this.toResponse(updated, false);
   }
 

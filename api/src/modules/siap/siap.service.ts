@@ -87,6 +87,11 @@ type CreateSubmittedSiapCaseInput = {
   priority?: CasePriority;
 };
 
+type SubmittableSiapCaseRecord = Pick<
+  SiapCaseDetailRecord,
+  'id' | 'caseNumber' | 'serviceType' | 'currentState' | 'priority'
+>;
+
 @Injectable()
 export class SiapService {
   constructor(
@@ -107,6 +112,7 @@ export class SiapService {
     input: CreateSubmittedSiapCaseInput,
     user: AuthUser,
     context?: AuditContext,
+    client?: SiapDbClient,
   ) {
     const created = await this.createCaseRecord(
       {
@@ -117,7 +123,13 @@ export class SiapService {
         priority: input.priority,
       },
       user,
+      client,
     );
+
+    if (client) {
+      const { submitted } = await this.submitCaseRecord(created, user, client);
+      return this.toCaseDetailResponse(submitted);
+    }
 
     return this.submitCase(created.id, user, context);
   }
@@ -187,86 +199,9 @@ export class SiapService {
       throw new NotFoundException('Case tidak ditemukan');
     }
 
-    if (existing.currentState !== DRAFT_STATE) {
-      throw new BadRequestException('Hanya case DRAFT yang dapat disubmit');
-    }
-
-    const workflow = await this.getActiveWorkflow(existing.serviceType);
-    const firstTransition = this.getNextTransition(workflow, DRAFT_STATE, 'SUBMIT');
-
-    if (!firstTransition) {
-      throw new BadRequestException(
-        `Workflow ${workflow.code} belum memiliki transition SUBMIT dari DRAFT`,
-      );
-    }
-
-    const now = new Date();
-
-    await this.siapRepository.withTransaction(async (client) => {
-      await this.siapRepository.updateCaseState(
-        existing.id,
-        {
-          currentState: firstTransition.toState,
-          status: CaseStatus.ACTIVE,
-          submittedAt: now,
-          updatedBy: user.id,
-        },
-        client,
-      );
-
-      await this.siapRepository.createWorkflowLog(
-        {
-          caseId: existing.id,
-          fromState: DRAFT_STATE,
-          toState: firstTransition.toState,
-          action: firstTransition.actionCode,
-          note: `Case dikirim ke tahap ${this.humanizeState(firstTransition.toState)}`,
-          performedBy: user.id,
-          performedAt: now,
-        },
-        client,
-      );
-
-      const task = await this.createTaskForTransition(
-        existing.id,
-        existing.priority,
-        firstTransition,
-        user,
-        now,
-        client,
-      );
-
-      await this.siapRepository.createTimelineEntry(
-        {
-          caseId: existing.id,
-          eventType: 'CASE_SUBMITTED',
-          title: 'Case dikirim',
-          description: `Case ${existing.caseNumber} dikirim dari DRAFT ke ${firstTransition.toState}`,
-          performedBy: user.id,
-          createdAt: now,
-        },
-        client,
-      );
-
-      await this.siapRepository.createTimelineEntry(
-        {
-          caseId: existing.id,
-          taskId: task.id,
-          eventType: 'TASK_CREATED',
-          title: 'Tugas tahap pertama dibuat',
-          description: `Tugas ${task.taskType} dibuat untuk role ${firstTransition.allowedRole}`,
-          performedBy: user.id,
-          createdAt: now,
-        },
-        client,
-      );
-    });
-
-    const submitted = await this.siapRepository.findCaseById(existing.id);
-
-    if (!submitted) {
-      throw new NotFoundException('Case tidak ditemukan setelah submit');
-    }
+    const { submitted, transition } = await this.siapRepository.withTransaction(
+      (client) => this.submitCaseRecord(existing, user, client),
+    );
 
     await this.eventBusService.publishNotification({
       type: 'CASE_SUBMITTED',
@@ -277,7 +212,7 @@ export class SiapService {
       recipientRoleCodes: [
         'SUPER_ADMIN',
         'ADMIN_BKPSDM',
-        firstTransition.allowedRole,
+        transition.allowedRole,
       ],
       createdBy: user.id,
       metadata: {
@@ -302,6 +237,96 @@ export class SiapService {
     });
 
     return this.toCaseDetailResponse(submitted);
+  }
+
+  private async submitCaseRecord(
+    existing: SubmittableSiapCaseRecord,
+    user: AuthUser,
+    client: SiapDbClient,
+  ): Promise<{
+    submitted: SiapCaseDetailRecord;
+    transition: WorkflowTransitionRecord;
+  }> {
+    if (existing.currentState !== DRAFT_STATE) {
+      throw new BadRequestException('Hanya case DRAFT yang dapat disubmit');
+    }
+
+    const workflow = await this.getActiveWorkflow(existing.serviceType, client);
+    const firstTransition = this.getNextTransition(workflow, DRAFT_STATE, 'SUBMIT');
+
+    if (!firstTransition) {
+      throw new BadRequestException(
+        `Workflow ${workflow.code} belum memiliki transition SUBMIT dari DRAFT`,
+      );
+    }
+
+    const now = new Date();
+
+    await this.siapRepository.updateCaseState(
+      existing.id,
+      {
+        currentState: firstTransition.toState,
+        status: CaseStatus.ACTIVE,
+        submittedAt: now,
+        updatedBy: user.id,
+      },
+      client,
+    );
+
+    await this.siapRepository.createWorkflowLog(
+      {
+        caseId: existing.id,
+        fromState: DRAFT_STATE,
+        toState: firstTransition.toState,
+        action: firstTransition.actionCode,
+        note: `Case dikirim ke tahap ${this.humanizeState(firstTransition.toState)}`,
+        performedBy: user.id,
+        performedAt: now,
+      },
+      client,
+    );
+
+    const task = await this.createTaskForTransition(
+      existing.id,
+      existing.priority,
+      firstTransition,
+      user,
+      now,
+      client,
+    );
+
+    await this.siapRepository.createTimelineEntry(
+      {
+        caseId: existing.id,
+        eventType: 'CASE_SUBMITTED',
+        title: 'Case dikirim',
+        description: `Case ${existing.caseNumber} dikirim dari DRAFT ke ${firstTransition.toState}`,
+        performedBy: user.id,
+        createdAt: now,
+      },
+      client,
+    );
+
+    await this.siapRepository.createTimelineEntry(
+      {
+        caseId: existing.id,
+        taskId: task.id,
+        eventType: 'TASK_CREATED',
+        title: 'Tugas tahap pertama dibuat',
+        description: `Tugas ${task.taskType} dibuat untuk role ${firstTransition.allowedRole}`,
+        performedBy: user.id,
+        createdAt: now,
+      },
+      client,
+    );
+
+    const submitted = await this.siapRepository.findCaseById(existing.id, client);
+
+    if (!submitted) {
+      throw new NotFoundException('Case tidak ditemukan setelah submit');
+    }
+
+    return { submitted, transition: firstTransition };
   }
 
   async findCases(query: CaseListQueryDto, user: AuthUser) {

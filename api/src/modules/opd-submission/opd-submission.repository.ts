@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+export type OpdSubmissionDbClient = PrismaService | Prisma.TransactionClient;
+
 const submissionInclude = {
   documents: {
     orderBy: { uploadedAt: 'desc' },
@@ -38,6 +40,12 @@ export type OpdSubmissionListFilters = {
 export class OpdSubmissionRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
+  async withTransaction<T>(
+    callback: (client: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(callback);
+  }
+
   async findMany(filters: OpdSubmissionListFilters) {
     const where = this.buildWhere(filters);
     const skip = (filters.page - 1) * filters.limit;
@@ -70,8 +78,12 @@ export class OpdSubmissionRepository {
     });
   }
 
-  update(id: string, data: Prisma.OpdSubmissionUncheckedUpdateInput) {
-    return this.prisma.opdSubmission.update({
+  update(
+    id: string,
+    data: Prisma.OpdSubmissionUncheckedUpdateInput,
+    client: OpdSubmissionDbClient = this.prisma,
+  ) {
+    return client.opdSubmission.update({
       where: { id },
       data,
       include: submissionInclude,
@@ -82,13 +94,14 @@ export class OpdSubmissionRepository {
     id: string,
     expectedStatuses: string[],
     data: Prisma.OpdSubmissionUncheckedUpdateInput,
+    client: OpdSubmissionDbClient = this.prisma,
   ): Promise<OpdSubmissionRecord | null> {
-    const { count } = await this.prisma.opdSubmission.updateMany({
+    const { count } = await client.opdSubmission.updateMany({
       where: { id, status: { in: expectedStatuses } },
       data,
     });
     if (count === 0) return null;
-    return this.prisma.opdSubmission.findUnique({
+    return client.opdSubmission.findUnique({
       where: { id },
       include: submissionInclude,
     });
@@ -169,8 +182,8 @@ export class OpdSubmissionRepository {
     note?: string | null;
     publicNote?: string | null;
     isVisibleToOpd?: boolean;
-  }) {
-    return this.prisma.opdSubmissionTimeline.create({
+  }, client: OpdSubmissionDbClient = this.prisma) {
+    return client.opdSubmissionTimeline.create({
       data: {
         submissionId: params.submissionId,
         fromStatus: params.fromStatus ?? null,

@@ -226,8 +226,11 @@ export class SiapRepository {
     return { items, total };
   }
 
-  async findCaseById(id: string): Promise<SiapCaseDetailRecord | null> {
-    return this.prisma.siapCase.findFirst({
+  async findCaseById(
+    id: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<SiapCaseDetailRecord | null> {
+    return client.siapCase.findFirst({
       where: {
         id,
         deletedAt: null,
