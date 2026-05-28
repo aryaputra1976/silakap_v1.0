@@ -1,5 +1,11 @@
 import { apiClient } from './client';
-import type { PaginatedResult, SiapCaseDetail, SiapCaseListItem, SiapTask } from './types';
+import type {
+  PaginatedResult,
+  SiapAssignableUser,
+  SiapCaseDetail,
+  SiapCaseListItem,
+  SiapTask,
+} from './types';
 
 export type CreateCasePayload = {
   serviceType: string;
@@ -42,6 +48,10 @@ export const siapApi = {
 
   fetchCaseById(id: string) {
     return apiClient.get<SiapCaseDetail>(`/siap/cases/${id}`);
+  },
+
+  fetchAssignees() {
+    return apiClient.get<SiapAssignableUser[]>('/siap/assignees');
   },
 
   createCase(payload: CreateCasePayload) {

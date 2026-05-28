@@ -17,6 +17,11 @@ export type UnitKerjaSummary = {
   nama: string;
 };
 
+export type RoleSummary = {
+  code: string;
+  name: string;
+};
+
 export type AuthUser = {
   id: string;
   username: string;
@@ -125,6 +130,17 @@ export type SiapTask = {
   case?: SiapCaseSummary & {
     asn?: Pick<AsnRecord, 'id' | 'nip' | 'nama'> | null;
   };
+  assignee?: NotificationUserSummary | null;
+  assigner?: NotificationUserSummary | null;
+};
+
+export type SiapAssignableUser = {
+  id: string;
+  username: string;
+  name: string;
+  nip: string | null;
+  unitKerja: UnitKerjaSummary | null;
+  roles: RoleSummary[];
 };
 
 export type WorkflowLog = {

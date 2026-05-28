@@ -25,7 +25,7 @@ export class CreateCaseDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(36)
+  @MaxLength(80)
   asnId?: string;
 
   @IsEnum(CasePriority)

@@ -79,6 +79,35 @@ const taskInclude = {
   },
 } satisfies Prisma.SiapTaskInclude;
 
+const assignableUserSelect = {
+  id: true,
+  username: true,
+  name: true,
+  nip: true,
+  unitKerja: {
+    select: {
+      id: true,
+      kode: true,
+      nama: true,
+    },
+  },
+  userRoles: {
+    select: {
+      role: {
+        select: {
+          code: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      role: {
+        code: 'asc',
+      },
+    },
+  },
+} satisfies Prisma.UserSelect;
+
 export type SiapCaseListRecord = Prisma.SiapCaseGetPayload<{
   include: typeof caseListInclude;
 }>;
@@ -89,6 +118,10 @@ export type SiapCaseDetailRecord = Prisma.SiapCaseGetPayload<{
 
 export type SiapTaskRecord = Prisma.SiapTaskGetPayload<{
   include: typeof taskInclude;
+}>;
+
+export type SiapAssignableUserRecord = Prisma.UserGetPayload<{
+  select: typeof assignableUserSelect;
 }>;
 
 const overdueSlaInclude = {
@@ -239,6 +272,52 @@ export class SiapRepository {
     });
 
     return userRole?.userId ?? null;
+  }
+
+  async findAssignableUsers(
+    roleCodes: string[],
+  ): Promise<SiapAssignableUserRecord[]> {
+    return this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        status: AccountStatus.ACTIVE,
+        userRoles: {
+          some: {
+            role: {
+              code: {
+                in: roleCodes,
+              },
+              isActive: true,
+            },
+          },
+        },
+      },
+      select: assignableUserSelect,
+      orderBy: [{ name: 'asc' }, { username: 'asc' }],
+    });
+  }
+
+  async findAsnIdByIdOrNip(
+    value: string,
+    client: SiapDbClient = this.prisma,
+  ): Promise<string | null> {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      return null;
+    }
+
+    const asn = await client.asn.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ id: normalized }, { nip: normalized }],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return asn?.id ?? null;
   }
 
   async updateCaseState(

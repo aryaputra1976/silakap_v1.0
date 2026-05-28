@@ -131,6 +131,13 @@ export class SiapController {
     return ok(result);
   }
 
+  @Get('assignees')
+  @Roles(...SIAP_ASSIGN_ROLES)
+  async findAssignableUsers(@CurrentUser() user: AuthUser) {
+    const result = await this.siapService.findAssignableUsers(user);
+    return ok(result);
+  }
+
   @Get('tasks/:id')
   async findTaskById(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const result = await this.siapService.findTaskById(id, user);

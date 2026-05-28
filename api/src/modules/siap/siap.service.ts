@@ -49,6 +49,35 @@ const SUPERVISOR_ROLES = [
   'ANALIS_MADYA',
   'ANALIS_MUDA',
 ];
+const ASSIGNEE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  ...STAFF_ROLES,
+];
+const STATE_LABELS: Record<string, string> = {
+  DRAFT: 'Draft',
+  VERIFIKASI_ADMIN: 'Verifikasi Administrasi',
+  ANALIS_PERTAMA: 'Analis Pertama',
+  ANALIS_MUDA: 'Analis Muda',
+  ANALIS_MADYA: 'Analis Madya',
+  KABID: 'Kabid',
+  KEPALA_BADAN: 'Kepala Badan',
+  COMPLETED: 'Selesai',
+};
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN_BKPSDM: 'Admin BKPSDM',
+  KEPALA_BADAN: 'Kepala Badan',
+  KABID: 'Kabid',
+  ANALIS_MADYA: 'Analis Madya',
+  ANALIS_MUDA: 'Analis Muda',
+  ANALIS_PERTAMA: 'Analis Pertama',
+  PENELAAH: 'Penelaah',
+  PPPK: 'PPPK',
+};
 
 @Injectable()
 export class SiapService {
@@ -72,6 +101,7 @@ export class SiapService {
     client?: SiapDbClient,
   ): Promise<SiapCaseListRecord> {
     const serviceType = dto.serviceType.trim().toUpperCase();
+    const resolvedAsnId = await this.resolveAsnId(dto.asnId, client);
 
     let created: SiapCaseListRecord | undefined;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -81,7 +111,7 @@ export class SiapService {
           serviceType,
           title: dto.title.trim(),
           description: this.normalizeOptionalText(dto.description),
-          asnId: this.normalizeOptionalText(dto.asnId),
+          asnId: resolvedAsnId,
           currentState: DRAFT_STATE,
           status: CaseStatus.DRAFT,
           priority: dto.priority ?? CasePriority.NORMAL,
@@ -96,6 +126,14 @@ export class SiapService {
           attempt < 3
         ) {
           continue;
+        }
+        if (
+          err instanceof PrismaClientKnownRequestError &&
+          err.code === 'P2003'
+        ) {
+          throw new BadRequestException(
+            'ASN terkait tidak ditemukan. Periksa kembali NIP atau pilih ASN dari hasil pencarian.',
+          );
         }
         throw err;
       }
@@ -309,6 +347,23 @@ export class SiapService {
       limit: filters.limit,
       total: result.total,
     };
+  }
+
+  async findAssignableUsers(user: AuthUser) {
+    if (!this.canAssignTask(user)) {
+      throw new ForbiddenException('Anda tidak berwenang melihat penerima tugas');
+    }
+
+    const users = await this.siapRepository.findAssignableUsers(ASSIGNEE_ROLES);
+
+    return users.map((item) => ({
+      id: item.id,
+      username: item.username,
+      name: item.name,
+      nip: item.nip,
+      unitKerja: item.unitKerja,
+      roles: item.userRoles.map((userRole) => userRole.role),
+    }));
   }
 
   async findTaskById(id: string, user: AuthUser) {
@@ -1035,6 +1090,27 @@ export class SiapService {
     return normalized ? normalized : undefined;
   }
 
+  private async resolveAsnId(value: string | undefined, client?: SiapDbClient) {
+    const normalized = this.normalizeOptionalText(value);
+
+    if (!normalized) {
+      return undefined;
+    }
+
+    const foundAsnId = await this.siapRepository.findAsnIdByIdOrNip(
+      normalized,
+      client,
+    );
+
+    if (!foundAsnId) {
+      throw new BadRequestException(
+        'ASN terkait tidak ditemukan. Periksa kembali NIP atau pilih ASN dari hasil pencarian.',
+      );
+    }
+
+    return foundAsnId;
+  }
+
   private normalizePositiveNumber(
     value: string | undefined,
     defaultValue: number,
@@ -1076,7 +1152,7 @@ export class SiapService {
   }
 
   private createTaskDescription(transition: WorkflowTransitionRecord) {
-    const roleLabel = this.humanizeState(transition.allowedRole);
+    const roleLabel = this.humanizeRole(transition.allowedRole);
     const slaLabel = transition.slaDays
       ? ` Target penyelesaian ${transition.slaDays} hari.`
       : '';
@@ -1085,10 +1161,18 @@ export class SiapService {
   }
 
   private humanizeState(value: string) {
+    if (STATE_LABELS[value]) {
+      return STATE_LABELS[value];
+    }
+
     return value
       .replace(/_/g, ' ')
       .toLowerCase()
       .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  private humanizeRole(value: string) {
+    return ROLE_LABELS[value] ?? this.humanizeState(value);
   }
 
   private toTaskPriority(priority: CasePriority): TaskPriority {

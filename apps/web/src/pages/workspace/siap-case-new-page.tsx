@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/lib/api/client';
+import { sidataApi } from '@/lib/api/sidata';
 import { siapApi } from '@/lib/api/siap';
+import type { AsnRecord } from '@/lib/api/types';
 import {
   ActionButton,
   ErrorAlert,
@@ -31,10 +33,50 @@ export function SiapCaseNewPage() {
   const [serviceType, setServiceType] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [asnId, setAsnId] = useState('');
+  const [asnSearch, setAsnSearch] = useState('');
+  const [asnResults, setAsnResults] = useState<AsnRecord[]>([]);
+  const [selectedAsn, setSelectedAsn] = useState<AsnRecord | null>(null);
+  const [asnLoading, setAsnLoading] = useState(false);
   const [priority, setPriority] = useState('NORMAL');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const keyword = asnSearch.trim();
+    if (keyword.length < 3) {
+      setAsnResults([]);
+      setAsnLoading(false);
+      return;
+    }
+
+    let active = true;
+    setAsnLoading(true);
+
+    const timer = window.setTimeout(() => {
+      sidataApi
+        .getAsnList({ q: keyword, page: 1, limit: 6 })
+        .then((result) => {
+          if (active) {
+            setAsnResults(result.items);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setAsnResults([]);
+          }
+        })
+        .finally(() => {
+          if (active) {
+            setAsnLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [asnSearch]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +89,7 @@ export function SiapCaseNewPage() {
         serviceType,
         title: title.trim(),
         description: description.trim() || undefined,
-        asnId: asnId.trim() || undefined,
+        asnId: selectedAsn?.id,
         priority,
       });
       navigate(`/siap/cases/${res.id}`);
@@ -118,15 +160,77 @@ export function SiapCaseNewPage() {
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
+              <div className="sm:col-span-2 flex flex-col gap-1.5">
                 <label className="text-sm font-medium">ASN terkait</label>
+                <p className="text-xs text-slate-500">
+                  Opsional. Pilih ASN jika kasus ini terkait pegawai tertentu.
+                </p>
                 <input
                   className={`${inputClass} bg-white`}
-                  value={asnId}
-                  onChange={(e) => setAsnId(e.target.value)}
-                  placeholder="Tempel ID ASN bila ada"
-                  maxLength={36}
+                  value={asnSearch}
+                  onChange={(e) => setAsnSearch(e.target.value)}
+                  placeholder="Cari nama atau NIP ASN"
+                  maxLength={120}
                 />
+                {selectedAsn ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-900">
+                        {selectedAsn.nama}
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        NIP {selectedAsn.nip}
+                        {selectedAsn.unitKerja?.nama ? ` - ${selectedAsn.unitKerja.nama}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-emerald-100"
+                      onClick={() => setSelectedAsn(null)}
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500">Belum ada ASN terkait</div>
+                )}
+                {asnSearch.trim().length >= 3 ? (
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    {asnLoading ? (
+                      <div className="px-3 py-2 text-sm text-slate-500">Mencari ASN...</div>
+                    ) : asnResults.length > 0 ? (
+                      asnResults.map((asn) => (
+                        <button
+                          key={asn.id}
+                          type="button"
+                          className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                          onClick={() => {
+                            setSelectedAsn(asn);
+                            setAsnSearch('');
+                            setAsnResults([]);
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900">
+                              {asn.nama}
+                            </span>
+                            <span className="block truncate text-xs text-slate-500">
+                              NIP {asn.nip}
+                              {asn.unitKerja?.nama ? ` - ${asn.unitKerja.nama}` : ''}
+                            </span>
+                          </span>
+                          <span className="shrink-0 rounded-md bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+                            Pilih
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-slate-500">
+                        ASN tidak ditemukan
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-col gap-1.5">

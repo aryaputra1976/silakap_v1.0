@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -10,7 +10,14 @@ import {
 } from 'lucide-react';
 import { ApiError } from '@/lib/api/client';
 import { siapApi } from '@/lib/api/siap';
-import type { SiapCaseDetail, SiapTask, SiapSlaTracking, TimelineEntry, WorkflowLog } from '@/lib/api/types';
+import type {
+  SiapAssignableUser,
+  SiapCaseDetail,
+  SiapSlaTracking,
+  SiapTask,
+  TimelineEntry,
+  WorkflowLog,
+} from '@/lib/api/types';
 import {
   ActionButton,
   ErrorAlert,
@@ -65,6 +72,9 @@ export function SiapCaseDetailPage() {
   const [actionError, setActionError] = useState('');
   const [working, setWorking] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
+  const [assignees, setAssignees] = useState<SiapAssignableUser[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
+  const [assigneeQuery, setAssigneeQuery] = useState('');
 
   const canAssign = user?.roles.some((r) => ASSIGN_ROLES.includes(r)) ?? false;
   const canCreate = user?.roles.some((r) => CREATE_ROLES.includes(r)) ?? false;
@@ -86,6 +96,58 @@ export function SiapCaseDetailPage() {
   useEffect(() => {
     void loadCase();
   }, [loadCase]);
+
+  useEffect(() => {
+    if (!canAssign) return;
+
+    let active = true;
+    setAssigneeLoading(true);
+
+    siapApi
+      .fetchAssignees()
+      .then((result) => {
+        if (active) {
+          setAssignees(result);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAssignees([]);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setAssigneeLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [canAssign]);
+
+  const filteredAssignees = useMemo(() => {
+    const keyword = assigneeQuery.trim().toLowerCase();
+
+    if (!keyword) {
+      return assignees.slice(0, 8);
+    }
+
+    return assignees
+      .filter((item) =>
+        [
+          item.name,
+          item.username,
+          item.nip,
+          item.unitKerja?.nama,
+          ...item.roles.map((role) => role.name),
+          ...item.roles.map((role) => role.code),
+        ]
+          .filter(Boolean)
+          .some((value) => value?.toLowerCase().includes(keyword)),
+      )
+      .slice(0, 8);
+  }, [assigneeQuery, assignees]);
 
   async function handleSubmitCase() {
     if (!id) return;
@@ -123,7 +185,7 @@ export function SiapCaseDetailPage() {
         await siapApi.completeTask(modal.taskId, modal.note || undefined);
       } else if (modal.type === 'assign') {
         if (!modal.assignedTo.trim()) {
-          setActionError('ID user harus diisi');
+          setActionError('Pilih penerima tugas terlebih dahulu');
           setWorking('');
           return;
         }
@@ -213,7 +275,7 @@ export function SiapCaseDetailPage() {
           {caseData.asn && (
             <InfoField label="ASN Terkait">
               <div>{caseData.asn.nama}</div>
-              <div className="text-xs text-muted-foreground">{caseData.asn.nip}</div>
+              <div className="text-xs text-muted-foreground">NIP: {caseData.asn.nip}</div>
             </InfoField>
           )}
           <InfoField label="Dibuat">{formatDateTime(caseData.createdAt)}</InfoField>
@@ -268,9 +330,10 @@ export function SiapCaseDetailPage() {
                 onComplete={() =>
                   setModal({ type: 'complete', taskId: task.id, note: '' })
                 }
-                onAssign={() =>
-                  setModal({ type: 'assign', taskId: task.id, assignedTo: '', note: '' })
-                }
+                onAssign={() => {
+                  setAssigneeQuery('');
+                  setModal({ type: 'assign', taskId: task.id, assignedTo: '', note: '' });
+                }}
                 onReturn={() =>
                   setModal({ type: 'return', taskId: task.id, reason: '', targetRole: '' })
                 }
@@ -345,7 +408,7 @@ export function SiapCaseDetailPage() {
                   {log.fromState && (
                     <>
                       <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{workflowStateLabel(log.fromState)}</span>
-                      <span className="text-muted-foreground">→</span>
+                      <span className="text-muted-foreground">-&gt;</span>
                     </>
                   )}
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{workflowStateLabel(log.toState)}</span>
@@ -357,7 +420,7 @@ export function SiapCaseDetailPage() {
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatDateTime(log.performedAt)}
-                  {log.performedBy ? ' · oleh Petugas Sistem' : ''}
+                  {log.performedBy ? ' - oleh Petugas Sistem' : ''}
                 </p>
               </div>
             ))}
@@ -368,7 +431,7 @@ export function SiapCaseDetailPage() {
       {/* Modal overlay */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-white p-6 shadow-xl">
             {modal.type === 'complete' && (
               <>
                 <h2 className="mb-4 text-base font-semibold">Selesaikan Tugas</h2>
@@ -388,15 +451,62 @@ export function SiapCaseDetailPage() {
                 <h2 className="mb-4 text-base font-semibold">Tugaskan</h2>
                 <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium">
-                      ID Pengguna <span className="text-destructive">*</span>
-                    </label>
+                    <label className="mb-1 block text-sm font-medium">Cari penerima tugas</label>
                     <input
                       className={inputClass}
-                      value={modal.assignedTo}
-                      onChange={(e) => setModal({ ...modal, assignedTo: e.target.value })}
-                      placeholder="Tempel ID pengguna penerima tugas"
+                      value={assigneeQuery}
+                      onChange={(e) => setAssigneeQuery(e.target.value)}
+                      placeholder="Cari nama, NIP, role, atau unit kerja"
                     />
+                    <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border bg-white">
+                      {assigneeLoading ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Memuat penerima tugas...
+                        </div>
+                      ) : filteredAssignees.length > 0 ? (
+                        filteredAssignees.map((item) => {
+                          const selected = modal.assignedTo === item.id;
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`flex w-full items-center justify-between gap-3 border-b border-border/60 px-3 py-2 text-left last:border-b-0 hover:bg-muted/40 ${
+                                selected ? 'bg-emerald-50' : ''
+                              }`}
+                              onClick={() => setModal({ ...modal, assignedTo: item.id })}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold">
+                                  {item.name}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  @{item.username}
+                                  {item.nip ? ` - NIP: ${item.nip}` : ''}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {item.roles.map((role) => role.name).join(', ') || 'Tanpa role'}
+                                  {item.unitKerja?.nama ? ` - ${item.unitKerja.nama}` : ''}
+                                </span>
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${
+                                  selected
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}
+                              >
+                                {selected ? 'Dipilih' : 'Pilih'}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Penerima tugas tidak ditemukan.
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium">Catatan</label>
@@ -499,19 +609,23 @@ function TaskRow({
     <div className="flex flex-wrap items-start gap-4 py-4 first:pt-0 last:pb-0">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-sm">{task.title}</span>
+          <span className="font-semibold text-sm">{timelineTitleLabel(task.title)}</span>
           <StatusBadge value={taskStatusLabel(task.status)} tone={taskStatusTone(task.status)} />
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{taskTypeLabel(task.taskType)}</span>
         </div>
         {task.description && (
-          <p className="mt-1 text-xs text-muted-foreground">{task.description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {timelineDescriptionLabel(task.description)}
+          </p>
         )}
         <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
           {task.dueDate && <span>Batas: {formatDate(task.dueDate)}</span>}
           {task.assignedTo && (
             <span>
               Ditugaskan ke:{' '}
-              <span className="font-medium text-foreground">Petugas yang ditunjuk</span>
+              <span className="font-medium text-foreground">
+                {task.assignee?.name ?? 'Petugas yang ditunjuk'}
+              </span>
             </span>
           )}
           {task.completedAt && <span>Selesai: {formatDate(task.completedAt)}</span>}

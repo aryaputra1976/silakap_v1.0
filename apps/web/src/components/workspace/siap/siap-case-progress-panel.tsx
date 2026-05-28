@@ -10,6 +10,7 @@ import {
   slaStatusTone,
   taskStatusTone,
   taskStatusLabel,
+  timelineTitleLabel,
   workflowStateLabel,
 } from '@/lib/siap/siap-labels';
 
@@ -114,7 +115,9 @@ export function SiapCaseProgressPanel({
               {tasks.slice(0, 2).map((task) => (
                 <div key={task.id} className="flex items-start justify-between gap-3 text-sm">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold text-zinc-950">{task.title}</div>
+                    <div className="truncate font-semibold text-zinc-950">
+                      {timelineTitleLabel(task.title)}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {task.dueDate ? `Batas ${formatDate(task.dueDate)}` : 'Tanpa batas waktu'}
                     </div>

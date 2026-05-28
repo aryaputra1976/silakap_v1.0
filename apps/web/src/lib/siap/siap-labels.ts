@@ -61,6 +61,11 @@ export function workflowStateLabel(value: string | null | undefined) {
     SUBMITTED: 'Dikirim',
     VERIFIKASI_ADMIN: 'Verifikasi Administrasi',
     VERIFIKASI: 'Verifikasi',
+    ANALIS_PERTAMA: 'Analis Pertama',
+    ANALIS_MUDA: 'Analis Muda',
+    ANALIS_MADYA: 'Analis Madya',
+    KABID: 'Kabid',
+    KEPALA_BADAN: 'Kepala Badan',
     APPROVAL: 'Persetujuan',
     APPROVED: 'Disetujui',
     COMPLETED: 'Selesai',
@@ -98,6 +103,11 @@ export function taskTypeLabel(value: string | null | undefined) {
     TINDAK_LANJUT: 'Tindak Lanjut',
     VERIFIKASI: 'Verifikasi',
     VERIFIKASI_ADMIN: 'Verifikasi Administrasi',
+    ANALIS_PERTAMA: 'Analis Pertama',
+    ANALIS_MUDA: 'Analis Muda',
+    ANALIS_MADYA: 'Analis Madya',
+    KABID: 'Kabid',
+    KEPALA_BADAN: 'Kepala Badan',
     APPROVAL: 'Persetujuan',
   };
   return labels[value] ?? humanizeCode(value);
@@ -206,9 +216,12 @@ export function timelineTitleLabel(value: string | null | undefined) {
     .replaceAll('case', 'kasus')
     .replaceAll('Task', 'Tugas')
     .replaceAll('task', 'tugas')
+    .replaceAll('Verifikasi Admin', 'Verifikasi Administrasi')
+    .replaceAll('Admin Bkpsdm', 'Admin BKPSDM')
     .replaceAll('DRAFT', 'Draft')
     .replaceAll('SUBMITTED', 'Dikirim')
-    .replaceAll('VERIFIKASI_ADMIN', 'Verifikasi Administrasi');
+    .replaceAll('VERIFIKASI_ADMIN', 'Verifikasi Administrasi')
+    .replaceAll('ADMIN_BKPSDM', 'Admin BKPSDM');
 }
 
 export function timelineDescriptionLabel(value: string | null | undefined) {
@@ -221,9 +234,12 @@ export function timelineDescriptionLabel(value: string | null | undefined) {
     .replaceAll('task', 'tugas')
     .replaceAll('disubmit', 'dikirim')
     .replaceAll('submit', 'kirim')
+    .replaceAll('Verifikasi Admin', 'Verifikasi Administrasi')
+    .replaceAll('Admin Bkpsdm', 'Admin BKPSDM')
     .replaceAll('DRAFT', 'Draft')
     .replaceAll('SUBMITTED', 'Dikirim')
     .replaceAll('VERIFIKASI_ADMIN', 'Verifikasi Administrasi')
+    .replaceAll('ADMIN_BKPSDM', 'Admin BKPSDM')
     .replaceAll('ASSIGNED', 'Belum Dikerjakan')
     .replaceAll('IN_PROGRESS', 'Sedang Dikerjakan')
     .replaceAll('COMPLETED', 'Selesai')
