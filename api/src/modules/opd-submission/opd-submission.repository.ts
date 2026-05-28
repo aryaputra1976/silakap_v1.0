@@ -14,6 +14,14 @@ const submissionInclude = {
   timelines: {
     orderBy: { createdAt: 'asc' },
   },
+  siapCase: {
+    select: {
+      id: true,
+      caseNumber: true,
+      currentState: true,
+      status: true,
+    },
+  },
 } satisfies Prisma.OpdSubmissionInclude;
 
 export type OpdSubmissionRecord = Prisma.OpdSubmissionGetPayload<{

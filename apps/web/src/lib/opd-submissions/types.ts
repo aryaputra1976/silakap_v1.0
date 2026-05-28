@@ -87,6 +87,13 @@ export type OpdSubmission = {
   description: string | null;
   status: OpdSubmissionStatus;
   correctionNote: string | null;
+  siapCaseId: string | null;
+  siapCase?: {
+    id: string;
+    caseNumber: string;
+    currentState: string;
+    status: string;
+  } | null;
   submittedAt: string | null;
   receivedAt: string | null;
   verifiedAt: string | null;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { FilePenLine, Send, UploadCloud } from 'lucide-react';
+import { ArrowRightCircle, FilePenLine, Send, UploadCloud } from 'lucide-react';
 import {
   ActionButton,
   ErrorAlert,
@@ -190,6 +190,29 @@ export function OpdSubmissionDetailPage() {
       </SectionCard>
 
       <ServiceSlaCard submission={submission} />
+
+      {submission.siapCase ? (
+        <SectionCard
+          title="SIAP Workflow Case"
+          description="Pengajuan ini sudah terhubung dengan alur kerja internal BKPSDM"
+          actions={
+            <Link to={`/siap/cases/${submission.siapCase.id}`}>
+              <ActionButton icon={ArrowRightCircle} variant="secondary">
+                Buka SIAP Case
+              </ActionButton>
+            </Link>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-3">
+            <FileMeta label="Nomor Case" value={submission.siapCase.caseNumber} />
+            <FileMeta
+              label="Tahap Saat Ini"
+              value={submission.siapCase.currentState}
+            />
+            <FileMeta label="Status Case" value={submission.siapCase.status} />
+          </div>
+        </SectionCard>
+      ) : null}
 
       {submission.status === 'NEEDS_CORRECTION' ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

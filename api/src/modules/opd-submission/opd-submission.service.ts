@@ -1419,6 +1419,15 @@ export class OpdSubmissionService {
       updatedById: internal ? record.updatedById : undefined,
       assignedToId: internal ? record.assignedToId : undefined,
       assignedToName: internal ? record.assignedToName : undefined,
+      siapCaseId: record.siapCaseId,
+      siapCase: record.siapCase
+        ? {
+            id: record.siapCase.id,
+            caseNumber: record.siapCase.caseNumber,
+            currentState: record.siapCase.currentState,
+            status: record.siapCase.status,
+          }
+        : null,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       documents: visibleDocuments.map((document) => ({
