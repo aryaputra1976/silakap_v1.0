@@ -48,10 +48,8 @@ const SIAP_CREATE_ROLES = [
 
 const SIAP_ASSIGN_ROLES = [
   'SUPER_ADMIN',
-  'ADMIN_BKPSDM',
   'KABID',
   'ANALIS_MADYA',
-  'ANALIS_MUDA',
 ];
 
 @UseGuards(JwtAuthGuard, RolesGuard)

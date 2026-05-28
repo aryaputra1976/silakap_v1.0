@@ -397,7 +397,7 @@ async function main() {
       {
         fromState: 'DRAFT',
         toState: 'VERIFIKASI_AWAL',
-        actionCode: 'SUBMIT_AWAL',
+        actionCode: 'SUBMIT',
         allowedRole: 'ANALIS_PERTAMA',
         slaDays: 3,
         sortOrder: 10,

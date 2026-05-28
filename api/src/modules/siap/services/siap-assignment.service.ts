@@ -88,11 +88,12 @@ export class SiapAssignmentService {
       where: { id: assignedUserId },
     });
 
+    // Update task
     const updatedTask = await this.prisma.siapTask.update({
       where: { id: taskId },
       data: {
         assignedTo: assignedUserId,
-        assignedAt: new Date(),
+        assignedBy: null,
         status: 'ASSIGNED',
       },
     });
@@ -106,7 +107,7 @@ export class SiapAssignmentService {
       taskId: updatedTask.id,
       assignedToUserId: assignedUserId,
       assignedToUserName: assignedUser?.name || 'Unknown',
-      assignedAt: updatedTask.assignedAt || new Date(),
+      assignedAt: new Date(),
       assignmentMethod: 'AUTO_LEAST_LOADED',
       workloadAtAssignment,
     };
@@ -120,46 +121,45 @@ export class SiapAssignmentService {
    * @param assignedByUserId - User yang melakukan assignment
    * @returns Assignment result
    */
-  async manualAssignTask(
-    taskId: string,
-    assignToUserId: string,
-    assignedByUserId: string,
-  ): Promise<AssignmentResult> {
-    // Validate task
-    const task = await this.prisma.siapTask.findUnique({
-      where: { id: taskId },
-      include: { case: true },
-    });
+    async manualAssignTask(
+      taskId: string,
+      assignToUserId: string,
+      assignedByUserId: string,
+    ): Promise<AssignmentResult> {
+      // Validate task
+      const task = await this.prisma.siapTask.findUnique({
+        where: { id: taskId },
+        include: { case: true },
+      });
 
-    if (!task) {
-      throw new BadRequestException(`Task ${taskId} tidak ditemukan`);
-    }
+      if (!task) {
+        throw new BadRequestException(`Task ${taskId} tidak ditemukan`);
+      }
 
-    // Validate target user exists and active
-    const targetUser = await this.prisma.user.findUnique({
-      where: { id: assignToUserId },
-    });
+      // Validate target user exists and active
+      const targetUser = await this.prisma.user.findUnique({
+        where: { id: assignToUserId },
+      });
 
-    if (!targetUser) {
-      throw new BadRequestException(`User ${assignToUserId} tidak ditemukan`);
-    }
+      if (!targetUser) {
+        throw new BadRequestException(`User ${assignToUserId} tidak ditemukan`);
+      }
 
-    if (!targetUser.isActive) {
-      throw new BadRequestException(
-        `User ${targetUser.name} tidak aktif dan tidak bisa menerima assignment`,
-      );
-    }
+      if (targetUser.status !== 'ACTIVE') {
+        throw new BadRequestException(
+          `User ${targetUser.name} tidak aktif dan tidak bisa menerima assignment`,
+        );
+      }
 
-    // Update task
-    const updatedTask = await this.prisma.siapTask.update({
-      where: { id: taskId },
-      data: {
-        assignedTo: assignToUserId,
-        assignedBy: assignedByUserId,
-        assignedAt: new Date(),
-        status: 'ASSIGNED',
-      },
-    });
+      // Update task
+      const updatedTask = await this.prisma.siapTask.update({
+        where: { id: taskId },
+        data: {
+          assignedTo: assignToUserId,
+          assignedBy: assignedByUserId,
+          status: 'ASSIGNED',
+        },
+      });
 
     // Get workload
     const workloadAtAssignment = await this.taskRepository.countActiveTasksByUser(
@@ -170,7 +170,7 @@ export class SiapAssignmentService {
       taskId: updatedTask.id,
       assignedToUserId: assignToUserId,
       assignedToUserName: targetUser.name,
-      assignedAt: updatedTask.assignedAt || new Date(),
+      assignedAt: new Date(),
       assignmentMethod: 'MANUAL',
       workloadAtAssignment,
     };

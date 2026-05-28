@@ -161,7 +161,8 @@ export class SiapTaskRepository {
     // 1. Cari semua user dengan role target yang aktif
     const activeUsers = await this.prisma.user.findMany({
       where: {
-        isActive: true,
+        status: 'ACTIVE',
+        deletedAt: null,
         ...(excludeUserIds && excludeUserIds.length > 0
           ? { id: { notIn: excludeUserIds } }
           : {}),
@@ -247,7 +248,8 @@ export class SiapTaskRepository {
   async getTeamWorkloadSummary(roleCode: string): Promise<UserWorkload[]> {
     const users = await this.prisma.user.findMany({
       where: {
-        isActive: true,
+        status: 'ACTIVE',
+        deletedAt: null,
       },
       select: { id: true },
     });

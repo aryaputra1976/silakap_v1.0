@@ -60,6 +60,9 @@ const ASSIGNEE_ROLES = [
 const STATE_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   VERIFIKASI_ADMIN: 'Verifikasi Administrasi',
+  VERIFIKASI_AWAL: 'Verifikasi Awal',
+  VERIFIKASI_SUBSTANSI: 'Verifikasi Substansi',
+  APPROVAL_KABID: 'Persetujuan Kabid',
   ANALIS_PERTAMA: 'Analis Pertama',
   ANALIS_MUDA: 'Analis Muda',
   ANALIS_MADYA: 'Analis Madya',

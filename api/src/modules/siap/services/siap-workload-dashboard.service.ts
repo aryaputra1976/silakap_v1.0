@@ -101,10 +101,10 @@ export class SiapWorkloadDashboardService {
     const userRoles = user.userRoles.map((ur) => ur.role.code);
 
     return {
+      ...workload,
       userId: user.id,
       userName: user.name,
       role: userRoles.join(', '),
-      ...workload,
       workloadScore: score,
       status,
     };
@@ -118,7 +118,8 @@ export class SiapWorkloadDashboardService {
   ): Promise<number> {
     const users = await this.prisma.user.findMany({
       where: {
-        isActive: true,
+        status: 'ACTIVE',
+        deletedAt: null,
       },
       select: { id: true },
     });
@@ -143,7 +144,8 @@ export class SiapWorkloadDashboardService {
     // Get team members
     let teamUsers = await this.prisma.user.findMany({
       where: {
-        isActive: true,
+        status: 'ACTIVE',
+        deletedAt: null,
       },
       select: { id: true, name: true, userRoles: { include: { role: true } } },
     });
@@ -281,13 +283,21 @@ export class SiapWorkloadDashboardService {
       serviceTypeDistribution: serviceDistribution,
       overloadedUsers,
       underloadedUsers,
-      overdueAlerts: overdueTasks.map((t) => ({
-        taskId: t.id,
-        caseNumber: t.case?.caseNumber,
-        daysOverdue: Math.ceil(
-          (new Date().getTime() - t.dueDate.getTime()) / (1000 * 60 * 60 * 24),
-        ),
-      })),
+      overdueAlerts: overdueTasks.flatMap((t) => {
+        if (!t.dueDate) {
+          return [];
+        }
+
+        return [
+          {
+            taskId: t.id,
+            caseNumber: t.case?.caseNumber,
+            daysOverdue: Math.ceil(
+              (Date.now() - t.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+            ),
+          },
+        ];
+      }),
       recommendations: this.generateRecommendations(
         overloadedUsers,
         underloadedUsers,
