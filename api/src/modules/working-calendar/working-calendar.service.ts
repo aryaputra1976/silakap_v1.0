@@ -8,6 +8,16 @@ import type { QueryHolidayDto } from './dto/query-holiday.dto';
 import type { UpdateWorkingCalendarDto } from './dto/update-working-calendar.dto';
 import { WorkingCalendarRepository } from './working-calendar.repository';
 
+const WORK_DAY_TO_NUMBER: Record<string, number> = {
+  SUNDAY: 0,
+  MONDAY: 1,
+  TUESDAY: 2,
+  WEDNESDAY: 3,
+  THURSDAY: 4,
+  FRIDAY: 5,
+  SATURDAY: 6,
+};
+
 @Injectable()
 export class WorkingCalendarService {
   constructor(
@@ -116,7 +126,7 @@ export class WorkingCalendarService {
 
     const holidays = await this.repo.findHolidays(record.id);
     return {
-      workDays: record.workDays as number[],
+      workDays: this.normalizeWorkDays(record.workDays),
       workStart: record.workStart,
       workEnd: record.workEnd,
       breakStart: record.breakStart ?? null,
@@ -130,5 +140,22 @@ export class WorkingCalendarService {
         return `${y}-${m}-${day}`;
       }),
     };
+  }
+
+  private normalizeWorkDays(value: unknown): number[] {
+    const rawDays = Array.isArray(value) ? value : [];
+    const days = rawDays
+      .map((day) => {
+        if (typeof day === 'number') return day;
+        if (typeof day === 'string') {
+          const asNumber = Number(day);
+          if (Number.isInteger(asNumber)) return asNumber;
+          return WORK_DAY_TO_NUMBER[day.trim().toUpperCase()];
+        }
+        return undefined;
+      })
+      .filter((day): day is number => day !== undefined && day >= 0 && day <= 6);
+
+    return days.length > 0 ? Array.from(new Set(days)) : DEFAULT_CALENDAR.workDays;
   }
 }

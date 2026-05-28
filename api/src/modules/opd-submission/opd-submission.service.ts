@@ -259,7 +259,7 @@ export class OpdSubmissionService {
           ? null
           : await this.siapService.createAndSubmitCase(
               {
-                serviceType: before.serviceType,
+                serviceType: this.toSiapServiceType(before),
                 title: this.buildSiapCaseTitle(before, submissionNumber),
                 description: this.buildSiapCaseDescription(before, submissionNumber),
                 asnId: before.subjectNip ?? undefined,
@@ -876,6 +876,32 @@ export class OpdSubmissionService {
 
   private buildSiapCaseTitle(record: OpdSubmissionRecord, submissionNumber: string) {
     return `[${submissionNumber}] ${record.title}`;
+  }
+
+  private toSiapServiceType(record: OpdSubmissionRecord) {
+    if (record.moduleKey === 'SIPENSIUN') {
+      return 'PENSIUN';
+    }
+
+    if (record.moduleKey !== 'LAYANAN_KEPEGAWAIAN') {
+      return 'LAIN_LAIN';
+    }
+
+    switch (record.serviceType) {
+      case 'kenaikan_pangkat':
+        return 'KENAIKAN_PANGKAT';
+      case 'mutasi':
+        return 'MUTASI';
+      case 'cuti':
+        return 'CUTI';
+      case 'pemberhentian':
+        return 'PENSIUN';
+      case 'pengangkatan':
+      case 'penghargaan':
+      case 'disiplin':
+      default:
+        return 'LAIN_LAIN';
+    }
   }
 
   private buildSiapCaseDescription(record: OpdSubmissionRecord, submissionNumber: string) {
