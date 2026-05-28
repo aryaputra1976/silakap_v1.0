@@ -15,7 +15,7 @@ import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdSubmissionTimeline } from '@/components/workspace/opd/opd-submission-timeline';
 import { ServiceSlaCard } from '@/components/workspace/service-workbench/service-sla-card';
 import {
-  canOpdSubmitCorrection,
+  type OpdSubmissionStatus,
   canOpdUploadDocument,
   opdSubmissionDocumentStatusLabel,
   opdSubmissionDocumentStatusTone,
@@ -59,7 +59,7 @@ export function OpdSubmissionDetailPage() {
     }
   }
 
-  async function submitCorrection() {
+  async function submitSubmission() {
     if (!submission) {
       return;
     }
@@ -69,14 +69,21 @@ export function OpdSubmissionDetailPage() {
     setSuccess('');
 
     try {
-      const result = await opdSubmissionsApi.submitOpdCorrection(submission.id);
+      const result =
+        submission.status === 'DRAFT'
+          ? await opdSubmissionsApi.submitOpdSubmission(submission.id)
+          : await opdSubmissionsApi.submitOpdCorrection(submission.id);
       setSubmission(result);
-      setSuccess('Perbaikan berkas berhasil dikirim ke antrian PPIK.');
+      setSuccess(
+        submission.status === 'DRAFT'
+          ? 'Permohonan berhasil dikirim ke antrian PPIK.'
+          : 'Perbaikan berkas berhasil dikirim ke antrian PPIK.',
+      );
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Gagal mengirim perbaikan berkas',
+          : 'Gagal mengirim permohonan',
       );
     } finally {
       setWorking(false);
@@ -100,6 +107,8 @@ export function OpdSubmissionDetailPage() {
     );
   }
 
+  const submitAction = getSubmitAction(submission.status);
+
   return (
     <div className="space-y-5">
       <OpdPageHeader
@@ -116,13 +125,15 @@ export function OpdSubmissionDetailPage() {
                 Tambah Dokumen
               </ActionButton>
             </Link>
-            <ActionButton
-              icon={Send}
-              disabled={!canOpdSubmitCorrection(submission.status) || working}
-              onClick={() => void submitCorrection()}
-            >
-              Kirim Perbaikan
-            </ActionButton>
+            {submitAction ? (
+              <ActionButton
+                icon={Send}
+                disabled={working}
+                onClick={() => void submitSubmission()}
+              >
+                {submitAction.label}
+              </ActionButton>
+            ) : null}
           </div>
         }
       />
@@ -260,4 +271,16 @@ function formatSize(value: number | null) {
   }
 
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getSubmitAction(status: OpdSubmissionStatus) {
+  if (status === 'DRAFT') {
+    return { label: 'Kirim Permohonan' };
+  }
+
+  if (status === 'NEEDS_CORRECTION') {
+    return { label: 'Kirim Perbaikan' };
+  }
+
+  return null;
 }
