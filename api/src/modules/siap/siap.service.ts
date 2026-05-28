@@ -32,6 +32,7 @@ import {
   WorkflowTransitionRecord,
 } from './siap.repository';
 import { NormalizedCaseFilters, NormalizedTaskFilters } from './siap.types';
+import { SiapAssignmentService } from './services/siap-assignment.service';
 
 const DRAFT_STATE = 'DRAFT';
 const COMPLETED_STATE = 'COMPLETED';
@@ -104,6 +105,8 @@ export class SiapService {
     private readonly eventBusService: EventBusService,
     @Inject(AuditService)
     private readonly auditService: AuditService,
+    @Inject(SiapAssignmentService)
+    private readonly siapAssignmentService: SiapAssignmentService,
   ) {}
 
   async createCase(dto: CreateCaseDto, user: AuthUser) {
@@ -906,14 +909,10 @@ export class SiapService {
     startedAt: Date,
     client: SiapDbClient,
   ): Promise<SiapTaskRecord> {
-    const assignedTo =
-      (await this.siapRepository.findActiveUserIdByRole(
-        transition.allowedRole,
-        client,
-      )) ?? undefined;
     const dueAt = transition.slaDays
       ? this.addDays(startedAt, transition.slaDays)
       : undefined;
+
     const task = await this.siapRepository.createTask(
       {
         caseId,
@@ -922,7 +921,7 @@ export class SiapService {
         description: this.createTaskDescription(transition),
         status: TaskStatus.ASSIGNED,
         priority: this.toTaskPriority(casePriority),
-        assignedTo,
+        assignedTo: undefined,
         assignedBy: user.id,
         dueDate: dueAt,
         createdBy: user.id,
@@ -945,7 +944,27 @@ export class SiapService {
       );
     }
 
-    return task;
+    try {
+      await this.siapAssignmentService.autoAssignTaskToLeastLoaded(
+        task.id,
+        this.resolveAssignmentRoleCodes(transition.allowedRole),
+      );
+    } catch {
+      // Jangan gagalkan pembuatan task jika pool kosong.
+      // Task tetap ASSIGNED tanpa assignedTo dan bisa direassign manual oleh role supervisor.
+    }
+
+    const updatedTask = await this.siapRepository.findTaskById(task.id);
+
+    return updatedTask ?? task;
+  }
+
+  private resolveAssignmentRoleCodes(roleCode: string): string[] {
+    if (roleCode === 'ANALIS_PERTAMA') {
+      return ['ANALIS_PERTAMA', 'PENELAAH', 'PPPK'];
+    }
+
+    return [roleCode];
   }
 
   private async getTaskForUser(id: string, user: AuthUser) {

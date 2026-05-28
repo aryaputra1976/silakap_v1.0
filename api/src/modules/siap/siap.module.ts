@@ -6,11 +6,23 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { SiapController } from './siap.controller';
 import { SiapRepository } from './siap.repository';
 import { SiapService } from './siap.service';
+import { SiapAssignmentService } from './services/siap-assignment.service';
+import { SiapTaskRepository } from './services/siap-task.repository';
 
 @Module({
   imports: [AuditModule, AuthModule, PrismaModule, EventsModule],
   controllers: [SiapController],
-  providers: [SiapRepository, SiapService],
-  exports: [SiapRepository, SiapService],
+  providers: [
+    SiapRepository,
+    SiapTaskRepository,
+    SiapAssignmentService,
+    SiapService,
+  ],
+  exports: [
+    SiapRepository,
+    SiapTaskRepository,
+    SiapAssignmentService,
+    SiapService,
+  ],
 })
 export class SiapModule {}
