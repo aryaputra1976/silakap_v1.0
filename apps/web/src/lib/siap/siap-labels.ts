@@ -156,6 +156,81 @@ export function worklogCategoryLabel(value: string | null | undefined) {
   return labels[value] ?? humanizeCode(value);
 }
 
+export function slaStatusLabel(value: string | null | undefined) {
+  if (!value) return '-';
+  const labels: Record<string, string> = {
+    ON_TRACK: 'Sesuai Jadwal',
+    WARNING: 'Perlu Perhatian',
+    OVERDUE: 'Terlambat',
+    ESCALATED: 'Dieskalasi',
+    COMPLETED: 'Selesai',
+  };
+  return labels[value] ?? humanizeCode(value);
+}
+
+export function slaStatusTone(value: string | null | undefined): BadgeTone {
+  if (value === 'COMPLETED') return 'success';
+  if (value === 'WARNING') return 'warning';
+  if (value === 'OVERDUE' || value === 'ESCALATED') return 'danger';
+  return 'info';
+}
+
+export function timelineEventLabel(value: string | null | undefined) {
+  if (!value) return '-';
+  const labels: Record<string, string> = {
+    CASE_CREATED: 'Kasus Dibuat',
+    CASE_SUBMITTED: 'Kasus Dikirim',
+    CASE_COMPLETED: 'Kasus Selesai',
+    CASE_CANCELLED: 'Kasus Dibatalkan',
+    TASK_CREATED: 'Tugas Dibuat',
+    TASK_STARTED: 'Tugas Mulai Dikerjakan',
+    TASK_COMPLETED: 'Tugas Diselesaikan',
+    TASK_ASSIGNED: 'Tugas Ditugaskan',
+    TASK_RETURNED: 'Tugas Dikembalikan',
+    DOCUMENT_UPLOADED: 'Dokumen Diunggah',
+    WORKLOG_CREATED: 'Buku Kerja Dibuat',
+  };
+  return labels[value] ?? humanizeCode(value);
+}
+
+export function timelineTitleLabel(value: string | null | undefined) {
+  if (!value) return '-';
+  const knownLabel = timelineEventLabel(value);
+  if (knownLabel !== humanizeCode(value)) return knownLabel;
+
+  return value
+    .replaceAll('Case', 'Kasus')
+    .replaceAll('case', 'kasus')
+    .replaceAll('Task', 'Tugas')
+    .replaceAll('task', 'tugas')
+    .replaceAll('DRAFT', 'Draft')
+    .replaceAll('SUBMITTED', 'Dikirim')
+    .replaceAll('VERIFIKASI_ADMIN', 'Verifikasi Administrasi');
+}
+
+export function timelineDescriptionLabel(value: string | null | undefined) {
+  if (!value) return null;
+
+  return value
+    .replaceAll('Case', 'Kasus')
+    .replaceAll('case', 'kasus')
+    .replaceAll('Task', 'Tugas')
+    .replaceAll('task', 'tugas')
+    .replaceAll('disubmit', 'dikirim')
+    .replaceAll('submit', 'kirim')
+    .replaceAll('DRAFT', 'Draft')
+    .replaceAll('SUBMITTED', 'Dikirim')
+    .replaceAll('VERIFIKASI_ADMIN', 'Verifikasi Administrasi')
+    .replaceAll('ASSIGNED', 'Belum Dikerjakan')
+    .replaceAll('IN_PROGRESS', 'Sedang Dikerjakan')
+    .replaceAll('COMPLETED', 'Selesai')
+    .replaceAll('ON_TRACK', 'Sesuai Jadwal');
+}
+
+export function actorDisplayName(value: string | null | undefined) {
+  return value ? 'Petugas Sistem' : undefined;
+}
+
 export function humanizeCode(value: string) {
   return value
     .replace(/_/g, ' ')

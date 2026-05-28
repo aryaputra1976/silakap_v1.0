@@ -28,14 +28,20 @@ import { SiapCaseProgressPanel } from '@/components/workspace/siap/siap-case-pro
 import { SiapCaseWorklogsPanel } from '@/components/workspace/siap/siap-case-worklogs-panel';
 import { useAuth } from '@/lib/auth/session';
 import {
+  actorDisplayName,
   caseStatusLabel,
   caseStatusTone,
   priorityLabel,
   priorityTone,
   serviceTypeLabel,
+  slaStatusLabel,
+  slaStatusTone,
   taskStatusLabel,
   taskStatusTone,
   taskTypeLabel,
+  timelineDescriptionLabel,
+  timelineEventLabel,
+  timelineTitleLabel,
   workflowActionLabel,
   workflowStateLabel,
 } from '@/lib/siap/siap-labels';
@@ -48,13 +54,6 @@ type ModalState =
   | { type: 'assign'; taskId: string; assignedTo: string; note: string }
   | { type: 'return'; taskId: string; reason: string; targetRole: string }
   | null;
-
-const SLA_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  ON_TRACK: 'success',
-  WARNING: 'warning',
-  OVERDUE: 'danger',
-  COMPLETED: 'neutral',
-};
 
 export function SiapCaseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -162,11 +161,11 @@ export function SiapCaseDetailPage() {
 
   const timelineItems = (caseData.timelines as TimelineEntry[]).map((t) => ({
     id: t.id,
-    title: t.title,
-    description: t.description,
-    type: t.eventType,
+    title: timelineTitleLabel(t.title || t.eventType),
+    description: timelineDescriptionLabel(t.description),
+    type: timelineEventLabel(t.eventType),
     timestamp: t.createdAt,
-    actor: t.performedBy ?? undefined,
+    actor: actorDisplayName(t.performedBy),
   }));
 
   return (
@@ -181,9 +180,6 @@ export function SiapCaseDetailPage() {
               value={priorityLabel(caseData.priority)}
               tone={priorityTone(caseData.priority)}
             />
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-              {workflowStateLabel(caseData.currentState)}
-            </span>
           </div>
         }
         actions={
@@ -201,6 +197,7 @@ export function SiapCaseDetailPage() {
 
       <SiapCaseProgressPanel
         caseId={caseData.id}
+        currentState={caseData.currentState}
         tasks={caseData.tasks}
         slaTracking={caseData.slaTracking}
       />
@@ -236,7 +233,7 @@ export function SiapCaseDetailPage() {
         {caseData.status === 'DRAFT' && canCreate && (
           <div className="mt-5 border-t border-border pt-4">
             <p className="mb-3 text-sm text-muted-foreground">
-              Kasus belum dikirim. Kirim untuk memulai proses.
+              Kasus masih draft. Kirim kasus untuk memulai proses layanan.
             </p>
             <ActionButton
               icon={Send}
@@ -304,12 +301,12 @@ export function SiapCaseDetailPage() {
                     <td className="py-2 pr-4 text-xs">{formatDate(sla.startedAt)}</td>
                     <td className="py-2 pr-4 text-xs">{formatDate(sla.dueAt)}</td>
                     <td className="py-2 pr-4 text-xs">
-                      {sla.completedAt ? formatDate(sla.completedAt) : '—'}
+                      {sla.completedAt ? formatDate(sla.completedAt) : '-'}
                     </td>
                     <td className="py-2">
                       <StatusBadge
-                        value={sla.status}
-                        tone={SLA_TONE[sla.status] ?? 'neutral'}
+                        value={slaStatusLabel(sla.status)}
+                        tone={slaStatusTone(sla.status)}
                       />
                     </td>
                   </tr>
@@ -353,10 +350,14 @@ export function SiapCaseDetailPage() {
                   )}
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{workflowStateLabel(log.toState)}</span>
                 </div>
-                {log.note && <p className="mt-1 text-muted-foreground">{log.note}</p>}
+                {log.note && (
+                  <p className="mt-1 text-muted-foreground">
+                    {timelineDescriptionLabel(log.note)}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatDateTime(log.performedAt)}
-                  {log.performedBy ? ` · oleh ${log.performedBy}` : ''}
+                  {log.performedBy ? ' · oleh Petugas Sistem' : ''}
                 </p>
               </div>
             ))}
@@ -510,7 +511,7 @@ function TaskRow({
           {task.assignedTo && (
             <span>
               Ditugaskan ke:{' '}
-              <span className="font-medium text-foreground">{task.assignedTo}</span>
+              <span className="font-medium text-foreground">Petugas yang ditunjuk</span>
             </span>
           )}
           {task.completedAt && <span>Selesai: {formatDate(task.completedAt)}</span>}

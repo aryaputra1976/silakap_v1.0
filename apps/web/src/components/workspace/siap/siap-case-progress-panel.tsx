@@ -6,16 +6,20 @@ import {
   formatDate,
 } from '@/components/workspace/ui';
 import {
+  slaStatusLabel,
+  slaStatusTone,
   taskStatusTone,
   taskStatusLabel,
   workflowStateLabel,
 } from '@/lib/siap/siap-labels';
 
 export function SiapCaseProgressPanel({
+  currentState,
   tasks,
   slaTracking,
 }: {
   caseId: string;
+  currentState: string;
   tasks: SiapTask[];
   slaTracking: SiapSlaTracking[];
 }) {
@@ -83,10 +87,13 @@ export function SiapCaseProgressPanel({
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-zinc-950">
-              {currentSla ? workflowStateLabel(currentSla.workflowState) : '-'}
+              {workflowStateLabel(currentSla?.workflowState ?? currentState)}
             </span>
             {currentSla ? (
-              <StatusBadge value={slaStatusLabel(currentSla.status)} tone={slaTone(currentSla.status)} />
+              <StatusBadge
+                value={slaStatusLabel(currentSla.status)}
+                tone={slaStatusTone(currentSla.status)}
+              />
             ) : null}
           </div>
           {currentSla ? (
@@ -155,21 +162,4 @@ function ProgressTile({
       </div>
     </div>
   );
-}
-
-function slaStatusLabel(status: SiapSlaTracking['status']) {
-  const labels: Record<SiapSlaTracking['status'], string> = {
-    ON_TRACK: 'Sesuai Jadwal',
-    WARNING: 'Perlu Dipantau',
-    OVERDUE: 'Terlambat',
-    COMPLETED: 'Selesai',
-  };
-  return labels[status];
-}
-
-function slaTone(status: SiapSlaTracking['status']) {
-  if (status === 'COMPLETED') return 'success' as const;
-  if (status === 'WARNING') return 'warning' as const;
-  if (status === 'OVERDUE') return 'danger' as const;
-  return 'info' as const;
 }
