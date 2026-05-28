@@ -1007,12 +1007,12 @@ export class SiapService {
   }
 
   private canAssignTask(user: AuthUser) {
+    // PERUBAHAN: Hanya SUPER_ADMIN, KABID, ANALIS_MADYA yang boleh assign
+    // Menghapus: ADMIN_BKPSDM dan ANALIS_MUDA tidak lagi boleh assign rutin
     return this.hasAnyRole(user, [
       'SUPER_ADMIN',
-      'ADMIN_BKPSDM',
       'KABID',
       'ANALIS_MADYA',
-      'ANALIS_MUDA',
     ]);
   }
 
