@@ -901,63 +901,57 @@ export class SiapService {
     return matches[0] ?? null;
   }
 
-  private async createTaskForTransition(
-    caseId: string,
-    casePriority: CasePriority,
-    transition: WorkflowTransitionRecord,
-    user: AuthUser,
-    startedAt: Date,
-    client: SiapDbClient,
-  ): Promise<SiapTaskRecord> {
-    const dueAt = transition.slaDays
-      ? this.addDays(startedAt, transition.slaDays)
-      : undefined;
+private async createTaskForTransition(
+  caseId: string,
+  casePriority: CasePriority,
+  transition: WorkflowTransitionRecord,
+  user: AuthUser,
+  startedAt: Date,
+  client: SiapDbClient,
+): Promise<SiapTaskRecord> {
+  const assignedTo =
+    (await this.siapRepository.findLeastLoadedActiveUserByRoleCodes(
+      this.resolveAssignmentRoleCodes(transition.allowedRole),
+      client,
+    )) ?? undefined;
 
-    const task = await this.siapRepository.createTask(
+  const dueAt = transition.slaDays
+    ? this.addDays(startedAt, transition.slaDays)
+    : undefined;
+
+  const task = await this.siapRepository.createTask(
+    {
+      caseId,
+      taskType: transition.toState,
+      title: this.createTaskTitle(transition),
+      description: this.createTaskDescription(transition),
+      status: TaskStatus.ASSIGNED,
+      priority: this.toTaskPriority(casePriority),
+      assignedTo,
+      assignedBy: assignedTo ? user.id : undefined,
+      dueDate: dueAt,
+      createdBy: user.id,
+      updatedBy: user.id,
+    },
+    client,
+  );
+
+  if (dueAt) {
+    await this.siapRepository.createSlaTracking(
       {
         caseId,
-        taskType: transition.toState,
-        title: this.createTaskTitle(transition),
-        description: this.createTaskDescription(transition),
-        status: TaskStatus.ASSIGNED,
-        priority: this.toTaskPriority(casePriority),
-        assignedTo: undefined,
-        assignedBy: user.id,
-        dueDate: dueAt,
-        createdBy: user.id,
-        updatedBy: user.id,
+        taskId: task.id,
+        workflowState: transition.toState,
+        startedAt,
+        dueAt,
+        status: SlaStatus.ON_TRACK,
       },
       client,
     );
-
-    if (dueAt) {
-      await this.siapRepository.createSlaTracking(
-        {
-          caseId,
-          taskId: task.id,
-          workflowState: transition.toState,
-          startedAt,
-          dueAt,
-          status: SlaStatus.ON_TRACK,
-        },
-        client,
-      );
-    }
-
-    try {
-      await this.siapAssignmentService.autoAssignTaskToLeastLoaded(
-        task.id,
-        this.resolveAssignmentRoleCodes(transition.allowedRole),
-      );
-    } catch {
-      // Jangan gagalkan pembuatan task jika pool kosong.
-      // Task tetap ASSIGNED tanpa assignedTo dan bisa direassign manual oleh role supervisor.
-    }
-
-    const updatedTask = await this.siapRepository.findTaskById(task.id);
-
-    return updatedTask ?? task;
   }
+
+  return task;
+}
 
   private resolveAssignmentRoleCodes(roleCode: string): string[] {
     if (roleCode === 'ANALIS_PERTAMA') {

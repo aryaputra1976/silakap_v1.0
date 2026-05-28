@@ -484,6 +484,69 @@ export class SiapRepository {
     });
   }
 
+  async findLeastLoadedActiveUserByRoleCodes(
+    roleCodes: string[],
+    client: SiapDbClient = this.prisma,
+  ): Promise<string | null> {
+    const candidates = await client.user.findMany({
+      where: {
+        deletedAt: null,
+        status: AccountStatus.ACTIVE,
+        userRoles: {
+          some: {
+            role: {
+              code: {
+                in: roleCodes,
+              },
+              isActive: true,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        _count: {
+          select: {
+            assignedTasks: {
+              where: {
+                deletedAt: null,
+                status: {
+                  in: [
+                    TaskStatus.ASSIGNED,
+                    TaskStatus.IN_PROGRESS,
+                    TaskStatus.WAITING,
+                    TaskStatus.RETURNED,
+                    TaskStatus.OVERDUE,
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        {
+          name: 'asc',
+        },
+        {
+          username: 'asc',
+        },
+      ],
+    });
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    candidates.sort(
+      (a, b) => a._count.assignedTasks - b._count.assignedTasks,
+    );
+
+    return candidates[0]?.id ?? null;
+  }
+
   private buildCaseWhere(
     filters: NormalizedCaseFilters,
   ): Prisma.SiapCaseWhereInput {
