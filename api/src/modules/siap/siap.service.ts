@@ -79,6 +79,14 @@ const ROLE_LABELS: Record<string, string> = {
   PPPK: 'PPPK',
 };
 
+type CreateSubmittedSiapCaseInput = {
+  serviceType: string;
+  title: string;
+  description?: string;
+  asnId?: string;
+  priority?: CasePriority;
+};
+
 @Injectable()
 export class SiapService {
   constructor(
@@ -93,6 +101,25 @@ export class SiapService {
   async createCase(dto: CreateCaseDto, user: AuthUser) {
     const created = await this.createCaseRecord(dto, user);
     return this.toCaseListResponse(created);
+  }
+
+  async createAndSubmitCase(
+    input: CreateSubmittedSiapCaseInput,
+    user: AuthUser,
+    context?: AuditContext,
+  ) {
+    const created = await this.createCaseRecord(
+      {
+        serviceType: input.serviceType,
+        title: input.title,
+        description: input.description,
+        asnId: input.asnId,
+        priority: input.priority,
+      },
+      user,
+    );
+
+    return this.submitCase(created.id, user, context);
   }
 
   async createCaseRecord(

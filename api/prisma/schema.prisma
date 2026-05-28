@@ -786,6 +786,7 @@ model SiapCase {
   slaTracking   SlaTracking[]
   timelines     TimelineEntry[]
   sipensiunCase SipensiunCase?
+  opdSubmission OpdSubmission?
   notifications Notification[]
   worklogs      SiapWorklog[]
   dmsDocuments  DmsDocument[]
@@ -1071,6 +1072,7 @@ model OpdSubmission {
   updatedById      String?   @map("updated_by_id") @db.VarChar(36)
   assignedToId     String?   @map("assigned_to_id") @db.VarChar(36)
   assignedToName   String?   @map("assigned_to_name") @db.VarChar(200)
+  siapCaseId        String?   @unique @map("siap_case_id") @db.VarChar(36)
   slaStartedAt     DateTime? @map("sla_started_at")
   slaPausedAt      DateTime? @map("sla_paused_at")
   slaResumedAt     DateTime? @map("sla_resumed_at")
@@ -1088,9 +1090,11 @@ model OpdSubmission {
   documents OpdSubmissionDocument[]
   auditLogs OpdSubmissionAuditLog[]
   timelines OpdSubmissionTimeline[]
+  siapCase  SiapCase? @relation(fields: [siapCaseId], references: [id], onDelete: SetNull)
 
   @@index([opdUserId])
   @@index([opdUnitId])
+  @@index([siapCaseId])
   @@index([serviceType])
   @@index([moduleKey])
   @@index([status])

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DmsDocumentCategory, Prisma } from '@prisma/client';
+import { CasePriority, DmsDocumentCategory, Prisma } from '@prisma/client';
 import { basename, extname } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
@@ -41,6 +41,7 @@ import {
   OpdSubmissionRepository,
   OpdSubmissionTimelineRecord,
 } from './opd-submission.repository';
+import { SiapService } from '../siap/siap.service';
 import { WorkingCalendarService } from '../working-calendar/working-calendar.service';
 
 const OPD_ROLE = 'OPD';
@@ -124,6 +125,7 @@ export class OpdSubmissionService {
     @Inject(DmsService) private readonly dmsService: DmsService,
     @Inject(KinerjaRhkCandidateService) private readonly candidateService: KinerjaRhkCandidateService,
     @Inject(WorkingCalendarService) private readonly workingCalendarService: WorkingCalendarService,
+    @Inject(SiapService) private readonly siapService: SiapService,
   ) {}
 
   async listMine(query: OpdSubmissionQueryDto, user: AuthUser) {
@@ -251,8 +253,23 @@ export class OpdSubmissionService {
     const targetHours = getSlaTargetHours(before.moduleKey, before.serviceType);
     const cal = await this.workingCalendarService.getEffectiveCalendar();
     const slaDueAt = calculateSlaDueAtBusiness(now, targetHours, cal);
+    const siapCase =
+      before.siapCaseId
+        ? null
+        : await this.siapService.createAndSubmitCase(
+            {
+              serviceType: before.serviceType,
+              title: this.buildSiapCaseTitle(before, submissionNumber),
+              description: this.buildSiapCaseDescription(before, submissionNumber),
+              asnId: before.subjectNip ?? undefined,
+              priority: CasePriority.NORMAL,
+            },
+            user,
+            context,
+          );
     const updated = await this.repo.update(before.id, {
       submissionNumber,
+      ...(siapCase ? { siapCaseId: siapCase.id } : {}),
       status: 'SUBMITTED',
       submittedAt: now,
       slaStartedAt: now,
@@ -270,6 +287,17 @@ export class OpdSubmissionService {
 
     await this.writeAudit(updated, 'SUBMIT', before, updated, user, dto.note, context);
     await this.writeTimeline(updated, before.status, 'SUBMITTED', 'SUBMIT', user, dto.note, 'Pengajuan dikirim OPD dan SLA mulai dihitung');
+    if (siapCase) {
+      await this.writeTimeline(
+        updated,
+        'SUBMITTED',
+        'SUBMITTED',
+        'SIAP_CASE_CREATED',
+        user,
+        `SIAP Case ${siapCase.caseNumber} otomatis dibuat dari pengajuan OPD`,
+        `SIAP Case ${siapCase.caseNumber} dibuat untuk proses internal BKPSDM`,
+      );
+    }
     return this.toResponse(updated, false);
   }
 
@@ -822,6 +850,25 @@ export class OpdSubmissionService {
     const updated = await this.getSubmission(before.id);
     await this.writeAudit(updated, action, before, updated, user, note, context);
     return this.toResponse(updated, true);
+  }
+
+  private buildSiapCaseTitle(record: OpdSubmissionRecord, submissionNumber: string) {
+    return `[${submissionNumber}] ${record.title}`;
+  }
+
+  private buildSiapCaseDescription(record: OpdSubmissionRecord, submissionNumber: string) {
+    const lines = [
+      'Pengajuan layanan kepegawaian dari OPD.',
+      `Nomor pengajuan: ${submissionNumber}`,
+      `Module: ${record.moduleKey}`,
+      `Jenis layanan: ${record.serviceType}`,
+      record.opdName ? `OPD: ${record.opdName}` : undefined,
+      record.subjectName ? `Nama ASN/subjek: ${record.subjectName}` : undefined,
+      record.subjectNip ? `NIP ASN/subjek: ${record.subjectNip}` : undefined,
+      record.description ? `Uraian: ${record.description}` : undefined,
+    ];
+
+    return lines.filter(Boolean).join('\n');
   }
 
   private async changeInternalStatus(
