@@ -133,21 +133,20 @@ const assignableUserSelect = {
   },
 } satisfies Prisma.UserSelect;
 
-export type SiapCaseListRecord = Prisma.SiapCaseGetPayload<{
-  include: typeof caseListInclude;
-}>;
-
-export type SiapCaseDetailRecord = Prisma.SiapCaseGetPayload<{
-  include: typeof caseDetailInclude;
-}>;
-
-export type SiapTaskRecord = Prisma.SiapTaskGetPayload<{
-  include: typeof taskInclude;
-}>;
-
-export type SiapAssignableUserRecord = Prisma.UserGetPayload<{
-  select: typeof assignableUserSelect;
-}>;
+const opdSubmissionVerificationInclude = {
+  documents: {
+    select: {
+      id: true,
+      documentType: true,
+      title: true,
+      status: true,
+      mimeType: true,
+      originalFileName: true,
+      storageKey: true,
+      uploadedAt: true,
+    },
+  },
+} satisfies Prisma.OpdSubmissionInclude;
 
 const overdueSlaInclude = {
   case: {
@@ -165,10 +164,6 @@ const overdueSlaInclude = {
   },
 } satisfies Prisma.SlaTrackingInclude;
 
-export type OverdueSlaRecord = Prisma.SlaTrackingGetPayload<{
-  include: typeof overdueSlaInclude;
-}>;
-
 const workflowDefinitionInclude = {
   transitions: {
     where: {
@@ -178,11 +173,37 @@ const workflowDefinitionInclude = {
   },
 } satisfies Prisma.WorkflowDefinitionInclude;
 
+export type SiapCaseListRecord = Prisma.SiapCaseGetPayload<{
+  include: typeof caseListInclude;
+}>;
+
+export type SiapCaseDetailRecord = Prisma.SiapCaseGetPayload<{
+  include: typeof caseDetailInclude;
+}>;
+
+export type SiapTaskRecord = Prisma.SiapTaskGetPayload<{
+  include: typeof taskInclude;
+}>;
+
+export type SiapAssignableUserRecord = Prisma.UserGetPayload<{
+  select: typeof assignableUserSelect;
+}>;
+
+export type OpdSubmissionVerificationRecord =
+  Prisma.OpdSubmissionGetPayload<{
+    include: typeof opdSubmissionVerificationInclude;
+  }>;
+
+export type OverdueSlaRecord = Prisma.SlaTrackingGetPayload<{
+  include: typeof overdueSlaInclude;
+}>;
+
 export type WorkflowDefinitionRecord = Prisma.WorkflowDefinitionGetPayload<{
   include: typeof workflowDefinitionInclude;
 }>;
 
-export type WorkflowTransitionRecord = WorkflowDefinitionRecord['transitions'][number];
+export type WorkflowTransitionRecord =
+  WorkflowDefinitionRecord['transitions'][number];
 
 @Injectable()
 export class SiapRepository {
@@ -404,9 +425,7 @@ export class SiapRepository {
   async findTaskVerification(id: string): Promise<{
     task: SiapTaskRecord;
     caseDetail: SiapCaseDetailRecord | null;
-    submission: (Prisma.OpdSubmissionGetPayload<{
-      include: { documents: true };
-    }>) | null;
+    submission: OpdSubmissionVerificationRecord | null;
   } | null> {
     const task = await this.prisma.siapTask.findFirst({
       where: {
@@ -432,23 +451,7 @@ export class SiapRepository {
       where: {
         siapCaseId: task.caseId,
       },
-      include: {
-        documents: {
-          where: {
-            // Don't filter by status, show all documents
-          },
-          select: {
-            id: true,
-            documentType: true,
-            title: true,
-            status: true,
-            mimeType: true,
-            originalFileName: true,
-            storageKey: true,
-            uploadedAt: true,
-          },
-        },
-      },
+      include: opdSubmissionVerificationInclude,
     });
 
     return {
@@ -463,7 +466,7 @@ export class SiapRepository {
       where: {
         id,
         deletedAt: null,
-        status: 'ACTIVE',
+        status: AccountStatus.ACTIVE,
       },
     });
 
@@ -636,6 +639,31 @@ export class SiapRepository {
       deletedAt: null,
     };
 
+    const accessConditions: Prisma.SiapCaseWhereInput[] = [];
+
+    if (filters.createdBy) {
+      accessConditions.push({ createdBy: filters.createdBy });
+    }
+
+    if (filters.assignedTaskUserId) {
+      accessConditions.push({
+        tasks: {
+          some: {
+            assignedTo: filters.assignedTaskUserId,
+            deletedAt: null,
+          },
+        },
+      });
+    }
+
+    if (accessConditions.length === 1) {
+      Object.assign(where, accessConditions[0]);
+    }
+
+    if (accessConditions.length > 1) {
+      where.OR = accessConditions;
+    }
+
     if (filters.serviceType) {
       where.serviceType = filters.serviceType;
     }
@@ -648,31 +676,6 @@ export class SiapRepository {
       where.status = filters.status;
     }
 
-    if (filters.createdBy && filters.assignedTaskUserId) {
-      // User dapat lihat case yang dibuat oleh user OR case dengan task assigned to user
-      where.OR = [
-        { createdBy: filters.createdBy },
-        {
-          tasks: {
-            some: {
-              assignedTo: filters.assignedTaskUserId,
-              deletedAt: null,
-            },
-          },
-        },
-      ];
-    } else if (filters.createdBy) {
-      where.createdBy = filters.createdBy;
-    } else if (filters.assignedTaskUserId) {
-      // User dapat lihat case dengan task assigned to user
-      where.tasks = {
-        some: {
-          assignedTo: filters.assignedTaskUserId,
-          deletedAt: null,
-        },
-      };
-    }
-
     if (filters.asnUnitKerjaId) {
       where.asn = {
         unitKerjaId: filters.asnUnitKerjaId,
@@ -680,13 +683,28 @@ export class SiapRepository {
     }
 
     if (filters.q) {
-      where.OR = [
+      const searchConditions: Prisma.SiapCaseWhereInput[] = [
         { caseNumber: { contains: filters.q } },
         { title: { contains: filters.q } },
         { description: { contains: filters.q } },
         { asn: { nama: { contains: filters.q } } },
         { asn: { nip: { contains: filters.q } } },
       ];
+
+      if (where.OR) {
+        where.AND = [
+          {
+            OR: where.OR,
+          },
+          {
+            OR: searchConditions,
+          },
+        ];
+
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
     }
 
     return where;
@@ -707,7 +725,10 @@ export class SiapRepository {
       where.taskType = filters.taskType;
     }
 
-    if (filters.status && (Object.values(TaskStatus) as string[]).includes(filters.status)) {
+    if (
+      filters.status &&
+      (Object.values(TaskStatus) as string[]).includes(filters.status)
+    ) {
       where.status = filters.status as TaskStatus;
     }
 

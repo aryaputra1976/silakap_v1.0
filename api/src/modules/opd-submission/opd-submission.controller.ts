@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -21,7 +22,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -61,10 +62,16 @@ const INTERNAL_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/opd/submissions')
 export class OpdSubmissionController {
-  constructor(@Inject(OpdSubmissionService) private readonly service: OpdSubmissionService) {}
+  constructor(
+    @Inject(OpdSubmissionService)
+    private readonly service: OpdSubmissionService,
+  ) {}
 
   @ApiOperation({ summary: 'Daftar pengajuan saya' })
-  @ApiResponse({ status: 200, description: 'Paginated list pengajuan OPD milik user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list pengajuan OPD milik user',
+  })
   @Get()
   @Roles('OPD')
   async listMine(
@@ -104,7 +111,11 @@ export class OpdSubmissionController {
 
   @ApiOperation({ summary: 'Buat draft pengajuan baru' })
   @ApiResponse({ status: 201, description: 'Draft berhasil dibuat' })
-  @ApiResponse({ status: 400, description: 'Validasi gagal (moduleKey tidak valid, serviceType tidak dikenal, dll)' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validasi gagal (moduleKey tidak valid, serviceType tidak dikenal, dll)',
+  })
   @Post()
   @Roles('OPD')
   async createDraft(
@@ -177,12 +188,19 @@ export class OpdSubmissionController {
     @Req() request: Request,
   ) {
     return ok(
-      await this.service.addDocumentMine(id, dto, user, getAuditContext(request)),
+      await this.service.addDocumentMine(
+        id,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
       'Metadata dokumen OPD berhasil disimpan',
     );
   }
 
-  @ApiOperation({ summary: 'Upload file dokumen (multipart/form-data, maks 10 MB)' })
+  @ApiOperation({
+    summary: 'Upload file dokumen (multipart/form-data, maks 10 MB)',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
   @ApiConsumes('multipart/form-data')
   @Post(':id/documents/upload')
@@ -207,7 +225,10 @@ export class OpdSubmissionController {
     );
   }
 
-  @ApiOperation({ summary: 'Kirim ulang berkas setelah perbaikan (NEEDS_CORRECTION → CORRECTION_SUBMITTED)' })
+  @ApiOperation({
+    summary:
+      'Kirim ulang berkas setelah perbaikan (NEEDS_CORRECTION → CORRECTION_SUBMITTED)',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
   @Post(':id/correction-submit')
   @Roles('OPD')
@@ -218,7 +239,12 @@ export class OpdSubmissionController {
     @Req() request: Request,
   ) {
     return ok(
-      await this.service.submitCorrectionMine(id, dto, user, getAuditContext(request)),
+      await this.service.submitCorrectionMine(
+        id,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
       'Perbaikan berkas OPD berhasil dikirim',
     );
   }
@@ -230,7 +256,10 @@ export class OpdSubmissionController {
 @Roles(...INTERNAL_ROLES)
 @Controller('api/v1/internal/opd-submissions')
 export class InternalOpdSubmissionController {
-  constructor(@Inject(OpdSubmissionService) private readonly service: OpdSubmissionService) {}
+  constructor(
+    @Inject(OpdSubmissionService)
+    private readonly service: OpdSubmissionService,
+  ) {}
 
   @ApiOperation({ summary: 'Daftar semua pengajuan (PPIK view)' })
   @Get()
@@ -250,7 +279,9 @@ export class InternalOpdSubmissionController {
     return ok(await this.service.getInternalSummary(query, user));
   }
 
-  @ApiOperation({ summary: 'Ringkasan SLA (jumlah OVERDUE, DUE_SOON, ON_TRACK)' })
+  @ApiOperation({
+    summary: 'Ringkasan SLA (jumlah OVERDUE, DUE_SOON, ON_TRACK)',
+  })
   @Get('sla/summary')
   async slaSummary(
     @Query() query: OpdSubmissionQueryDto,
@@ -268,7 +299,9 @@ export class InternalOpdSubmissionController {
     return ok(await this.service.getInternalSlaQueue(query, user, 'OVERDUE'));
   }
 
-  @ApiOperation({ summary: 'Antrian pengajuan DUE_SOON (mendekati batas SLA)' })
+  @ApiOperation({
+    summary: 'Antrian pengajuan DUE_SOON (mendekati batas SLA)',
+  })
   @Get('sla/due-soon')
   async slaDueSoon(
     @Query() query: OpdSubmissionQueryDto,
@@ -287,7 +320,40 @@ export class InternalOpdSubmissionController {
     return ok(await this.service.getInternalTimeline(id, user));
   }
 
-  @ApiOperation({ summary: 'Detail pengajuan (PPIK view dengan data assignee dan SLA)' })
+  @ApiOperation({ summary: 'Download/preview dokumen individual pengajuan' })
+  @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
+  @ApiParam({ name: 'documentId', description: 'ID dokumen (UUID)' })
+  @Get(':id/documents/:documentId/download')
+  async downloadDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentUser() user: AuthUser,
+    @Res() response: Response,
+  ) {
+    const file = await this.service.getInternalDocumentFile(
+      id,
+      documentId,
+      user,
+    );
+
+    const safeFileName = encodeURIComponent(file.fileName);
+
+    response.setHeader(
+      'Content-Type',
+      file.mimeType ?? 'application/octet-stream',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${safeFileName}"`,
+    );
+    response.setHeader('Content-Length', file.buffer.length);
+
+    return response.send(file.buffer);
+  }
+
+  @ApiOperation({
+    summary: 'Detail pengajuan (PPIK view dengan data assignee dan SLA)',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
   @ApiResponse({ status: 200, description: 'Detail pengajuan lengkap' })
   @ApiResponse({ status: 404, description: 'Pengajuan tidak ditemukan' })
@@ -305,10 +371,14 @@ export class InternalOpdSubmissionController {
     @CurrentUser() user: AuthUser,
     @Req() request: Request,
   ) {
-    return ok(await this.service.receive(id, dto, user, getAuditContext(request)));
+    return ok(
+      await this.service.receive(id, dto, user, getAuditContext(request)),
+    );
   }
 
-  @ApiOperation({ summary: 'Mulai verifikasi berkas (RECEIVED → IN_VERIFICATION)' })
+  @ApiOperation({
+    summary: 'Mulai verifikasi berkas (RECEIVED → IN_VERIFICATION)',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
   @Post(':id/start-verification')
   async startVerification(
@@ -317,7 +387,14 @@ export class InternalOpdSubmissionController {
     @CurrentUser() user: AuthUser,
     @Req() request: Request,
   ) {
-    return ok(await this.service.startVerification(id, dto, user, getAuditContext(request)));
+    return ok(
+      await this.service.startVerification(
+        id,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
+    );
   }
 
   @ApiOperation({ summary: 'Minta perbaikan berkas OPD (SLA dijeda)' })
@@ -329,7 +406,14 @@ export class InternalOpdSubmissionController {
     @CurrentUser() user: AuthUser,
     @Req() request: Request,
   ) {
-    return ok(await this.service.requestCorrection(id, dto, user, getAuditContext(request)));
+    return ok(
+      await this.service.requestCorrection(
+        id,
+        dto,
+        user,
+        getAuditContext(request),
+      ),
+    );
   }
 
   @ApiOperation({ summary: 'Verifikasi pengajuan (IN_VERIFICATION → VERIFIED)' })
@@ -356,9 +440,14 @@ export class InternalOpdSubmissionController {
     return ok(await this.service.reject(id, dto, user, getAuditContext(request)));
   }
 
-  @ApiOperation({ summary: 'Selesaikan pengajuan (VERIFIED → COMPLETED), SLA ditutup' })
+  @ApiOperation({
+    summary: 'Selesaikan pengajuan (VERIFIED → COMPLETED), SLA ditutup',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
-  @ApiResponse({ status: 400, description: 'Dokumen belum semua terverifikasi (tanpa overrideNote)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Dokumen belum semua terverifikasi (tanpa overrideNote)',
+  })
   @Post(':id/complete')
   async complete(
     @Param('id') id: string,
@@ -366,10 +455,14 @@ export class InternalOpdSubmissionController {
     @CurrentUser() user: AuthUser,
     @Req() request: Request,
   ) {
-    return ok(await this.service.complete(id, dto, user, getAuditContext(request)));
+    return ok(
+      await this.service.complete(id, dto, user, getAuditContext(request)),
+    );
   }
 
-  @ApiOperation({ summary: 'Upload file dokumen internal PPIK (multipart/form-data)' })
+  @ApiOperation({
+    summary: 'Upload file dokumen internal PPIK (multipart/form-data)',
+  })
   @ApiParam({ name: 'id', description: 'ID pengajuan (UUID)' })
   @ApiConsumes('multipart/form-data')
   @Post(':id/documents/upload')

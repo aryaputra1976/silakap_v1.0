@@ -6,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CasePriority, DmsDocumentCategory, Prisma } from '@prisma/client';
-import { basename, extname } from 'path';
+import { readFile } from 'fs/promises';
+import { basename, extname, isAbsolute, join, normalize } from 'path';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth.types';
 import { DmsService, type UploadedDmsFile } from '../dms/dms.service';
@@ -793,6 +794,51 @@ export class OpdSubmissionService {
     return this.toResponse(updated, true);
   }
 
+  async getInternalDocumentFile(
+    id: string,
+    documentId: string,
+    user: AuthUser,
+  ): Promise<{
+    buffer: Buffer;
+    fileName: string;
+    mimeType: string | null;
+  }> {
+    this.ensureInternalAction(
+      user,
+      INTERNAL_ROLES,
+      'mengakses file dokumen pengajuan',
+    );
+
+    const submission = await this.getSubmission(id);
+
+    const document = submission.documents.find(
+      (item) => item.id === documentId,
+    );
+
+    if (!document) {
+      throw new NotFoundException('Dokumen pengajuan tidak ditemukan');
+    }
+
+    if (!document.storageKey) {
+      throw new NotFoundException('File dokumen belum tersedia');
+    }
+
+    const filePath = isAbsolute(document.storageKey)
+      ? document.storageKey
+      : join(process.cwd(), document.storageKey);
+
+    const buffer = await readFile(filePath);
+
+    return {
+      buffer,
+      fileName:
+        document.originalFileName ??
+        document.title ??
+        `dokumen-${document.id}`,
+      mimeType: document.mimeType ?? null,
+    };
+  }
+
   async verifyDocument(
     id: string,
     documentId: string,
@@ -1097,6 +1143,16 @@ export class OpdSubmissionService {
 
   private normalizeNullable(value: string | undefined | null) {
     return this.normalizeOptional(value) ?? null;
+  }
+
+  private resolveSafeStoragePath(storageKey: string): string {
+    const normalizedStorageKey = normalize(storageKey);
+
+    if (isAbsolute(normalizedStorageKey)) {
+      return normalizedStorageKey;
+    }
+
+    return join(process.cwd(), normalizedStorageKey);
   }
 
   private normalizeRequired(value: string | undefined | null, message: string) {

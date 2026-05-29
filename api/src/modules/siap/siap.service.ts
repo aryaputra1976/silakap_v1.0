@@ -1346,48 +1346,60 @@ private normalizeCaseFilters(
     };
   }
 
-  async getTaskVerification(id: string, user: AuthUser) {
-    await this.getTaskForUser(id, user);
+async getTaskVerification(id: string, user: AuthUser) {
+  await this.getTaskForUser(id, user);
 
-    const verificationData = await this.siapRepository.findTaskVerification(id.trim());
+  const verificationData = await this.siapRepository.findTaskVerification(
+    id.trim(),
+  );
 
-    if (!verificationData) {
-      throw new NotFoundException('Task verifikasi tidak ditemukan');
-    }
+  if (!verificationData) {
+    throw new NotFoundException('Task verifikasi tidak ditemukan');
+  }
 
-    const { task, caseDetail, submission } = verificationData;
+  const { task, caseDetail, submission } = verificationData;
 
-    const allDocuments: Array<{
-      id: string;
-      title: string;
-      documentType: string;
-      status: string;
-      mimeType: string | null | undefined;
-      originalFileName: string | null | undefined;
-      storageKey: string | null | undefined;
-      uploadedAt: Date | string;
-      source: 'DMS' | 'OPD_SUBMISSION';
-    }> = [];
+  const allDocuments: Array<{
+    id: string;
+    title: string;
+    documentType: string;
+    status: string;
+    mimeType: string | null | undefined;
+    originalFileName: string | null | undefined;
+    storageKey: string | null | undefined;
+    uploadedAt: Date | string;
+    source: 'DMS' | 'OPD_SUBMISSION';
+    previewUrl: string | null;
+    downloadUrl: string | null;
+  }> = [];
 
-    if (caseDetail?.documents) {
-      allDocuments.push(
-        ...caseDetail.documents.map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          documentType: doc.category,
-          status: doc.status,
-          mimeType: doc.mimeType,
-          originalFileName: doc.originalFileName,
-          storageKey: doc.storagePath,
-          uploadedAt: doc.createdAt,
-          source: 'DMS' as const,
-        })),
-      );
-    }
+  if (caseDetail?.dmsDocuments) {
+    allDocuments.push(
+      ...caseDetail.dmsDocuments.map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        documentType: doc.category,
+        status: doc.status,
+        mimeType: doc.mimeType,
+        originalFileName: doc.originalFileName,
+        storageKey: doc.storagePath,
+        uploadedAt: doc.createdAt,
+        source: 'DMS' as const,
 
-    if (submission?.documents) {
-      allDocuments.push(
-        ...submission.documents.map((doc) => ({
+        // Endpoint DMS preview/download belum diaudit final.
+        // Untuk sementara dikosongkan agar tidak membuat link palsu.
+        previewUrl: null,
+        downloadUrl: null,
+      })),
+    );
+  }
+
+  if (submission?.documents) {
+    allDocuments.push(
+      ...submission.documents.map((doc) => {
+        const downloadUrl = `/api/v1/internal/opd-submissions/${submission.id}/documents/${doc.id}/download`;
+
+        return {
           id: doc.id,
           title: doc.title,
           documentType: doc.documentType,
@@ -1397,58 +1409,77 @@ private normalizeCaseFilters(
           storageKey: doc.storageKey,
           uploadedAt: doc.uploadedAt,
           source: 'OPD_SUBMISSION' as const,
-        })),
-      );
-    }
 
-    return {
-      task: {
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        taskType: task.taskType,
-        dueDate: task.dueDate,
-        createdAt: task.createdAt,
-      },
-      case: caseDetail
-        ? {
-            id: caseDetail.id,
-            caseNumber: caseDetail.caseNumber,
-            serviceType: caseDetail.serviceType,
-            title: caseDetail.title,
-            description: caseDetail.description,
-            asn: caseDetail.asn
-              ? {
-                  id: caseDetail.asn.id,
-                  nip: caseDetail.asn.nip,
-                  nama: caseDetail.asn.nama,
-                }
-              : null,
-          }
-        : null,
-      submission: submission
-        ? {
-            id: submission.id,
-            submissionNumber: submission.submissionNumber,
-            serviceType: submission.serviceType,
-            subjectName: submission.subjectName,
-            subjectNip: submission.subjectNip,
-            description: submission.description,
-          }
-        : null,
-      documents: allDocuments.map((doc) => ({
-        id: doc.id,
-        title: doc.title,
-        documentType: doc.documentType,
-        status: doc.status,
-        mimeType: doc.mimeType,
-        originalFileName: doc.originalFileName,
-        storageKey: doc.storageKey,
-        uploadedAt: typeof doc.uploadedAt === 'string' ? doc.uploadedAt : doc.uploadedAt.toISOString(),
-        source: doc.source,
-      })),
-    };
+          // Untuk PDF dan image, URL download bisa dipakai sebagai preview iframe/img.
+          previewUrl: this.isBrowserPreviewableMimeType(doc.mimeType)
+            ? downloadUrl
+            : null,
+          downloadUrl,
+        };
+      }),
+    );
   }
+
+  return {
+    task: {
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      taskType: task.taskType,
+      dueDate: task.dueDate,
+      createdAt: task.createdAt,
+    },
+    case: caseDetail
+      ? {
+          id: caseDetail.id,
+          caseNumber: caseDetail.caseNumber,
+          serviceType: caseDetail.serviceType,
+          title: caseDetail.title,
+          description: caseDetail.description,
+          asn: caseDetail.asn
+            ? {
+                id: caseDetail.asn.id,
+                nip: caseDetail.asn.nip,
+                nama: caseDetail.asn.nama,
+              }
+            : null,
+        }
+      : null,
+    submission: submission
+      ? {
+          id: submission.id,
+          submissionNumber: submission.submissionNumber,
+          serviceType: submission.serviceType,
+          subjectName: submission.subjectName,
+          subjectNip: submission.subjectNip,
+          description: submission.description,
+        }
+      : null,
+    documents: allDocuments.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      documentType: doc.documentType,
+      status: doc.status,
+      mimeType: doc.mimeType,
+      originalFileName: doc.originalFileName,
+      storageKey: doc.storageKey,
+      uploadedAt:
+        typeof doc.uploadedAt === 'string'
+          ? doc.uploadedAt
+          : doc.uploadedAt.toISOString(),
+      source: doc.source,
+      previewable: this.isBrowserPreviewableMimeType(doc.mimeType),
+      previewUrl: doc.previewUrl,
+      downloadUrl: doc.downloadUrl,
+    })),
+  };
+}
+
+private isBrowserPreviewableMimeType(
+  mimeType: string | null | undefined,
+): boolean {
+  return mimeType === 'application/pdf' || mimeType?.startsWith('image/') === true;
+}
 
   private toTaskResponse(record: SiapTaskRecord) {
     return {
