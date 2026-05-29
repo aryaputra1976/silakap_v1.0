@@ -46,6 +46,31 @@ const caseDetailInclude = {
   timelines: {
     orderBy: [{ createdAt: 'asc' }],
   },
+  dmsDocuments: {
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      subCategory: true,
+      fileName: true,
+      originalFileName: true,
+      storagePath: true,
+      mimeType: true,
+      fileSize: true,
+      status: true,
+      createdAt: true,
+      createdById: true,
+      submittedAt: true,
+      submittedById: true,
+      verifiedAt: true,
+      verifiedById: true,
+      deletedAt: true,
+    },
+    where: {
+      deletedAt: null,
+    },
+    orderBy: [{ createdAt: 'desc' }],
+  },
 } satisfies Prisma.SiapCaseInclude;
 
 const taskInclude = {
@@ -374,6 +399,63 @@ export class SiapRepository {
       },
       include: taskInclude,
     });
+  }
+
+  async findTaskVerification(id: string): Promise<{
+    task: SiapTaskRecord;
+    caseDetail: SiapCaseDetailRecord | null;
+    submission: (Prisma.OpdSubmissionGetPayload<{
+      include: { documents: true };
+    }>) | null;
+  } | null> {
+    const task = await this.prisma.siapTask.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      include: taskInclude,
+    });
+
+    if (!task) {
+      return null;
+    }
+
+    const caseDetail = await this.prisma.siapCase.findFirst({
+      where: {
+        id: task.caseId,
+        deletedAt: null,
+      },
+      include: caseDetailInclude,
+    });
+
+    const submission = await this.prisma.opdSubmission.findFirst({
+      where: {
+        siapCaseId: task.caseId,
+      },
+      include: {
+        documents: {
+          where: {
+            // Don't filter by status, show all documents
+          },
+          select: {
+            id: true,
+            documentType: true,
+            title: true,
+            status: true,
+            mimeType: true,
+            originalFileName: true,
+            storageKey: true,
+            uploadedAt: true,
+          },
+        },
+      },
+    });
+
+    return {
+      task,
+      caseDetail,
+      submission,
+    };
   }
 
   async userExists(id: string, client: SiapDbClient = this.prisma) {

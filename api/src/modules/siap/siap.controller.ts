@@ -142,6 +142,15 @@ export class SiapController {
     return ok(result);
   }
 
+  @Get('tasks/:id/verification')
+  async getTaskVerification(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const result = await this.siapService.getTaskVerification(id, user);
+    return ok(result);
+  }
+
   @Post('tasks/:id/start')
   async startTask(
     @Param('id') id: string,

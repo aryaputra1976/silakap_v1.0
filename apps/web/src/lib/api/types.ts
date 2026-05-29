@@ -206,6 +206,26 @@ export type SiapCaseDetail = SiapCaseListItem & {
   workflowLogs: WorkflowLog[];
   slaTracking: SiapSlaTracking[];
   timelines: TimelineEntry[];
+  documents: DmsDocumentSummary[];
+};
+
+export type DmsDocumentSummary = {
+  id: string;
+  title: string;
+  category: string;
+  subCategory?: string;
+  fileName?: string;
+  originalFileName?: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  status: string;
+  createdAt: string;
+  createdById?: string;
+  submittedAt?: string | null;
+  submittedById?: string | null;
+  verifiedAt?: string | null;
+  verifiedById?: string | null;
 };
 
 export type RequirementItem = {

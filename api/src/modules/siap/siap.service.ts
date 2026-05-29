@@ -1006,24 +1006,32 @@ private async createTaskForTransition(
     return false;
   }
 
-  private canSeeCase(record: SiapCaseDetailRecord, user: AuthUser) {
-    if (this.canSeeAllCases(user)) {
-      return true;
-    }
-
-    if (this.hasRole(user, 'ASN')) {
-      return record.createdBy === user.id;
-    }
-
-    if (this.hasRole(user, 'OPD_OPERATOR')) {
-      return (
-        record.createdBy === user.id ||
-        (!!user.unitKerjaId && record.asn?.unitKerjaId === user.unitKerjaId)
-      );
-    }
-
-    return false;
+private canSeeCase(record: SiapCaseDetailRecord, user: AuthUser) {
+  if (this.canSeeAllCases(user)) {
+    return true;
   }
+
+  if (this.hasRole(user, 'ASN')) {
+    return record.createdBy === user.id;
+  }
+
+  if (this.hasRole(user, 'OPD_OPERATOR')) {
+    return (
+      record.createdBy === user.id ||
+      (!!user.unitKerjaId && record.asn?.unitKerjaId === user.unitKerjaId)
+    );
+  }
+
+  const hasAssignedTask = record.tasks.some(
+    (task) => task.assignedTo === user.id && task.deletedAt === null,
+  );
+
+  if (hasAssignedTask) {
+    return true;
+  }
+
+  return false;
+}
 
   private canSeeAllTasks(user: AuthUser) {
     return this.hasPrivilegedRole(user);
@@ -1317,6 +1325,128 @@ private normalizeCaseFilters(
       workflowLogs: record.workflowLogs,
       slaTracking: record.slaTracking,
       timelines: record.timelines,
+      documents: record.dmsDocuments.map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        category: doc.category,
+        subCategory: doc.subCategory ?? undefined,
+        fileName: doc.fileName ?? undefined,
+        originalFileName: doc.originalFileName ?? undefined,
+        storagePath: doc.storagePath ?? undefined,
+        mimeType: doc.mimeType ?? undefined,
+        fileSize: doc.fileSize ?? undefined,
+        status: doc.status,
+        createdAt: doc.createdAt,
+        createdById: doc.createdById ?? undefined,
+        submittedAt: doc.submittedAt ?? undefined,
+        submittedById: doc.submittedById ?? undefined,
+        verifiedAt: doc.verifiedAt ?? undefined,
+        verifiedById: doc.verifiedById ?? undefined,
+      })),
+    };
+  }
+
+  async getTaskVerification(id: string, user: AuthUser) {
+    await this.getTaskForUser(id, user);
+
+    const verificationData = await this.siapRepository.findTaskVerification(id.trim());
+
+    if (!verificationData) {
+      throw new NotFoundException('Task verifikasi tidak ditemukan');
+    }
+
+    const { task, caseDetail, submission } = verificationData;
+
+    const allDocuments: Array<{
+      id: string;
+      title: string;
+      documentType: string;
+      status: string;
+      mimeType: string | null | undefined;
+      originalFileName: string | null | undefined;
+      storageKey: string | null | undefined;
+      uploadedAt: Date | string;
+      source: 'DMS' | 'OPD_SUBMISSION';
+    }> = [];
+
+    if (caseDetail?.documents) {
+      allDocuments.push(
+        ...caseDetail.documents.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          documentType: doc.category,
+          status: doc.status,
+          mimeType: doc.mimeType,
+          originalFileName: doc.originalFileName,
+          storageKey: doc.storagePath,
+          uploadedAt: doc.createdAt,
+          source: 'DMS' as const,
+        })),
+      );
+    }
+
+    if (submission?.documents) {
+      allDocuments.push(
+        ...submission.documents.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          documentType: doc.documentType,
+          status: doc.status,
+          mimeType: doc.mimeType,
+          originalFileName: doc.originalFileName,
+          storageKey: doc.storageKey,
+          uploadedAt: doc.uploadedAt,
+          source: 'OPD_SUBMISSION' as const,
+        })),
+      );
+    }
+
+    return {
+      task: {
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        taskType: task.taskType,
+        dueDate: task.dueDate,
+        createdAt: task.createdAt,
+      },
+      case: caseDetail
+        ? {
+            id: caseDetail.id,
+            caseNumber: caseDetail.caseNumber,
+            serviceType: caseDetail.serviceType,
+            title: caseDetail.title,
+            description: caseDetail.description,
+            asn: caseDetail.asn
+              ? {
+                  id: caseDetail.asn.id,
+                  nip: caseDetail.asn.nip,
+                  nama: caseDetail.asn.nama,
+                }
+              : null,
+          }
+        : null,
+      submission: submission
+        ? {
+            id: submission.id,
+            submissionNumber: submission.submissionNumber,
+            serviceType: submission.serviceType,
+            subjectName: submission.subjectName,
+            subjectNip: submission.subjectNip,
+            description: submission.description,
+          }
+        : null,
+      documents: allDocuments.map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        documentType: doc.documentType,
+        status: doc.status,
+        mimeType: doc.mimeType,
+        originalFileName: doc.originalFileName,
+        storageKey: doc.storageKey,
+        uploadedAt: typeof doc.uploadedAt === 'string' ? doc.uploadedAt : doc.uploadedAt.toISOString(),
+        source: doc.source,
+      })),
     };
   }
 

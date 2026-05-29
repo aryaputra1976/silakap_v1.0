@@ -3,9 +3,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  FileText,
   Play,
   RefreshCcw,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -60,6 +62,8 @@ export function SiapTasksPage() {
   const [processingSla, setProcessingSla] = useState(false);
   const [lastSlaResult, setLastSlaResult] =
     useState<SlaProcessOverdueResult | null>(null);
+  const [selectedTask, setSelectedTask] = useState<SiapTask | null>(null);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
 
   const canProcessSla =
     user?.roles.some((role) =>
@@ -135,6 +139,16 @@ export function SiapTasksPage() {
     } finally {
       setWorkingId('');
     }
+  }
+
+  function openVerifyModal(task: SiapTask) {
+    setSelectedTask(task);
+    setVerifyModalOpen(true);
+  }
+
+  function closeVerifyModal() {
+    setVerifyModalOpen(false);
+    setSelectedTask(null);
   }
 
   async function processSlaOverdue() {
@@ -315,7 +329,12 @@ export function SiapTasksPage() {
                         Selesai
                       </ActionButton>
                     ) : null}
-                    {item.status !== 'ASSIGNED' && item.status !== 'IN_PROGRESS' ? <StatusBadge value="-" /> : null}
+                    {item.caseId ? (
+                      <ActionButton icon={FileText} onClick={() => openVerifyModal(item)} variant="secondary">
+                        Verifikasi
+                      </ActionButton>
+                    ) : null}
+                    {!item.caseId && item.status !== 'ASSIGNED' && item.status !== 'IN_PROGRESS' ? <StatusBadge value="-" /> : null}
                   </div>
                 ),
               },
@@ -323,6 +342,90 @@ export function SiapTasksPage() {
           />
         )}
       </SectionCard>
+
+      {verifyModalOpen && selectedTask ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
+            <button
+              type="button"
+              onClick={closeVerifyModal}
+              className="absolute right-4 top-4 text-zinc-500 hover:text-zinc-700"
+              aria-label="Tutup"
+            >
+              <X className="size-5" />
+            </button>
+
+            <div className="mb-6 space-y-4">
+              <h2 className="text-xl font-bold text-zinc-950">Verifikasi Tugas</h2>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-zinc-500">Nomor Kasus</p>
+                  <p className="mt-1 font-medium text-zinc-900">{selectedTask.case?.caseNumber ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-zinc-500">ASN</p>
+                  <p className="mt-1 font-medium text-zinc-900">{selectedTask.case?.asn?.nama ?? '-'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs font-semibold uppercase text-zinc-500">Tugas</p>
+                  <p className="mt-1 font-medium text-zinc-900">{selectedTask.title}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-zinc-500">Jenis</p>
+                  <p className="mt-1 font-medium text-zinc-900">{taskTypeLabel(selectedTask.taskType)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-zinc-500">Status</p>
+                  <p className="mt-1">
+                    <StatusBadge
+                      value={taskStatusLabel(selectedTask.status)}
+                      tone={taskStatusTone(selectedTask.status)}
+                    />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-zinc-500">Batas Waktu</p>
+                  <p className="mt-1 font-medium text-zinc-900">{formatDate(selectedTask.dueDate)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
+                <p className="italic">📄 Dokumen belum dimuat di modal ini</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {selectedTask.status === 'ASSIGNED' ? (
+                <ActionButton
+                  disabled={workingId === selectedTask.id}
+                  icon={Play}
+                  onClick={() => {
+                    mutateTask(selectedTask.id, 'start');
+                  }}
+                  variant="secondary"
+                >
+                  Mulai
+                </ActionButton>
+              ) : null}
+              {selectedTask.status === 'IN_PROGRESS' ? (
+                <ActionButton
+                  disabled={workingId === selectedTask.id}
+                  icon={CheckCircle2}
+                  onClick={() => {
+                    mutateTask(selectedTask.id, 'complete');
+                  }}
+                >
+                  Selesai
+                </ActionButton>
+              ) : null}
+              <ActionButton onClick={closeVerifyModal} variant="secondary">
+                Tutup
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
