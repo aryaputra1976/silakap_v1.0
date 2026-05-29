@@ -87,7 +87,18 @@ type CreateSubmittedSiapCaseInput = {
   serviceType: string;
   title: string;
   description?: string;
-  asnId?: string;
+
+  /**
+   * ASN reference from upstream modules.
+   *
+   * This value may be:
+   * - Asn.id, or
+   * - Asn.nip
+   *
+   * It is resolved to Asn.id by createCaseRecord() through resolveAsnId().
+   */
+  asnRef?: string;
+
   priority?: CasePriority;
 };
 
@@ -125,11 +136,11 @@ export class SiapService {
         serviceType: input.serviceType,
         title: input.title,
         description: input.description,
-        asnId: input.asnId,
+        asnId: input.asnRef,
         priority: input.priority,
       },
       user,
-      client,
+      client, 
     );
 
     if (client) {

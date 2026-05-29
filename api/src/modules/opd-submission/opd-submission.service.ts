@@ -254,21 +254,25 @@ export class OpdSubmissionService {
     const cal = await this.workingCalendarService.getEffectiveCalendar();
     const slaDueAt = calculateSlaDueAtBusiness(now, targetHours, cal);
     const updated = await this.repo.withTransaction(async (client) => {
-      const createdSiapCase =
-        before.siapCaseId
-          ? null
-          : await this.siapService.createAndSubmitCase(
-              {
-                serviceType: this.toSiapServiceType(before),
-                title: this.buildSiapCaseTitle(before, submissionNumber),
-                description: this.buildSiapCaseDescription(before, submissionNumber),
-                asnId: before.subjectNip ?? undefined,
-                priority: CasePriority.NORMAL,
-              },
-              user,
-              context,
-              client,
-            );
+    const createdSiapCase =
+      before.siapCaseId
+        ? null
+        : await this.siapService.createAndSubmitCase(
+            {
+              serviceType: this.toSiapServiceType(before),
+              title: this.buildSiapCaseTitle(before, submissionNumber),
+              description: this.buildSiapCaseDescription(before, submissionNumber),
+
+              // subjectNip is intentionally passed as an ASN reference.
+              // SiapService resolves it to Asn.id before creating SiapCase.
+              asnRef: before.subjectNip ?? undefined,
+
+              priority: CasePriority.NORMAL,
+            },
+            user,
+            context,
+            client,
+          );
 
       const submitted = await this.repo.updateAtomic(
         before.id,
