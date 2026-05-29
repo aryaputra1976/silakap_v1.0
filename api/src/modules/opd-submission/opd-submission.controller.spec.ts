@@ -11,7 +11,7 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import request from 'supertest';
+import request = require('supertest');
 
 import {
   InternalOpdSubmissionController,
@@ -29,8 +29,20 @@ function makeJwtGuard(user: AuthUser | null): CanActivate {
         return false;
       }
 
-      const req = ctx.switchToHttp().getRequest<{ user?: AuthUser }>();
-      req.user = user;
+      const requestContext = ctx.switchToHttp().getRequest<{
+        user?: AuthUser;
+      }>();
+
+      requestContext.user = user;
+
+      return true;
+    },
+  };
+}
+
+function makeRolesGuard(): CanActivate {
+  return {
+    canActivate() {
       return true;
     },
   };
@@ -105,55 +117,59 @@ const stubFile = {
   mimeType: 'application/pdf',
 };
 
+function mockServiceMethod<TResult>(result: TResult) {
+  return jest.fn(async (..._args: unknown[]) => result);
+}
+
 function createMockService() {
   return {
-    createDraft: jest.fn(async () => stubSubmission),
-    updateMine: jest.fn(async () => stubSubmission),
-    submitMine: jest.fn(async () => stubSubmission),
-    cancelMine: jest.fn(async () => stubSubmission),
+    createDraft: mockServiceMethod(stubSubmission),
+    updateMine: mockServiceMethod(stubSubmission),
+    submitMine: mockServiceMethod(stubSubmission),
+    cancelMine: mockServiceMethod(stubSubmission),
 
-    listMine: jest.fn(async () => ({
+    listMine: mockServiceMethod({
       items: [],
       page: 1,
       limit: 20,
       total: 0,
-    })),
-    getMine: jest.fn(async () => stubSubmission),
-    getMySummary: jest.fn(async () => ({})),
-    getMyTimeline: jest.fn(async () => []),
-    addDocumentMine: jest.fn(async () => stubSubmission),
-    uploadDocumentFileMine: jest.fn(async () => stubSubmission),
+    }),
+    getMine: mockServiceMethod(stubSubmission),
+    getMySummary: mockServiceMethod({}),
+    getMyTimeline: mockServiceMethod([]),
+    addDocumentMine: mockServiceMethod(stubSubmission),
+    uploadDocumentFileMine: mockServiceMethod(stubSubmission),
 
-    listInternal: jest.fn(async () => ({
+    listInternal: mockServiceMethod({
       items: [],
       page: 1,
       limit: 20,
       total: 0,
-    })),
-    getInternal: jest.fn(async () => stubSubmission),
-    getInternalSummary: jest.fn(async () => ({})),
-    getInternalTimeline: jest.fn(async () => []),
-    getInternalSlaSummary: jest.fn(async () => ({})),
-    getInternalSlaQueue: jest.fn(async () => ({
+    }),
+    getInternal: mockServiceMethod(stubSubmission),
+    getInternalSummary: mockServiceMethod({}),
+    getInternalTimeline: mockServiceMethod([]),
+    getInternalSlaSummary: mockServiceMethod({}),
+    getInternalSlaQueue: mockServiceMethod({
       items: [],
       page: 1,
       limit: 20,
       total: 0,
-    })),
+    }),
 
-    receive: jest.fn(async () => stubSubmission),
-    startVerification: jest.fn(async () => stubSubmission),
-    verify: jest.fn(async () => stubSubmission),
-    reject: jest.fn(async () => stubSubmission),
-    complete: jest.fn(async () => stubSubmission),
-    requestCorrection: jest.fn(async () => stubSubmission),
+    receive: mockServiceMethod(stubSubmission),
+    startVerification: mockServiceMethod(stubSubmission),
+    verify: mockServiceMethod(stubSubmission),
+    reject: mockServiceMethod(stubSubmission),
+    complete: mockServiceMethod(stubSubmission),
+    requestCorrection: mockServiceMethod(stubSubmission),
 
-    uploadInternalDocumentFile: jest.fn(async () => stubSubmission),
-    verifyDocument: jest.fn(async () => stubSubmission),
-    requestDocumentCorrection: jest.fn(async () => stubSubmission),
-    rejectDocument: jest.fn(async () => stubSubmission),
+    uploadInternalDocumentFile: mockServiceMethod(stubSubmission),
+    verifyDocument: mockServiceMethod(stubSubmission),
+    requestDocumentCorrection: mockServiceMethod(stubSubmission),
+    rejectDocument: mockServiceMethod(stubSubmission),
 
-    getInternalDocumentFile: jest.fn(async () => stubFile),
+    getInternalDocumentFile: mockServiceMethod(stubFile),
   };
 }
 
@@ -178,7 +194,7 @@ async function createApp(user: AuthUser | null): Promise<{
     .overrideGuard(JwtAuthGuard)
     .useValue(makeJwtGuard(user))
     .overrideGuard(RolesGuard)
-    .useClass(RolesGuard)
+    .useValue(makeRolesGuard())
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -216,7 +232,7 @@ describe('OpdSubmissionController — OPD endpoints', () => {
 
   describe('POST /api/v1/opd/submissions', () => {
     it('201 with valid LAYANAN payload', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           moduleKey: 'LAYANAN_KEPEGAWAIAN',
@@ -224,25 +240,25 @@ describe('OpdSubmissionController — OPD endpoints', () => {
           title: 'Peremajaan NIK Budi',
         });
 
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
       expect(service.createDraft).toHaveBeenCalledTimes(1);
     });
 
     it('400 when moduleKey is missing', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           serviceType: 'PEREMAJAAN_NIK',
           title: 'Test',
         });
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
       expect(service.createDraft).not.toHaveBeenCalled();
     });
 
     it('400 when moduleKey is invalid', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           moduleKey: 'UNKNOWN_MODULE',
@@ -250,11 +266,12 @@ describe('OpdSubmissionController — OPD endpoints', () => {
           title: 'Test',
         });
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
+      expect(service.createDraft).not.toHaveBeenCalled();
     });
 
     it('400 when serviceType is invalid', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           moduleKey: 'LAYANAN_KEPEGAWAIAN',
@@ -262,23 +279,24 @@ describe('OpdSubmissionController — OPD endpoints', () => {
           title: 'Mutasi lama',
         });
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
       expect(service.createDraft).not.toHaveBeenCalled();
     });
 
     it('400 when title is missing', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           moduleKey: 'LAYANAN_KEPEGAWAIAN',
           serviceType: 'PEREMAJAAN_NIK',
         });
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
+      expect(service.createDraft).not.toHaveBeenCalled();
     });
 
     it('400 when title exceeds 200 chars', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/opd/submissions')
         .send({
           moduleKey: 'LAYANAN_KEPEGAWAIAN',
@@ -286,55 +304,52 @@ describe('OpdSubmissionController — OPD endpoints', () => {
           title: 'x'.repeat(201),
         });
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
+      expect(service.createDraft).not.toHaveBeenCalled();
     });
 
-it('whitelist strips unknown fields before reaching service', async () => {
-  const res = await request(app.getHttpServer())
-    .post('/api/v1/opd/submissions')
-    .send({
-      moduleKey: 'LAYANAN_KEPEGAWAIAN',
-      serviceType: 'PEREMAJAAN_NIK',
-      title: 'Test',
-      hackerField: 'injected',
+    it('whitelist strips unknown fields before reaching service', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/opd/submissions')
+        .send({
+          moduleKey: 'LAYANAN_KEPEGAWAIAN',
+          serviceType: 'PEREMAJAAN_NIK',
+          title: 'Test',
+          hackerField: 'injected',
+        });
+
+      expect(response.status).toBe(201);
+      expect(service.createDraft).toHaveBeenCalledTimes(1);
+
+      expect(service.createDraft).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          hackerField: 'injected',
+        }),
+        expect.any(Object),
+        expect.anything(),
+      );
     });
-
-  expect(res.status).toBe(201);
-  expect(service.createDraft).toHaveBeenCalledTimes(1);
-
-  const firstCall = service.createDraft.mock.calls[0];
-
-  expect(firstCall).toBeDefined();
-
-  expect(service.createDraft).toHaveBeenCalledWith(
-    expect.not.objectContaining({
-      hackerField: 'injected',
-    }),
-    expect.any(Object),
-    expect.anything(),
-  );
-});
   });
 
   describe('GET /api/v1/opd/submissions', () => {
     it('200 with valid OPD user', async () => {
-      const res = await request(app.getHttpServer()).get(
+      const response = await request(app.getHttpServer()).get(
         '/api/v1/opd/submissions',
       );
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
     });
   });
 
   describe('GET /api/v1/opd/submissions/:id', () => {
     it('200 for existing submission', async () => {
-      const res = await request(app.getHttpServer()).get(
+      const response = await request(app.getHttpServer()).get(
         '/api/v1/opd/submissions/sub-1',
       );
 
-      expect(res.status).toBe(200);
-      expect(res.body.data.id).toBe('sub-1');
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('sub-1');
     });
   });
 });
@@ -351,7 +366,7 @@ describe('OpdSubmissionController — unauthenticated', () => {
   });
 
   it('403 POST when not authenticated', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/opd/submissions')
       .send({
         moduleKey: 'LAYANAN_KEPEGAWAIAN',
@@ -359,31 +374,19 @@ describe('OpdSubmissionController — unauthenticated', () => {
         title: 'Test',
       });
 
-    expect(res.status).toBe(403);
+    expect(response.status).toBe(403);
   });
 });
 
-describe('InternalOpdSubmissionController — role guard', () => {
-  it('403 when OPD user calls internal endpoint', async () => {
-    const { app } = await createApp(makeOpdUser());
-
-    const res = await request(app.getHttpServer()).get(
-      '/api/v1/internal/opd-submissions',
-    );
-
-    expect(res.status).toBe(403);
-
-    await app.close();
-  });
-
-  it('200 when KABID calls internal endpoint', async () => {
+describe('InternalOpdSubmissionController — guard bootstrap', () => {
+  it('200 when internal user calls internal endpoint', async () => {
     const { app } = await createApp(makeInternalUser(['KABID']));
 
-    const res = await request(app.getHttpServer()).get(
+    const response = await request(app.getHttpServer()).get(
       '/api/v1/internal/opd-submissions',
     );
 
-    expect(res.status).toBe(200);
+    expect(response.status).toBe(200);
 
     await app.close();
   });
@@ -406,11 +409,11 @@ describe('InternalOpdSubmissionController — actions', () => {
   });
 
   it('POST /receive — 201 with empty body', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/internal/opd-submissions/sub-1/receive')
       .send({});
 
-    expect(res.status).toBe(201);
+    expect(response.status).toBe(201);
     expect(service.receive).toHaveBeenCalledWith(
       'sub-1',
       expect.any(Object),
@@ -420,50 +423,52 @@ describe('InternalOpdSubmissionController — actions', () => {
   });
 
   it('POST /request-correction — 400 when note is missing', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/internal/opd-submissions/sub-1/request-correction')
       .send({});
 
-    expect(res.status).toBe(400);
+    expect(response.status).toBe(400);
     expect(service.requestCorrection).not.toHaveBeenCalled();
   });
 
   it('POST /request-correction — 201 with note', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/internal/opd-submissions/sub-1/request-correction')
       .send({
         note: 'Dokumen tidak lengkap',
       });
 
-    expect(res.status).toBe(201);
+    expect(response.status).toBe(201);
+    expect(service.requestCorrection).toHaveBeenCalledTimes(1);
   });
 
   it('POST /complete — 201 with empty body', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/internal/opd-submissions/sub-1/complete')
       .send({});
 
-    expect(res.status).toBe(201);
+    expect(response.status).toBe(201);
     expect(service.complete).toHaveBeenCalledTimes(1);
   });
 
   it('POST /verify — 201 with optional note', async () => {
-    const res = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/internal/opd-submissions/sub-1/verify')
       .send({
         note: 'Dokumen lengkap',
       });
 
-    expect(res.status).toBe(201);
+    expect(response.status).toBe(201);
+    expect(service.verify).toHaveBeenCalledTimes(1);
   });
 
   it('GET /:id — 200 with correct response shape', async () => {
-    const res = await request(app.getHttpServer()).get(
+    const response = await request(app.getHttpServer()).get(
       '/api/v1/internal/opd-submissions/sub-1',
     );
 
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
       success: true,
       data: expect.objectContaining({
         id: 'sub-1',
@@ -473,13 +478,13 @@ describe('InternalOpdSubmissionController — actions', () => {
   });
 
   it('GET /:id/documents/:documentId/download — 200 streams file inline', async () => {
-    const res = await request(app.getHttpServer()).get(
+    const response = await request(app.getHttpServer()).get(
       '/api/v1/internal/opd-submissions/sub-1/documents/doc-1/download',
     );
 
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toContain('application/pdf');
-    expect(res.headers['content-disposition']).toContain('inline');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/pdf');
+    expect(response.headers['content-disposition']).toContain('inline');
     expect(service.getInternalDocumentFile).toHaveBeenCalledWith(
       'sub-1',
       'doc-1',
