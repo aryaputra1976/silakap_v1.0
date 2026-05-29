@@ -17,7 +17,19 @@ import { NotificationListQueryDto } from './dto/notification-list-query.dto';
 import { NotificationsService } from './notifications.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_BKPSDM', 'KABID')
+@Roles(
+  'SUPER_ADMIN',
+  'ADMIN_BKPSDM',
+  'KEPALA_BADAN',
+  'KABID',
+  'ANALIS_MADYA',
+  'ANALIS_MUDA',
+  'ANALIS_PERTAMA',
+  'PENELAAH',
+  'PPPK',
+  'OPD',
+  'OPD_OPERATOR',
+)
 @Controller('api/v1/notifications')
 export class NotificationsController {
   constructor(

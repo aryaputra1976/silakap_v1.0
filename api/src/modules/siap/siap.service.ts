@@ -1104,32 +1104,46 @@ private async createTaskForTransition(
     }
   }
 
-  private normalizeCaseFilters(
-    query: CaseListQueryDto,
-    user: AuthUser,
-  ): NormalizedCaseFilters {
-    const filters: NormalizedCaseFilters = {
-      q: this.normalizeOptionalText(query.q),
-      serviceType: this.normalizeOptionalText(query.serviceType)?.toUpperCase(),
-      currentState: this.normalizeOptionalText(query.currentState),
-      status: query.status,
-      page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
-      limit: this.normalizePositiveNumber(query.limit, 10, 1, 100),
-    };
+private normalizeCaseFilters(
+  query: CaseListQueryDto,
+  user: AuthUser,
+): NormalizedCaseFilters {
+  const filters: NormalizedCaseFilters = {
+    q: this.normalizeOptionalText(query.q),
+    serviceType: this.normalizeOptionalText(query.serviceType)?.toUpperCase(),
+    currentState: this.normalizeOptionalText(query.currentState),
+    status: query.status,
+    page: this.normalizePositiveNumber(query.page, 1, 1, 10000),
+    limit: this.normalizePositiveNumber(query.limit, 10, 1, 100),
+  };
 
-    if (this.hasRole(user, 'ASN')) {
-      filters.createdBy = user.id;
-    } else if (this.hasRole(user, 'OPD_OPERATOR') && user.unitKerjaId) {
+  if (this.canSeeAllCases(user)) {
+    return filters;
+  }
+
+  if (this.hasRole(user, 'ASN')) {
+    filters.createdBy = user.id;
+    return filters;
+  }
+
+  if (this.hasRole(user, 'OPD_OPERATOR')) {
+    if (user.unitKerjaId) {
       filters.asnUnitKerjaId = user.unitKerjaId;
-    } else if (
-      this.hasRole(user, 'OPD_OPERATOR') &&
-      !this.canSeeAllCases(user)
-    ) {
+    } else {
       filters.createdBy = user.id;
     }
 
     return filters;
   }
+
+  if (this.hasAnyRole(user, STAFF_ROLES)) {
+    filters.assignedTaskUserId = user.id;
+    return filters;
+  }
+
+  filters.createdBy = user.id;
+  return filters;
+}
 
   private normalizeTaskFilters(
     query: TaskListQueryDto,

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Send, UploadCloud } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -11,11 +11,13 @@ import {
 } from '@/components/workspace/ui';
 import { ApiError } from '@/lib/api/client';
 import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
+import { getRequiredDocumentOptions } from '@/lib/opd-document-catalog';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdUploadGuidanceCard } from '@/components/workspace/opd/opd-upload-guidance-card';
 import type { OpdSubmission } from '@/lib/opd-submissions/types';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 const ALLOWED_FILE_TYPES = [
   'application/pdf',
   'image/jpeg',
@@ -27,6 +29,7 @@ const ALLOWED_FILE_TYPES = [
 export function OpdDocumentUploadPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const [submissionId, setSubmissionId] = useState(
     searchParams.get('submissionId') ?? '',
   );
@@ -38,6 +41,16 @@ export function OpdDocumentUploadPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
+  const selectedSubmission = useMemo(
+    () => submissions.find((submission) => submission.id === submissionId),
+    [submissionId, submissions],
+  );
+
+  const documentOptions = useMemo(
+    () => getRequiredDocumentOptions(selectedSubmission?.serviceType),
+    [selectedSubmission?.serviceType],
+  );
 
   useEffect(() => {
     let active = true;
@@ -64,11 +77,76 @@ export function OpdDocumentUploadPage() {
     };
   }, []);
 
+  useEffect(() => {
+    setDocumentType('');
+    setTitle('');
+    setNote('');
+    setFile(null);
+    setSuccess('');
+    setError('');
+  }, [submissionId]);
+
+  useEffect(() => {
+    if (!documentType) {
+      return;
+    }
+
+    const selectedDocument = documentOptions.find(
+      (item) => item.value === documentType,
+    );
+
+    if (selectedDocument && !title.trim()) {
+      setTitle(selectedDocument.label);
+    }
+  }, [documentOptions, documentType, title]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setSuccess('');
     setError('');
+
+    if (!submissionId) {
+      setError('Pengajuan OPD wajib dipilih.');
+      setSaving(false);
+      return;
+    }
+
+    if (!selectedSubmission) {
+      setError('Data pengajuan OPD tidak ditemukan.');
+      setSaving(false);
+      return;
+    }
+
+    if (!documentType) {
+      setError('Jenis dokumen syarat wajib dipilih.');
+      setSaving(false);
+      return;
+    }
+
+    if (documentOptions.length === 0) {
+      setError(
+        'Jenis layanan pada pengajuan ini belum memiliki daftar dokumen syarat.',
+      );
+      setSaving(false);
+      return;
+    }
+
+    const isAllowedDocumentType = documentOptions.some(
+      (item) => item.value === documentType,
+    );
+
+    if (!isAllowedDocumentType) {
+      setError('Jenis dokumen tidak sesuai dengan jenis layanan pengajuan.');
+      setSaving(false);
+      return;
+    }
+
+    if (!title.trim()) {
+      setError('Judul dokumen wajib diisi.');
+      setSaving(false);
+      return;
+    }
 
     if (!file) {
       setError('File bukti dukung wajib dipilih.');
@@ -86,10 +164,12 @@ export function OpdDocumentUploadPage() {
     try {
       const formData = new FormData();
       formData.set('documentType', documentType);
-      formData.set('title', title);
+      formData.set('title', title.trim());
+
       if (note.trim()) {
         formData.set('note', note.trim());
       }
+
       formData.set('file', file);
 
       const updated = await opdSubmissionsApi.uploadOpdSubmissionDocumentFile(
@@ -114,7 +194,7 @@ export function OpdDocumentUploadPage() {
     <div className="space-y-5">
       <OpdPageHeader
         title="Upload Bukti Dukung"
-        description="Unggah bukti dukung OPD untuk layanan, SIPENSIUN, atau pemutakhiran SIDATA."
+        description="Unggah dokumen syarat dan bukti dukung OPD sesuai jenis layanan PPIK."
       />
 
       {success ? (
@@ -141,6 +221,7 @@ export function OpdDocumentUploadPage() {
                 <option value="" disabled>
                   Pilih pengajuan
                 </option>
+
                 {submissions.map((submission) => (
                   <option key={submission.id} value={submission.id}>
                     {submission.submissionNumber ?? 'DRAFT'} - {submission.title}
@@ -148,30 +229,50 @@ export function OpdDocumentUploadPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Kategori Dokumen">
+
+            <Field label="Jenis Dokumen Syarat">
               <select
                 className={inputClass}
                 value={documentType}
                 onChange={(event) => setDocumentType(event.target.value)}
+                disabled={!selectedSubmission || documentOptions.length === 0}
               >
                 <option value="" disabled>
-                  Pilih kategori
+                  {selectedSubmission
+                    ? 'Pilih jenis dokumen syarat'
+                    : 'Pilih pengajuan terlebih dahulu'}
                 </option>
-                <option value="LAYANAN_KEPEGAWAIAN">Layanan Kepegawaian</option>
-                <option value="SIPENSIUN">SIPENSIUN</option>
-                <option value="SIDATA_ASN">SIDATA ASN</option>
+
+                {documentOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
               </select>
             </Field>
+
             <Field label="Judul Dokumen">
               <input
                 className={inputClass}
-                placeholder="Contoh: Surat Pengantar OPD"
+                placeholder="Contoh: KTP"
                 type="text"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
             </Field>
           </div>
+
+          {selectedSubmission ? (
+            <div className="rounded-lg border border-[#b9e4d4] bg-[#f1fbf7] px-4 py-3 text-sm text-[#0f5f50]">
+              <div className="font-semibold">Jenis layanan terpilih</div>
+              <div className="mt-1">
+                {selectedSubmission.serviceType}
+                {documentOptions.length > 0
+                  ? ` — ${documentOptions.length} dokumen syarat tersedia`
+                  : ' — belum ada dokumen syarat yang dikonfigurasi'}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="File Bukti Dukung">
@@ -186,7 +287,8 @@ export function OpdDocumentUploadPage() {
                 }}
               />
             </Field>
-            <div className="lg:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:col-span-2">
               Maksimal 10 MB. Format yang diterima: PDF, JPG, PNG, DOCX, dan
               XLSX. Dokumen tidak otomatis terverifikasi setelah upload.
             </div>
@@ -205,6 +307,7 @@ export function OpdDocumentUploadPage() {
             <ActionButton icon={UploadCloud} disabled={saving} type="submit">
               Upload File
             </ActionButton>
+
             <ActionButton icon={Send} disabled={saving} variant="secondary">
               Simpan ke Pengajuan
             </ActionButton>

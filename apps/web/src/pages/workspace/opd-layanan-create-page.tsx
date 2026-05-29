@@ -14,9 +14,9 @@ import { opdSubmissionsApi } from '@/lib/api/opd-submissions';
 import { OpdPageHeader } from '@/components/workspace/opd/opd-page-header';
 import { OpdUploadGuidanceCard } from '@/components/workspace/opd/opd-upload-guidance-card';
 import {
-  LAYANAN_SERVICE_TYPE_OPTIONS,
   layananServiceTypeLabel,
 } from '@/lib/layanan/layanan-data';
+import { PPIK_SERVICE_OPTIONS } from '@/lib/opd-service-catalog';
 
 export function OpdLayananCreatePage() {
   const navigate = useNavigate();
@@ -121,11 +121,13 @@ export function OpdLayananCreatePage() {
                 <option value="" disabled>
                   Pilih jenis layanan
                 </option>
-                {LAYANAN_SERVICE_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                {PPIK_SERVICE_OPTIONS.flatMap((group) => 
+                  group.items.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))
+                )}
               </select>
             </Field>
             <Field label="Nama ASN Terkait">
