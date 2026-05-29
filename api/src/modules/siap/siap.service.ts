@@ -1144,12 +1144,16 @@ private async createTaskForTransition(
   }
 
   private canSeeAllCases(user: AuthUser) {
+    // Only SUPER_ADMIN, ADMIN_BKPSDM, KEPALA_BADAN, KABID, ANALIS_MADYA dapat melihat semua case
+    // Lower roles (ANALIS_MUDA, ANALIS_PERTAMA, PENELAAH, PPPK) hanya lihat case yang:
+    // - Ada task yang assigned ke user tersebut, atau
+    // - Dibuat oleh user tersebut
     return this.hasAnyRole(user, [
       'SUPER_ADMIN',
       'ADMIN_BKPSDM',
       'KEPALA_BADAN',
       'KABID',
-      ...STAFF_ROLES,
+      'ANALIS_MADYA',
     ]);
   }
 

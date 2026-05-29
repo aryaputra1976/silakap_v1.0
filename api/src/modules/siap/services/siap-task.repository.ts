@@ -150,7 +150,7 @@ export class SiapTaskRepository {
    * 4. Jika task sama, urutkan berdasarkan due date paling ringan
    * 5. Return user dengan beban paling ringan
    * 
-   * @param roleCode - Role code untuk filter
+   * @param roleCode - Role code untuk filter (REQUIRED - bukan optional)
    * @param excludeUserIds - Optional: user IDs yang dikecualikan
    * @returns User ID dengan beban paling ringan, atau null jika tidak ada
    */
@@ -163,6 +163,14 @@ export class SiapTaskRepository {
       where: {
         status: 'ACTIVE',
         deletedAt: null,
+        userRoles: {
+          some: {
+            role: {
+              code: roleCode,
+              isActive: true,
+            },
+          },
+        },
         ...(excludeUserIds && excludeUserIds.length > 0
           ? { id: { notIn: excludeUserIds } }
           : {}),

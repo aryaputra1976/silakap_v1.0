@@ -566,8 +566,29 @@ export class SiapRepository {
       where.status = filters.status;
     }
 
-    if (filters.createdBy) {
+    if (filters.createdBy && filters.assignedTaskUserId) {
+      // User dapat lihat case yang dibuat oleh user OR case dengan task assigned to user
+      where.OR = [
+        { createdBy: filters.createdBy },
+        {
+          tasks: {
+            some: {
+              assignedTo: filters.assignedTaskUserId,
+              deletedAt: null,
+            },
+          },
+        },
+      ];
+    } else if (filters.createdBy) {
       where.createdBy = filters.createdBy;
+    } else if (filters.assignedTaskUserId) {
+      // User dapat lihat case dengan task assigned to user
+      where.tasks = {
+        some: {
+          assignedTo: filters.assignedTaskUserId,
+          deletedAt: null,
+        },
+      };
     }
 
     if (filters.asnUnitKerjaId) {

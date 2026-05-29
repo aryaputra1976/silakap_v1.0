@@ -7,6 +7,7 @@ export type NormalizedCaseFilters = {
   status?: CaseStatus;
   createdBy?: string;
   asnUnitKerjaId?: string;
+  assignedTaskUserId?: string; // For restricted visibility: see only cases with tasks assigned to user
   page: number;
   limit: number;
 };
