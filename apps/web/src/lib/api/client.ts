@@ -27,7 +27,19 @@ function getBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1';
 }
 
+function getApiOrigin() {
+  return getBaseUrl().replace(/\/api\/v1\/?$/, '');
+}
+
 function toUrl(path: string) {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  if (path.startsWith('/api/v1')) {
+    return `${getApiOrigin()}${path}`;
+  }
+
   return `${getBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
@@ -44,7 +56,10 @@ function toQuery(params: Record<string, string | number | undefined>) {
   return serialized ? `?${serialized}` : '';
 }
 
-function appendQuery(path: string, params: Record<string, string | number | undefined>) {
+function appendQuery(
+  path: string,
+  params: Record<string, string | number | undefined>,
+) {
   const query = toQuery(params);
 
   if (!query) {
@@ -54,7 +69,7 @@ function appendQuery(path: string, params: Record<string, string | number | unde
   return path.includes('?') ? `${path}&${query.slice(1)}` : `${path}${query}`;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+function buildHeaders(init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = tokenStore.get();
 
@@ -66,12 +81,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
 
+  return headers;
+}
+
+async function requestRaw(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   let response: Response;
 
   try {
     response = await fetch(toUrl(path), {
       ...init,
-      headers,
+      headers: buildHeaders(init),
     });
   } catch {
     throw new ApiError(
@@ -85,22 +107,30 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     window.dispatchEvent(new Event('silakap:unauthorized'));
   }
 
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type') ?? '';
+
+    if (contentType.includes('application/json')) {
+      const payload = (await response.json()) as { message?: string };
+      throw new ApiError(payload.message ?? 'Request gagal', response.status);
+    }
+
+    const message = response.statusText || 'Request gagal';
+    throw new ApiError(message, response.status);
+  }
+
+  return response;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await requestRaw(path, init);
   const contentType = response.headers.get('content-type') ?? '';
 
   if (!contentType.includes('application/json')) {
-    if (!response.ok) {
-      const message = response.statusText || 'Request gagal';
-      throw new ApiError(message, response.status);
-    }
-
     return response.blob() as Promise<T>;
   }
 
   const payload = (await response.json()) as ApiEnvelope<T> | { message?: string };
-
-  if (!response.ok) {
-    throw new ApiError(payload.message ?? 'Request gagal', response.status);
-  }
 
   if ('data' in payload) {
     return payload.data;
@@ -123,7 +153,10 @@ function triggerBrowserDownload(blob: Blob, fileName: string) {
 }
 
 export const apiClient = {
-  get<T>(path: string, params: Record<string, string | number | undefined> = {}) {
+  get<T>(
+    path: string,
+    params: Record<string, string | number | undefined> = {},
+  ) {
     return request<T>(`${path}${toQuery(params)}`);
   },
 
@@ -154,12 +187,29 @@ export const apiClient = {
     });
   },
 
+  raw(path: string, init: RequestInit = {}) {
+    return requestRaw(path, init);
+  },
+
+  async blob(path: string, init: RequestInit = {}) {
+    const response = await requestRaw(path, init);
+    return response.blob();
+  },
+
   async download(
     path: string,
     fileName: string,
     params: Record<string, string | number | undefined> = {},
   ) {
     const blob = await request<Blob>(appendQuery(path, params), {
+      method: 'GET',
+    });
+
+    triggerBrowserDownload(blob, fileName);
+  },
+
+  async downloadBlob(path: string, fileName: string) {
+    const blob = await this.blob(path, {
       method: 'GET',
     });
 

@@ -5,7 +5,6 @@ import {
   Clock3,
   Download,
   FileText,
-  ImageIcon,
   Play,
   RefreshCcw,
   ShieldAlert,
@@ -185,15 +184,26 @@ export function SiapTasksPage() {
     setSearchParams(nextParams);
   }
 
-  async function mutateTask(id: string, action: 'start' | 'complete') {
+  async function mutateTask(
+    id: string,
+    action: 'start' | 'complete' | 'return',
+    note?: string,
+  ) {
     setWorkingId(id);
     setError('');
 
     try {
-      await apiClient.post(
-        `/siap/tasks/${id}/${action}`,
-        action === 'complete' ? { note: 'Selesai dari workspace' } : undefined,
-      );
+      if (action === 'start') {
+        await apiClient.post(`/siap/tasks/${id}/start`);
+      } else if (action === 'complete') {
+        const finalNote = note?.trim() || 'Verifikasi selesai dan diteruskan';
+        await apiClient.post(`/siap/tasks/${id}/complete`, { note: finalNote });
+      } else if (action === 'return') {
+        await apiClient.post(`/siap/tasks/${id}/return`, {
+          reason: note?.trim() || '',
+          targetRole: 'OPD_OPERATOR',
+        });
+      }
 
       await load();
 
@@ -483,18 +493,17 @@ export function SiapTasksPage() {
         )}
       </SectionCard>
 
-      {verifyModalOpen && selectedTask ? (
-        <VerifyTaskModal
-          detail={verificationDetail}
-          error={verificationError}
-          loading={verificationLoading}
-          selectedTask={selectedTask}
-          workingId={workingId}
-          onClose={closeVerifyModal}
-          onComplete={(taskId) => mutateTask(taskId, 'complete')}
-          onStart={(taskId) => mutateTask(taskId, 'start')}
-        />
-      ) : null}
+        {verifyModalOpen && selectedTask ? (
+          <VerifyTaskModal
+            detail={verificationDetail}
+            error={verificationError}
+            loading={verificationLoading}
+            selectedTask={selectedTask}
+            workingId={workingId}
+            onClose={closeVerifyModal}
+            onMutateTask={mutateTask}
+          />
+        ) : null}
     </div>
   );
 }
@@ -506,8 +515,7 @@ function VerifyTaskModal({
   selectedTask,
   workingId,
   onClose,
-  onComplete,
-  onStart,
+  onMutateTask,
 }: {
   detail: TaskVerificationDetail | null;
   error: string;
@@ -515,9 +523,13 @@ function VerifyTaskModal({
   selectedTask: SiapTask;
   workingId: string;
   onClose: () => void;
-  onComplete: (taskId: string) => void;
-  onStart: (taskId: string) => void;
+  onMutateTask: (id: string, action: 'start' | 'complete' | 'return', note?: string) => void;
 }) {
+  const [verificationNote, setVerificationNote] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  const currentStatus = detail?.task.status ?? selectedTask.status;
+
   const caseNumber =
     detail?.case?.caseNumber ?? selectedTask.case?.caseNumber ?? '-';
 
@@ -533,33 +545,82 @@ function VerifyTaskModal({
   const serviceType =
     detail?.submission?.serviceType ?? detail?.case?.serviceType ?? '-';
 
-  const description =
-    detail?.submission?.description ?? detail?.case?.description ?? '-';
-
   const documents = detail?.documents ?? [];
+
+  function handleComplete() {
+    onMutateTask(selectedTask.id, 'complete', verificationNote);
+  }
+
+  function handleReturn() {
+    if (!verificationNote.trim()) {
+      setActionError('Catatan wajib diisi untuk mengembalikan berkas.');
+      return;
+    }
+    setActionError('');
+    onMutateTask(selectedTask.id, 'return', verificationNote);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="relative max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-start justify-between border-b border-zinc-200 px-6 py-5">
-          <div>
-            <h2 className="text-2xl font-bold text-zinc-950">
-              Verifikasi Tugas
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {caseNumber} — {serviceType}
-            </p>
-          </div>
+<div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-6 py-5">
+  <div>
+    <h2 className="text-2xl font-bold text-zinc-950">
+      Verifikasi Tugas
+    </h2>
+    <p className="mt-1 text-sm text-muted-foreground">
+      {caseNumber} — {serviceType}
+    </p>
+  </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
-            aria-label="Tutup"
-          >
-            <X className="size-6" />
-          </button>
-        </div>
+  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+    {currentStatus === 'ASSIGNED' ? (
+      <ActionButton
+        disabled={workingId === selectedTask.id}
+        icon={Play}
+        onClick={() => onMutateTask(selectedTask.id, 'start')}
+        variant="secondary"
+      >
+        Mulai
+      </ActionButton>
+    ) : null}
+
+    {currentStatus === 'IN_PROGRESS' ? (
+      <>
+        <ActionButton
+          disabled={workingId === selectedTask.id}
+          icon={CheckCircle2}
+          onClick={handleComplete}
+          variant="secondary"
+        >
+          Setujui / Teruskan
+        </ActionButton>
+
+        <ActionButton
+          disabled={workingId === selectedTask.id}
+          icon={FileText}
+          onClick={handleReturn}
+          variant="secondary"
+        >
+          Kembalikan Berkas
+        </ActionButton>
+      </>
+    ) : null}
+
+    <ActionButton onClick={onClose} variant="secondary">
+      Tutup
+    </ActionButton>
+
+    <button
+      type="button"
+      onClick={onClose}
+      className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+      aria-label="Tutup"
+    >
+      <X className="size-6" />
+    </button>
+  </div>
+</div>
 
         <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
           {error ? (
@@ -571,14 +632,14 @@ function VerifyTaskModal({
           {loading ? (
             <LoadingState label="Memuat data verifikasi dan dokumen" />
           ) : (
-            <div className="grid gap-5 lg:grid-cols-[0.9fr_1.4fr]">
-              <section className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-[380px_1fr]">
+              <section className="space-y-4 lg:sticky lg:top-4 lg:self-start">
                 <div className="rounded-xl border border-zinc-200 p-4">
                   <h3 className="font-semibold text-zinc-950">
                     Data Pengajuan
                   </h3>
 
-                  <div className="mt-4 grid gap-4 text-sm">
+                  <div className="mt-4 grid gap-3 text-sm">
                     <InfoItem label="Nomor Kasus" value={caseNumber} />
                     <InfoItem label="Jenis Layanan" value={serviceType} />
                     <InfoItem label="ASN / Subjek" value={asnName} />
@@ -594,8 +655,8 @@ function VerifyTaskModal({
                       </p>
                       <div className="mt-1">
                         <StatusBadge
-                          value={taskStatusLabel(selectedTask.status)}
-                          tone={taskStatusTone(selectedTask.status)}
+                          value={taskStatusLabel(currentStatus)}
+                          tone={taskStatusTone(currentStatus)}
                         />
                       </div>
                     </div>
@@ -603,41 +664,29 @@ function VerifyTaskModal({
                       label="Batas Waktu"
                       value={formatDate(selectedTask.dueDate)}
                     />
-                    <InfoItem label="Uraian" value={description} />
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-zinc-200 p-4">
                   <h3 className="font-semibold text-zinc-950">
-                    Aksi Verifikasi
+                    Catatan Verifikasi
                   </h3>
+                  
+                  {actionError ? (
+                    <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                      {actionError}
+                    </div>
+                  ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {selectedTask.status === 'ASSIGNED' ? (
-                      <ActionButton
-                        disabled={workingId === selectedTask.id}
-                        icon={Play}
-                        onClick={() => onStart(selectedTask.id)}
-                        variant="secondary"
-                      >
-                        Mulai
-                      </ActionButton>
-                    ) : null}
-
-                    {selectedTask.status === 'IN_PROGRESS' ? (
-                      <ActionButton
-                        disabled={workingId === selectedTask.id}
-                        icon={CheckCircle2}
-                        onClick={() => onComplete(selectedTask.id)}
-                      >
-                        Selesai
-                      </ActionButton>
-                    ) : null}
-
-                    <ActionButton onClick={onClose} variant="secondary">
-                      Tutup
-                    </ActionButton>
-                  </div>
+                  <textarea
+                    className="w-full min-h-36 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Masukkan catatan verifikasi..."
+                    value={verificationNote}
+                    onChange={(e) => {
+                      setVerificationNote(e.target.value);
+                      if (actionError) setActionError('');
+                    }}
+                  />
                 </div>
               </section>
 
@@ -693,13 +742,72 @@ function DocumentPreviewCard({
 }: {
   document: VerificationDocument;
 }) {
-  const title = document.title || document.originalFileName || document.documentType;
-  const previewUrl = document.previewUrl ?? null;
-  const downloadUrl = document.downloadUrl ?? null;
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+
+  const title =
+    document.title || document.originalFileName || document.documentType;
+
+  const downloadUrl = document.downloadUrl ?? document.previewUrl ?? null;
   const mimeType = document.mimeType ?? '';
 
   const isPdf = mimeType === 'application/pdf';
   const isImage = mimeType.startsWith('image/');
+  const canPreview = Boolean(downloadUrl) && (isPdf || isImage);
+
+  useEffect(() => {
+    let active = true;
+    let createdUrl: string | null = null;
+
+    async function loadPreview() {
+      if (!downloadUrl || !canPreview) {
+        return;
+      }
+
+      setLoadingPreview(true);
+      setPreviewError('');
+
+      try {
+        const response = await apiClient.raw(downloadUrl, {
+          method: 'GET',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gagal memuat dokumen (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        createdUrl = URL.createObjectURL(blob);
+
+        if (active) {
+          setObjectUrl(createdUrl);
+        }
+      } catch (caught) {
+        if (active) {
+          setPreviewError(
+            caught instanceof Error
+              ? caught.message
+              : 'Gagal memuat preview dokumen',
+          );
+        }
+      } finally {
+        if (active) {
+          setLoadingPreview(false);
+        }
+      }
+    }
+
+    void loadPreview();
+
+    return () => {
+      active = false;
+
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [downloadUrl, canPreview]);
 
   return (
     <article className="overflow-hidden rounded-xl border border-zinc-200">
@@ -712,52 +820,65 @@ function DocumentPreviewCard({
         </div>
 
         {downloadUrl ? (
-          <a
+          <button
+            type="button"
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-            href={downloadUrl}
-            rel="noreferrer"
-            target="_blank"
+            onClick={async () => {
+              const response = await apiClient.raw(downloadUrl, {
+                method: 'GET',
+              });
+
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+
+              const link = window.document.createElement('a');
+              link.href = url;
+              link.download = document.originalFileName ?? title;
+              link.click();
+
+              URL.revokeObjectURL(url);
+            }}
           >
             <Download className="size-4" />
             Download
-          </a>
+          </button>
         ) : null}
       </div>
 
       <div className="bg-white p-4">
-        {previewUrl && isPdf ? (
+        {loadingPreview ? (
+          <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-sm text-zinc-600">
+            Memuat preview dokumen...
+          </div>
+        ) : null}
+
+        {previewError ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            {previewError}
+          </div>
+        ) : null}
+
+        {!loadingPreview && !previewError && objectUrl && isPdf ? (
           <iframe
             className="h-[520px] w-full rounded-lg border border-zinc-200"
-            src={previewUrl}
+            src={objectUrl}
             title={title}
           />
         ) : null}
 
-        {previewUrl && isImage ? (
+        {!loadingPreview && !previewError && objectUrl && isImage ? (
           <img
             alt={title}
             className="max-h-[520px] w-full rounded-lg border border-zinc-200 object-contain"
-            src={previewUrl}
+            src={objectUrl}
           />
         ) : null}
 
-        {!previewUrl ? (
+        {!loadingPreview && !previewError && !objectUrl ? (
           <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-sm text-zinc-600">
             <FileText className="mb-2 size-8 text-zinc-400" />
             <div className="font-medium text-zinc-800">
               Preview belum tersedia
-            </div>
-            <div className="mt-1">
-              Backend belum mengirim previewUrl/downloadUrl untuk dokumen ini.
-            </div>
-          </div>
-        ) : null}
-
-        {previewUrl && !isPdf && !isImage ? (
-          <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-sm text-zinc-600">
-            <ImageIcon className="mb-2 size-8 text-zinc-400" />
-            <div className="font-medium text-zinc-800">
-              Format ini tidak bisa dipreview langsung
             </div>
             <div className="mt-1">
               Gunakan tombol download untuk membuka dokumen.
